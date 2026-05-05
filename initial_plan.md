@@ -41,6 +41,41 @@ Waunder/
 - Support manual job/link entry later as a fallback.
 - Avoid broad scraping as the first ingestion path.
 
+### Application Route Resolution
+
+Waunder should separate where a job was discovered from where the application should actually be submitted. Discovery may come from LinkedIn, Glassdoor, Indeed, email alerts, or manual saves, but application should prefer canonical employer or ATS routes when available.
+
+For each job, Waunder should attempt to store:
+
+- Source URL where the job was found.
+- Canonical job posting URL.
+- Application URL.
+- Application route type.
+- Recommended route.
+- Route confidence.
+
+Preferred application route order:
+
+1. Direct ATS/company application URL.
+2. Company careers page.
+3. Job-board external apply URL.
+4. LinkedIn Easy Apply, Indeed Apply, or Glassdoor Apply.
+5. Manual apply only.
+
+Initial route types:
+
+- `company_careers`
+- `greenhouse`
+- `lever`
+- `ashby`
+- `workday`
+- `linkedin_easy_apply`
+- `indeed_apply`
+- `glassdoor_apply`
+- `unknown`
+
+If a job is discovered on a job board but links to a real employer ATS, Waunder should recommend the ATS route. For example, a Glassdoor posting that ultimately links to Greenhouse should be treated as a Glassdoor discovery source with Greenhouse as the preferred application route.
+
 ### Job Scoring and Summaries
 
 Use OpenRouter-backed LLM calls to generate:
@@ -161,6 +196,7 @@ Suggested starting resources:
 - `Profile`
 - `ResumeDocument`
 - `JobPost`
+- `ApplicationRoute`
 - `Company`
 - `ContactCandidate`
 - `Application`
@@ -175,6 +211,7 @@ Initial background job types:
 
 - Parse inbound job alert email.
 - Normalize job data.
+- Resolve canonical application route.
 - Generate LLM summary and match score.
 - Generate application draft/autofill payload.
 - Generate outreach draft.
@@ -223,3 +260,4 @@ End-to-end MVP scenario:
 - Trusted submit is allowed only after explicit approval and only for supported flows.
 - LinkedIn outreach is opened/presented for manual sending, not automatically sent.
 - Broad scraping is out of scope for the first ingestion path.
+- Employer/ATS application routes should be preferred over job-board account automation whenever they can be found.
