@@ -76,6 +76,19 @@ Initial route types:
 
 If a job is discovered on a job board but links to a real employer ATS, Waunder should recommend the ATS route. For example, a Glassdoor posting that ultimately links to Greenhouse should be treated as a Glassdoor discovery source with Greenhouse as the preferred application route.
 
+### Scripted Automation
+
+Where input formats are predictable, prefer deterministic scripts over LLM calls to reduce cost and improve reliability.
+
+Obvious candidates:
+- ATS route detection from URL patterns (Greenhouse, Lever, Ashby, Workday all have recognizable signatures).
+- ATS detection from careers page content (known JS bundles, iframes, form attributes).
+- Form fill logic for supported ATS platforms — scripts handle navigation, LLM generates the payload content.
+- Job alert email parsing for known senders (LinkedIn, Indeed, Glassdoor have stable HTML formats).
+- Application route preference ranking (pure logic from the priority list above).
+
+Fall back to LLM when no pattern matches or the format is novel or unstructured.
+
 ### Job Scoring and Summaries
 
 Use OpenRouter-backed LLM calls to generate:
