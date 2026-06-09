@@ -52,6 +52,9 @@ Be honest about the current state — most of the suite is still to be written.
 - **api/** — `spec/models/company_spec.rb`, `spec/models/job_post_spec.rb`, and
   `spec/models/application_route_spec.rb`: model specs for the core job-posting associations,
   validations, route-type allowlist, and score/confidence bounds.
+- **api/** — `spec/models/application_spec.rb`, `spec/models/application_draft_spec.rb`, and
+  `spec/models/audit_event_spec.rb`: model specs for the application lifecycle, draft JSON
+  payload shape, audit payload shape, and associations.
 - **workers/** — `src/safety.test.ts`: unit tests for sensitive-field detection
   (`isSensitiveField`) and answer partitioning (`partitionBySensitivity`).
 - **web/** — **no tests yet.**
@@ -97,7 +100,10 @@ Keep this table up to date — add a row when adding a new test file.
 
 | File | Domain | What It Covers |
 |---|---|---|
+| `api/spec/models/application_draft_spec.rb` | API (Rails) | application draft association plus structured-answer and autofill JSON shapes |
 | `api/spec/models/application_route_spec.rb` | API (Rails) | application route type allowlist and confidence validation |
+| `api/spec/models/application_spec.rb` | API (Rails) | application status lifecycle validation and draft/audit associations |
+| `api/spec/models/audit_event_spec.rb` | API (Rails) | audit event application/status validation plus screenshot/log/metadata JSON shapes |
 | `api/spec/models/company_spec.rb` | API (Rails) | company name validation and job-post association |
 | `api/spec/models/job_post_spec.rb` | API (Rails) | job post company/title validations, application-route association, match-score bounds |
 | `api/spec/requests/api/auth_spec.rb` | API (Rails) | shared-secret session success/failure, protected endpoint gating, health bypass, worker bearer guard |

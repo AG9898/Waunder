@@ -299,3 +299,8 @@ printing the generated secrets.
 `railway variable set KEY --stdin --skip-deploys` fails when stdin is empty. During provisioning,
 set only populated values and explicit Railway references; leave blank optional `.env` keys unset
 until real integration secrets exist.
+
+### 2026-06-09 — Rails JSON default validations
+Rails `presence` validation treats empty JSON arrays and objects (`[]`/`{}`) as blank. For JSONB
+columns that default to empty payloads, validate the Ruby shape (`Array`/`Hash`) instead of
+requiring presence.

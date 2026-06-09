@@ -122,6 +122,9 @@ dispatch.
   directly.
 - `ApplicationRoute::ROUTE_TYPES` is the canonical route-type list. Keep the model inclusion
   validation and the database check constraint in sync whenever route types change.
+- `Application::STATUSES` is the canonical application lifecycle (`draft`, `approved`,
+  `submitted`, `paused`, `failed`). Keep the model inclusion validation and database check
+  constraints in sync whenever lifecycle values change.
 - Sensitive resume/profile fields use Active Record Encryption (`encrypts :field`) so they are
   encrypted at rest.
 - `DATABASE_URL` comes from the environment only — never hardcode connection strings.

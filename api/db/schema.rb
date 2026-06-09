@@ -10,9 +10,23 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_09_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_09_121000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "application_drafts", force: :cascade do |t|
+    t.bigint "application_id", null: false
+    t.jsonb "autofill_payload", default: {}, null: false
+    t.text "cover_letter"
+    t.datetime "created_at", null: false
+    t.text "message"
+    t.text "resume_emphasis_notes"
+    t.jsonb "structured_answers", default: [], null: false
+    t.datetime "updated_at", null: false
+    t.index ["application_id"], name: "index_application_drafts_on_application_id", unique: true
+    t.check_constraint "jsonb_typeof(autofill_payload) = 'object'::text", name: "application_drafts_autofill_payload_json_object"
+    t.check_constraint "jsonb_typeof(structured_answers) = 'array'::text", name: "application_drafts_structured_answers_json_array"
+  end
 
   create_table "application_routes", force: :cascade do |t|
     t.string "application_url"
@@ -27,6 +41,38 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_09_120000) do
     t.index ["job_post_id"], name: "index_application_routes_on_job_post_id", unique: true
     t.check_constraint "route_confidence IS NULL OR route_confidence >= 0::numeric AND route_confidence <= 1::numeric", name: "application_routes_route_confidence_range"
     t.check_constraint "route_type::text = ANY (ARRAY['company_careers'::character varying, 'greenhouse'::character varying, 'lever'::character varying, 'ashby'::character varying, 'workday'::character varying, 'linkedin_easy_apply'::character varying, 'indeed_apply'::character varying, 'glassdoor_apply'::character varying, 'unknown'::character varying]::text[])", name: "application_routes_route_type_check"
+  end
+
+  create_table "applications", force: :cascade do |t|
+    t.datetime "approved_at"
+    t.datetime "created_at", null: false
+    t.text "failure_reason"
+    t.bigint "job_post_id", null: false
+    t.string "status", default: "draft", null: false
+    t.datetime "submitted_at"
+    t.datetime "updated_at", null: false
+    t.index ["job_post_id"], name: "index_applications_on_job_post_id"
+    t.index ["status"], name: "index_applications_on_status"
+    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying, 'approved'::character varying, 'submitted'::character varying, 'paused'::character varying, 'failed'::character varying]::text[])", name: "applications_status_check"
+  end
+
+  create_table "audit_events", force: :cascade do |t|
+    t.bigint "application_id", null: false
+    t.datetime "created_at", null: false
+    t.string "event_type", default: "status_change", null: false
+    t.jsonb "logs", default: [], null: false
+    t.jsonb "metadata", default: {}, null: false
+    t.text "reason"
+    t.jsonb "screenshots", default: [], null: false
+    t.string "status", null: false
+    t.datetime "updated_at", null: false
+    t.index ["application_id"], name: "index_audit_events_on_application_id"
+    t.index ["event_type"], name: "index_audit_events_on_event_type"
+    t.index ["status"], name: "index_audit_events_on_status"
+    t.check_constraint "jsonb_typeof(logs) = 'array'::text", name: "audit_events_logs_json_array"
+    t.check_constraint "jsonb_typeof(metadata) = 'object'::text", name: "audit_events_metadata_json_object"
+    t.check_constraint "jsonb_typeof(screenshots) = 'array'::text", name: "audit_events_screenshots_json_array"
+    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying, 'approved'::character varying, 'submitted'::character varying, 'paused'::character varying, 'failed'::character varying]::text[])", name: "audit_events_status_check"
   end
 
   create_table "companies", force: :cascade do |t|
@@ -72,6 +118,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_09_120000) do
     t.check_constraint "match_score IS NULL OR match_score >= 0 AND match_score <= 100", name: "job_posts_match_score_range"
   end
 
+  add_foreign_key "application_drafts", "applications"
   add_foreign_key "application_routes", "job_posts"
+  add_foreign_key "applications", "job_posts"
+  add_foreign_key "audit_events", "applications"
   add_foreign_key "job_posts", "companies"
 end

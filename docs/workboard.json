@@ -129,7 +129,7 @@
       "id": "DATA-02",
       "title": "Application, ApplicationDraft, AuditEvent schema and models",
       "description": "Migrations and models for Application (belongs_to JobPost; status lifecycle such as draft/approved/submitted/paused/failed), ApplicationDraft (tailored resume emphasis notes, cover letter/message, structured answers, and an autofill payload JSON column), and AuditEvent (auditable record of submit attempts/status with references to screenshots and logs). Enforce foreign keys at the database level.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "DATA",
       "depends_on": [
