@@ -37,7 +37,7 @@
       "id": "INFRA-02",
       "title": "Provision Railway project, services, and Postgres via CLI",
       "description": "OWNER-AUTHORIZED infra task. Using the authenticated Railway CLI, create the Waunder project (railway init), add three services (web, api, worker) and a managed PostgreSQL plugin, and push environment variables from the local .env files via railway variables --set for each service, reading values from .env WITHOUT echoing them. Wire API_INTERNAL_URL (api private-network URL) on web and worker, and set an identical WORKER_SERVICE_TOKEN on api and worker. Do NOT build/deploy images and do NOT run production migrations in this task.",
-      "status": "todo",
+      "status": "done",
       "priority": "critical",
       "group_id": "INFRA",
       "depends_on": [

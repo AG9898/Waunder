@@ -104,3 +104,15 @@ There is no staging environment — only Local dev and Production (Railway).
 | `WORKER_HEADLESS` | Optional | Optional |
 | `LINKEDIN_EASY_APPLY_ENABLED` | Optional | Optional |
 | `REDIS_URL` | Optional | Optional |
+
+## Railway Production Provisioning Notes
+
+Production variables are set per Railway service with deploys skipped during provisioning. The
+`api` service uses Railway managed Postgres for `DATABASE_URL`; do not copy a local development
+database URL into production. The `web` and `worker` services use the Rails private-network URL for
+`API_INTERNAL_URL` (`http://...` over Railway private networking, not HTTPS and not a public Rails
+domain), and `WORKER_SERVICE_TOKEN` must match exactly on `api` and `worker`.
+
+Blank optional values from local `.env` files are left unset because the Railway CLI refuses empty
+stdin values. Add conditional secrets such as `OPENROUTER_API_KEY` or `RESEND_WEBHOOK_SECRET` only
+when those integrations are being enabled.

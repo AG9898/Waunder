@@ -294,3 +294,8 @@ entries.
 `deterministic_key`, and `key_derivation_salt`), not the uppercase env var names. Redirect the
 command to a private temp file and map those keys into `ACTIVE_RECORD_ENCRYPTION_*` values without
 printing the generated secrets.
+
+### 2026-06-09 — Railway blank variable writes
+`railway variable set KEY --stdin --skip-deploys` fails when stdin is empty. During provisioning,
+set only populated values and explicit Railway references; leave blank optional `.env` keys unset
+until real integration secrets exist.
