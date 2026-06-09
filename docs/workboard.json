@@ -66,7 +66,7 @@
       "id": "AUTH-01",
       "title": "Shared-secret session and worker bearer auth in Api::BaseController",
       "description": "Implement RESOLVED-14. Add POST /api/session that compares the posted passphrase to APP_SHARED_SECRET and on match sets a signed, HTTP-only session cookie (signed with SESSION_SECRET); add DELETE /api/session to clear it. Add a before_action in Api::BaseController enforcing a valid session on all /api endpoints except health. Add a separate worker-auth guard that authenticates Authorization: Bearer <WORKER_SERVICE_TOKEN> for worker-facing endpoints. Return the consistent JSON error shape on auth failure. Read all secrets from env only.",
-      "status": "todo",
+      "status": "done",
       "priority": "critical",
       "group_id": "AUTH",
       "depends_on": [

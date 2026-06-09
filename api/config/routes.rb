@@ -8,6 +8,7 @@ Rails.application.routes.draw do
   # Application API. All client-facing endpoints live under /api.
   namespace :api do
     get "health", to: "health#show"
+    resource :session, only: %i[create destroy]
   end
 
   # Defines the root path route ("/")

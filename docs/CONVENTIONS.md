@@ -107,7 +107,8 @@ dispatch.
 
 - API-only app: controllers render JSON. Keep controllers thin — no business logic in
   controllers; delegate to models and service objects.
-- Validate request input and return a consistent JSON error shape via `Api::BaseController`.
+- Validate request input and return the consistent JSON error shape via `Api::BaseController`:
+  `{ "error": { "code": "...", "message": "..." } }`.
 
 ### Auth
 

@@ -2,12 +2,14 @@ module Api
   # Lightweight JSON health check for the API service. Reports app liveness
   # and database connectivity. Distinct from Rails' "/up" boot check.
   class HealthController < BaseController
+    skip_before_action :authenticate_session!
+
     def show
       render json: {
         status: "ok",
         service: "waunder-api",
         database: database_status,
-        time: Time.current.iso8601,
+        time: Time.current.iso8601
       }
     end
 

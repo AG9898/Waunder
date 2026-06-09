@@ -47,6 +47,8 @@ Be honest about the current state — most of the suite is still to be written.
 - **api/** — `spec/requests/api/health_spec.rb`: a request spec for `GET /api/health` asserting
   HTTP 200, the JSON shape (`status: "ok"`, `service: "waunder-api"`), and database connectivity
   (`database: "connected"`).
+- **api/** — `spec/requests/api/auth_spec.rb`: request specs for `POST /api/session`,
+  protected endpoint gating, health bypass, and the worker bearer guard.
 - **workers/** — `src/safety.test.ts`: unit tests for sensitive-field detection
   (`isSensitiveField`) and answer partitioning (`partitionBySensitivity`).
 - **web/** — **no tests yet.**
@@ -92,6 +94,7 @@ Keep this table up to date — add a row when adding a new test file.
 
 | File | Domain | What It Covers |
 |---|---|---|
+| `api/spec/requests/api/auth_spec.rb` | API (Rails) | shared-secret session success/failure, protected endpoint gating, health bypass, worker bearer guard |
 | `api/spec/requests/api/health_spec.rb` | API (Rails) | `GET /api/health` — 200 status, JSON shape, database connectivity |
 | `workers/src/safety.test.ts` | Worker safety | `isSensitiveField` detection + `partitionBySensitivity` splitting of answers |
 
