@@ -120,6 +120,8 @@ dispatch.
 
 - Schema changes go through Rails migrations **only** — never `ALTER TABLE` or modify the schema
   directly.
+- `ApplicationRoute::ROUTE_TYPES` is the canonical route-type list. Keep the model inclusion
+  validation and the database check constraint in sync whenever route types change.
 - Sensitive resume/profile fields use Active Record Encryption (`encrypts :field`) so they are
   encrypted at rest.
 - `DATABASE_URL` comes from the environment only — never hardcode connection strings.

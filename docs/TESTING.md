@@ -49,6 +49,9 @@ Be honest about the current state — most of the suite is still to be written.
   (`database: "connected"`).
 - **api/** — `spec/requests/api/auth_spec.rb`: request specs for `POST /api/session`,
   protected endpoint gating, health bypass, and the worker bearer guard.
+- **api/** — `spec/models/company_spec.rb`, `spec/models/job_post_spec.rb`, and
+  `spec/models/application_route_spec.rb`: model specs for the core job-posting associations,
+  validations, route-type allowlist, and score/confidence bounds.
 - **workers/** — `src/safety.test.ts`: unit tests for sensitive-field detection
   (`isSensitiveField`) and answer partitioning (`partitionBySensitivity`).
 - **web/** — **no tests yet.**
@@ -82,7 +85,7 @@ Be honest about the current state — most of the suite is still to be written.
 ### Not covered yet
 
 - Any `web/` (Go) tests at all.
-- Rails model/webhook/job/dispatch specs (only the health request spec exists).
+- Rails webhook/job/dispatch specs.
 - Playwright ATS handler and pause/fail tests (only pure safety-helper unit tests exist).
 - The full end-to-end MVP integration scenario (see below).
 
@@ -94,6 +97,9 @@ Keep this table up to date — add a row when adding a new test file.
 
 | File | Domain | What It Covers |
 |---|---|---|
+| `api/spec/models/application_route_spec.rb` | API (Rails) | application route type allowlist and confidence validation |
+| `api/spec/models/company_spec.rb` | API (Rails) | company name validation and job-post association |
+| `api/spec/models/job_post_spec.rb` | API (Rails) | job post company/title validations, application-route association, match-score bounds |
 | `api/spec/requests/api/auth_spec.rb` | API (Rails) | shared-secret session success/failure, protected endpoint gating, health bypass, worker bearer guard |
 | `api/spec/requests/api/health_spec.rb` | API (Rails) | `GET /api/health` — 200 status, JSON shape, database connectivity |
 | `workers/src/safety.test.ts` | Worker safety | `isSensitiveField` detection + `partitionBySensitivity` splitting of answers |

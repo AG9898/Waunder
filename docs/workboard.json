@@ -99,7 +99,7 @@
       "id": "DATA-01",
       "title": "JobPost, Company, ApplicationRoute schema and models",
       "description": "Migrations and models for Company, JobPost, and ApplicationRoute. ApplicationRoute stores source URL, canonical posting URL, application URL, a route_type enum (company_careers, greenhouse, lever, ashby, workday, linkedin_easy_apply, indeed_apply, glassdoor_apply, unknown), recommended route, and route confidence. JobPost holds normalized posting fields plus columns for scoring results, belongs_to Company, and has_one ApplicationRoute. Enforce foreign keys at the database level.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "DATA",
       "depends_on": [],
