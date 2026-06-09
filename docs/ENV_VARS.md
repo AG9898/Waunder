@@ -27,9 +27,13 @@ If any other doc mentions a variable, it should link here rather than restate it
 | `ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY` | Yes | none | Active Record Encryption primary key for sensitive resume/profile fields. | `api` runtime (secret) |
 | `ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY` | Yes | none | Active Record Encryption deterministic key (for queryable encrypted fields). | `api` runtime (secret) |
 | `ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT` | Yes | none | Active Record Encryption key-derivation salt. | `api` runtime (secret) |
+| `APP_SHARED_SECRET` | Yes | none | The single owner's login passphrase, exchanged at `POST /api/session` for a signed session cookie (RESOLVED-14). | `api` runtime (secret) |
+| `SESSION_SECRET` | Yes | none | Server-side key used to sign/verify the session cookie issued by `POST /api/session`. | `api` runtime (secret) |
+| `WORKER_SERVICE_TOKEN` | Yes | none | Static bearer token the `worker` presents to authenticate its task-pull/report calls to Rails (RESOLVED-14). Set identically on `api` and `worker`. | `api` + `worker` runtime (secret) |
 | `OPENROUTER_API_KEY` | Conditional | none | OpenRouter LLM gateway API key; required for scoring, summaries, and drafts. | `api` runtime (secret) |
-| `OPENROUTER_MODEL` | No | `openai/gpt-4o-mini` (configurable) | Model id used for LLM calls. Kept configurable by env per the plan; choose any OpenRouter model id. | `api` runtime |
-| `MAILGUN_WEBHOOK_SIGNING_KEY` | Conditional | none | Validates Mailgun inbound webhook signatures; required for email ingestion. | `api` runtime (secret) |
+| `OPENROUTER_MODEL` | No | `google/gemma-4-31b-it:free` | Model id used for **all** LLM calls (scoring, summaries, drafts) — single model, no per-task tiers (RESOLVED-17). Free-tier default; configurable to any OpenRouter model id. | `api` runtime |
+| `RESEND_WEBHOOK_SECRET` | Conditional | none | Svix signing secret that validates Resend inbound (`email.received`) webhook signatures at `POST /webhooks/resend/inbound`; required for email ingestion (RESOLVED-13). | `api` runtime (secret) |
+| `RESEND_INBOUND_DOMAIN` | Conditional | none | The Resend-verified receiving domain that forwarded job alerts are sent to (reference/config; e.g. `inbound.example.com`). | `api` runtime |
 | `VAPID_PUBLIC_KEY` | Conditional | none | Web Push VAPID public key. **Public by design** — sent to the browser for push subscription. | `api` runtime + exposed to the web client |
 | `VAPID_PRIVATE_KEY` | Conditional | none | Web Push VAPID private key; signs push messages. | `api` runtime (secret) |
 | `VAPID_SUBJECT` | Conditional | none | VAPID contact (`mailto:` address or URL). | `api` runtime |
@@ -42,26 +46,32 @@ If any other doc mentions a variable, it should link here rather than restate it
 
 ## Local Development Setup
 
-Recommend committing a `.env.example` with placeholder values for each service so the
-variable surface is documented without exposing secrets. Never commit a real `.env`.
+Each service has a committed `.env.example` with placeholder values for its local runtime
+variables. Copy the relevant template to `.env` for local development; never commit a real
+`.env`.
 
 **api (Rails):**
 1. Run `bin/setup` to install gems and prepare the database.
-2. Create `api/.env` (copy from `api/.env.example`) with `DATABASE_URL` and any feature keys
-   you need locally (`OPENROUTER_API_KEY`, Mailgun and VAPID keys for those flows).
-3. Provide the Active Record Encryption keys. `bin/rails db:encryption:init` generates a set
-   of `ACTIVE_RECORD_ENCRYPTION_*` values you can copy into `api/.env` (or Rails credentials).
+2. Create `api/.env` from `api/.env.example` with `DATABASE_URL`, the auth secrets
+   (`APP_SHARED_SECRET`, `SESSION_SECRET`, `WORKER_SERVICE_TOKEN`), and any feature keys you need
+   locally (`OPENROUTER_API_KEY`, `RESEND_WEBHOOK_SECRET`, and VAPID keys for those flows).
+3. Provide the Active Record Encryption keys. `bin/rails db:encryption:init` generates nested
+   `active_record_encryption` YAML values that map to the `ACTIVE_RECORD_ENCRYPTION_*`
+   environment variables in the template.
 4. Keep the local `RAILS_MASTER_KEY` in `api/config/master.key` (already gitignored).
 5. Never commit `api/.env`.
 
 **web (Go + go-app):**
-1. Build and run with `make run` (defaults to `localhost:8000`).
-2. Set `API_INTERNAL_URL` to your local Rails URL (e.g. `http://localhost:3000`) so the
+1. Create `web/.env` from `web/.env.example`.
+2. Build and run with `make run` (defaults to `localhost:8000`).
+3. Set `API_INTERNAL_URL` to your local Rails URL (e.g. `http://localhost:3000`) so the
    `/api` proxy is active. If unset, the proxy is disabled and the PWA serves standalone.
 
 **worker (Node + Playwright):**
-1. Set `API_INTERNAL_URL` to your local Rails URL so the worker can poll and report.
-2. Optionally set `WORKER_HEADLESS=false` to watch the browser, and adjust
+1. Create `workers/.env` from `workers/.env.example`.
+2. Set `API_INTERNAL_URL` to your local Rails URL so the worker can poll and report, and use the
+   same `WORKER_SERVICE_TOKEN` value as `api/.env`.
+3. Optionally set `WORKER_HEADLESS=false` to watch the browser, and adjust
    `WORKER_POLL_INTERVAL_MS` for faster local iteration.
 
 ---
@@ -80,9 +90,13 @@ There is no staging environment — only Local dev and Production (Railway).
 | `ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY` | Required | Required |
 | `ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY` | Required | Required |
 | `ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT` | Required | Required |
+| `APP_SHARED_SECRET` | Required | Required |
+| `SESSION_SECRET` | Required | Required |
+| `WORKER_SERVICE_TOKEN` | Required | Required |
 | `OPENROUTER_API_KEY` | Conditional | Conditional |
 | `OPENROUTER_MODEL` | Optional | Optional |
-| `MAILGUN_WEBHOOK_SIGNING_KEY` | Conditional | Conditional |
+| `RESEND_WEBHOOK_SECRET` | Conditional | Conditional |
+| `RESEND_INBOUND_DOMAIN` | Conditional | Conditional |
 | `VAPID_PUBLIC_KEY` | Conditional | Conditional |
 | `VAPID_PRIVATE_KEY` | Conditional | Conditional |
 | `VAPID_SUBJECT` | Conditional | Conditional |

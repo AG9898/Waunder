@@ -1,6 +1,924 @@
 {
   "$schema": "./workboard.schema.json",
   "schema_version": "1.0.0",
-  "last_updated": "2026-04-23",
-  "tasks": []
+  "last_updated": "2026-06-09",
+  "tasks": [
+    {
+      "id": "INFRA-01",
+      "title": "Generate local secrets and .env scaffolding (no echo)",
+      "description": "Create gitignored .env files for api/web/workers and committed .env.example templates (placeholders only) covering every variable in ENV_VARS.md. Generate tooling-producible secrets and write them into api/.env WITHOUT echoing values to stdout, logs, or git: Active Record Encryption keys (bin/rails db:encryption:init), a VAPID public/private keypair + VAPID_SUBJECT, SESSION_SECRET, APP_SHARED_SECRET, and WORKER_SERVICE_TOKEN (write the same WORKER_SERVICE_TOKEN into workers/.env). Externally-sourced secrets (OPENROUTER_API_KEY, RESEND_WEBHOOK_SECRET, RESEND_INBOUND_DOMAIN) are owner-provided: if already present in api/.env leave them untouched, otherwise add empty placeholder keys. Ensure every real .env is gitignored. Never print, log, or commit any secret value.",
+      "status": "done",
+      "priority": "critical",
+      "group_id": "INFRA",
+      "depends_on": [],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        ".env.example committed for api, web, and workers with every ENV_VARS.md variable as a placeholder",
+        "Gitignored api/.env, web/.env, workers/.env exist and are not tracked by git",
+        "AR encryption keys, VAPID keypair+subject, SESSION_SECRET, APP_SHARED_SECRET, WORKER_SERVICE_TOKEN populated in api/.env; identical WORKER_SERVICE_TOKEN in workers/.env",
+        "Owner-provided external secret keys (OPENROUTER_API_KEY, RESEND_WEBHOOK_SECRET, RESEND_INBOUND_DOMAIN) present, either preserved or as empty placeholders",
+        "No secret value appears in command output, logs, or git diff"
+      ],
+      "docs": [
+        "docs/ENV_VARS.md"
+      ],
+      "files": [
+        "api/.env.example",
+        "web/.env.example",
+        "workers/.env.example",
+        ".gitignore"
+      ],
+      "commands": [
+        "git status --porcelain",
+        "git check-ignore api/.env workers/.env web/.env"
+      ]
+    },
+    {
+      "id": "INFRA-02",
+      "title": "Provision Railway project, services, and Postgres via CLI",
+      "description": "OWNER-AUTHORIZED infra task. Using the authenticated Railway CLI, create the Waunder project (railway init), add three services (web, api, worker) and a managed PostgreSQL plugin, and push environment variables from the local .env files via railway variables --set for each service, reading values from .env WITHOUT echoing them. Wire API_INTERNAL_URL (api private-network URL) on web and worker, and set an identical WORKER_SERVICE_TOKEN on api and worker. Do NOT build/deploy images and do NOT run production migrations in this task.",
+      "status": "todo",
+      "priority": "critical",
+      "group_id": "INFRA",
+      "depends_on": [
+        "INFRA-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Railway project exists with web, api, worker services and a managed Postgres plugin",
+        "Per-service variables set from .env (verified by key presence via railway variables; values never printed)",
+        "API_INTERNAL_URL wired on web and worker; identical WORKER_SERVICE_TOKEN on api and worker",
+        "No secret value echoed to output; no deploy or production migration triggered"
+      ],
+      "docs": [
+        "docs/ENV_VARS.md",
+        "docs/ARCHITECTURE.md"
+      ],
+      "files": [
+        "docs/ENV_VARS.md"
+      ],
+      "commands": [
+        "railway status",
+        "railway variables"
+      ]
+    },
+    {
+      "id": "AUTH-01",
+      "title": "Shared-secret session and worker bearer auth in Api::BaseController",
+      "description": "Implement RESOLVED-14. Add POST /api/session that compares the posted passphrase to APP_SHARED_SECRET and on match sets a signed, HTTP-only session cookie (signed with SESSION_SECRET); add DELETE /api/session to clear it. Add a before_action in Api::BaseController enforcing a valid session on all /api endpoints except health. Add a separate worker-auth guard that authenticates Authorization: Bearer <WORKER_SERVICE_TOKEN> for worker-facing endpoints. Return the consistent JSON error shape on auth failure. Read all secrets from env only.",
+      "status": "todo",
+      "priority": "critical",
+      "group_id": "AUTH",
+      "depends_on": [
+        "INFRA-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "POST /api/session with correct passphrase sets a signed HTTP-only cookie and returns 200; wrong passphrase returns 401",
+        "Protected /api endpoint returns 401 without a session and 200 with one; health is reachable without a session",
+        "Worker bearer guard accepts a valid WORKER_SERVICE_TOKEN and rejects missing/invalid tokens",
+        "Request specs cover session success/failure, protected-endpoint gating, and worker bearer cases"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md",
+        "docs/DECISIONS.md"
+      ],
+      "files": [
+        "api/app/controllers/api/base_controller.rb",
+        "api/app/controllers/api/sessions_controller.rb",
+        "api/config/routes.rb",
+        "api/spec/requests/api"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "DATA-01",
+      "title": "JobPost, Company, ApplicationRoute schema and models",
+      "description": "Migrations and models for Company, JobPost, and ApplicationRoute. ApplicationRoute stores source URL, canonical posting URL, application URL, a route_type enum (company_careers, greenhouse, lever, ashby, workday, linkedin_easy_apply, indeed_apply, glassdoor_apply, unknown), recommended route, and route confidence. JobPost holds normalized posting fields plus columns for scoring results, belongs_to Company, and has_one ApplicationRoute. Enforce foreign keys at the database level.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "DATA",
+      "depends_on": [],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Migrations create companies, job_posts, and application_routes with DB-level FK constraints",
+        "route_type is constrained to the nine documented values",
+        "Models define associations and validations; bin/rails db:migrate runs clean",
+        "Model specs pass"
+      ],
+      "docs": [
+        "docs/CONVENTIONS.md"
+      ],
+      "files": [
+        "api/db/migrate",
+        "api/app/models/company.rb",
+        "api/app/models/job_post.rb",
+        "api/app/models/application_route.rb",
+        "api/spec/models"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "DATA-02",
+      "title": "Application, ApplicationDraft, AuditEvent schema and models",
+      "description": "Migrations and models for Application (belongs_to JobPost; status lifecycle such as draft/approved/submitted/paused/failed), ApplicationDraft (tailored resume emphasis notes, cover letter/message, structured answers, and an autofill payload JSON column), and AuditEvent (auditable record of submit attempts/status with references to screenshots and logs). Enforce foreign keys at the database level.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "DATA",
+      "depends_on": [
+        "DATA-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Migrations create applications, application_drafts, and audit_events with DB-level FK constraints",
+        "Application status is enum-constrained to the documented lifecycle values",
+        "Models define associations and validations; migrate runs clean",
+        "Model specs pass"
+      ],
+      "docs": [
+        "docs/CONVENTIONS.md"
+      ],
+      "files": [
+        "api/db/migrate",
+        "api/app/models/application.rb",
+        "api/app/models/application_draft.rb",
+        "api/app/models/audit_event.rb",
+        "api/spec/models"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "DATA-03",
+      "title": "Profile and ResumeDocument with encrypted sensitive fields",
+      "description": "Migrations and models for Profile (structured profile capture) and ResumeDocument (uploaded resume plus parsed structure). Sensitive resume/profile fields use Active Record Encryption (encrypts :field, deterministic where the field must remain queryable). Sensitive fields are never stored in plaintext.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "DATA",
+      "depends_on": [
+        "INFRA-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Migrations create profiles and resume_documents",
+        "Sensitive fields are encrypted at rest via Active Record Encryption",
+        "Model spec verifies ciphertext is stored in the column while the accessor returns plaintext",
+        "migrate runs clean and rubocop is clean"
+      ],
+      "docs": [
+        "docs/CONVENTIONS.md",
+        "docs/ENV_VARS.md"
+      ],
+      "files": [
+        "api/db/migrate",
+        "api/app/models/profile.rb",
+        "api/app/models/resume_document.rb",
+        "api/spec/models"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "DATA-04",
+      "title": "ContactCandidate and OutreachDraft schema and models",
+      "description": "Migrations and models for ContactCandidate (a LinkedIn contact candidate linked to a JobPost, with a relevance reason) and OutreachDraft (a tailored outreach message generated from a loose template, prefilled for manual sending only). Enforce foreign keys at the database level.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "DATA",
+      "depends_on": [
+        "DATA-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Migrations create contact_candidates and outreach_drafts with DB-level FK constraints",
+        "ContactCandidate links to a JobPost and records a relevance reason",
+        "Models define associations and validations; migrate runs clean",
+        "Model specs pass"
+      ],
+      "docs": [
+        "docs/CONVENTIONS.md"
+      ],
+      "files": [
+        "api/db/migrate",
+        "api/app/models/contact_candidate.rb",
+        "api/app/models/outreach_draft.rb",
+        "api/spec/models"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "INGEST-01",
+      "title": "Resend inbound webhook endpoint with Svix verification",
+      "description": "Add POST /webhooks/resend/inbound (outside session auth) that verifies the Svix signature (svix-id/svix-timestamp/svix-signature) against RESEND_WEBHOOK_SECRET, parses the email.received payload, persists the raw inbound email, and enqueues a solid_queue parse job. Reject invalid or missing signatures with 401. Guard live behavior behind presence of RESEND_WEBHOOK_SECRET. Log identifiers and status only, never email PII.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "INGEST",
+      "depends_on": [
+        "DATA-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Valid Svix signature returns 200 and enqueues a parse job; invalid/missing signature returns 401",
+        "Raw inbound email is persisted",
+        "Endpoint is not session-guarded (provider-signature auth only)",
+        "Request spec covers valid and invalid signatures; no PII is logged",
+        "Live-wiring (deferred to deploy): once the public URL exists, create the Resend email.received webhook via CLI profile waunder pointing at the deployed /webhooks/resend/inbound URL, capture its Svix signing secret into RESEND_WEBHOOK_SECRET (api service + api/.env, never echoed), and ensure receiving is enabled on ubcpsych.com with MX records configured"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "api/app/controllers/webhooks/resend_controller.rb",
+        "api/app/jobs",
+        "api/config/routes.rb",
+        "api/spec/requests/webhooks"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "INGEST-02",
+      "title": "Deterministic known-sender email parser to normalized JobPost",
+      "description": "Implement deterministic parsers for known job-alert senders (LinkedIn, Indeed, Glassdoor) that extract postings from a forwarded alert into normalized JobPost records (title, company, location, source URL, posting URL). Prefer deterministic parsing; when no known-sender parser matches, persist the raw content and flag it for LLM fallback (consumed by LLM scoring). Isolate parsing in a tested service object; no live external calls in tests.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "INGEST",
+      "depends_on": [
+        "INGEST-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Known-sender fixtures parse into JobPost rows with expected normalized fields",
+        "Unknown-sender input is persisted and flagged for fallback, never silently dropped",
+        "Parser is a service object covered by unit tests with no live external calls"
+      ],
+      "docs": [
+        "docs/CONVENTIONS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "api/app/services",
+        "api/app/jobs",
+        "api/spec/services"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "ROUTE-01",
+      "title": "Deterministic ATS detection and route-preference ranking",
+      "description": "Implement deterministic ApplicationRoute resolution: detect route_type from URL patterns (greenhouse/lever/ashby/workday/linkedin/indeed/glassdoor/company_careers/unknown) and rank to a recommended application route using the preference order (direct ATS/company application URL > company careers > job-board external apply > LinkedIn/Indeed/Glassdoor apply > manual only), recording a route confidence. Fall back to the LLM only when no pattern matches. Runs in the ingest pipeline after normalization.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "ROUTE",
+      "depends_on": [
+        "DATA-01",
+        "INGEST-02"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "URL fixtures map to the correct route_type",
+        "Recommended route follows the documented preference order and records a confidence",
+        "Resolution logic is deterministic and tested without invoking the LLM",
+        "Resolution runs in the pipeline after JobPost normalization"
+      ],
+      "docs": [
+        "docs/CONVENTIONS.md",
+        "docs/ARCHITECTURE.md"
+      ],
+      "files": [
+        "api/app/services",
+        "api/app/models/application_route.rb",
+        "api/spec/services"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "MANUAL-01",
+      "title": "Manual job/link entry endpoint",
+      "description": "Add an authenticated POST /api/job_posts accepting a URL and/or pasted text (RESOLVED-16), creating a JobPost and running it through the same normalize -> route-resolve -> score pipeline as email ingestion. Session-guarded; consistent JSON error shape on invalid input.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "MANUAL",
+      "depends_on": [
+        "AUTH-01",
+        "ROUTE-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Authenticated POST creates a JobPost and enqueues the normalize/route/score pipeline",
+        "Unauthenticated request returns 401",
+        "Invalid input returns the consistent JSON error shape",
+        "Request spec covers success and failure cases"
+      ],
+      "docs": [
+        "docs/PRD.md",
+        "docs/ARCHITECTURE.md"
+      ],
+      "files": [
+        "api/app/controllers/api/job_posts_controller.rb",
+        "api/config/routes.rb",
+        "api/spec/requests/api"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "LLM-01",
+      "title": "OpenRouter client (structured JSON, env model, key-guarded)",
+      "description": "Implement an OpenRouter client service reading OPENROUTER_API_KEY and OPENROUTER_MODEL (default google/gemma-4-31b-it:free). Request structured JSON where supported and degrade gracefully (retry / parse-fallback) given free-tier rate limits and looser schema guarantees. Raise a typed error when the API key is absent so callers can guard/skip. Isolate as a client object, never inline in controllers. Never log prompt/completion contents containing PII.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "LLM",
+      "depends_on": [
+        "INFRA-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Client builds requests using OPENROUTER_MODEL from env (default applied when unset)",
+        "Missing API key raises a typed error rather than crashing",
+        "Structured-JSON parsing with graceful fallback is covered by tests against mocked responses",
+        "No live external calls in tests; no PII logged"
+      ],
+      "docs": [
+        "docs/CONVENTIONS.md",
+        "docs/ENV_VARS.md",
+        "docs/DECISIONS.md"
+      ],
+      "files": [
+        "api/app/services",
+        "api/spec/services"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "LLM-02",
+      "title": "Job scoring and summary background job",
+      "description": "solid_queue job that scores a normalized JobPost via the OpenRouter client and writes structured results to the JobPost: summary, match score, relevant requirements, missing/weak requirements, resume alignment notes, suggested application strategy, and red flags. Also serves as the LLM fallback for postings the deterministic parser flagged. Skips gracefully (marks skipped, no error) when no API key is configured.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "LLM",
+      "depends_on": [
+        "LLM-01",
+        "DATA-01",
+        "INGEST-02"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Job populates the scoring/summary fields on JobPost from mocked LLM JSON",
+        "Parser-flagged fallback postings are scored through the same job",
+        "With no API key the job no-ops/marks skipped without raising",
+        "Job spec uses a mocked OpenRouter client; no PII logged"
+      ],
+      "docs": [
+        "docs/CONVENTIONS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "api/app/jobs",
+        "api/app/services",
+        "api/spec/jobs"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "LLM-03",
+      "title": "Application draft and autofill payload generation",
+      "description": "solid_queue job/service generating an ApplicationDraft for a JobPost + Profile: tailored resume emphasis notes, a cover letter/message draft, structured application answers, and an autofill payload keyed to the resolved route's ATS shape. Uses encrypted Profile/ResumeDocument data and never logs PII. Skips gracefully when no API key is configured.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "LLM",
+      "depends_on": [
+        "LLM-01",
+        "DATA-02",
+        "DATA-03",
+        "ROUTE-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Produces an ApplicationDraft with an autofill payload matching the resolved route's ATS shape",
+        "Draft generation incorporates Profile/ResumeDocument data",
+        "With no API key the job skips gracefully without raising",
+        "Spec uses a mocked LLM client; no PII logged"
+      ],
+      "docs": [
+        "docs/CONVENTIONS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "api/app/jobs",
+        "api/app/services",
+        "api/spec/jobs"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "PROFILE-01",
+      "title": "Resume upload and structured profile API",
+      "description": "Authenticated endpoints to upload a resume (stored as ResumeDocument with sensitive fields encrypted) and to read/update the structured Profile. Session-guarded; consistent JSON shapes; sensitive data never stored in plaintext and never logged.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "PROFILE",
+      "depends_on": [
+        "DATA-03",
+        "AUTH-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Authenticated resume upload stores a ResumeDocument with encrypted sensitive fields",
+        "Profile GET and PATCH read/update the structured profile",
+        "Unauthenticated requests return 401",
+        "Request specs cover success, auth failure, and encrypted-at-rest storage"
+      ],
+      "docs": [
+        "docs/CONVENTIONS.md",
+        "docs/ARCHITECTURE.md"
+      ],
+      "files": [
+        "api/app/controllers/api/profile_controller.rb",
+        "api/app/controllers/api/resume_documents_controller.rb",
+        "api/config/routes.rb",
+        "api/spec/requests/api"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "PUSH-01",
+      "title": "PushSubscription model, subscribe endpoints, and VAPID config",
+      "description": "Migration and PushSubscription model plus authenticated endpoints to register and remove a Web Push subscription, and an endpoint exposing the public VAPID_PUBLIC_KEY to the client. Configure VAPID from env only. Subscription endpoints are session-guarded; the public-key read is available to the client as needed.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "PUSH",
+      "depends_on": [
+        "AUTH-01",
+        "INFRA-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Authenticated subscribe endpoint stores a PushSubscription for the owner; unsubscribe removes it",
+        "The public VAPID key is retrievable by the client",
+        "VAPID configuration is read from env only",
+        "Request specs cover subscribe/unsubscribe and auth gating"
+      ],
+      "docs": [
+        "docs/ENV_VARS.md",
+        "docs/ARCHITECTURE.md"
+      ],
+      "files": [
+        "api/db/migrate",
+        "api/app/models/push_subscription.rb",
+        "api/app/controllers/api/push_subscriptions_controller.rb",
+        "api/config/routes.rb",
+        "api/spec/requests/api"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "PUSH-02",
+      "title": "Daily digest builder and web-push dispatch job",
+      "description": "solid_queue job that builds the daily digest from recently scored JobPosts and dispatches a VAPID-signed Web Push notification to stored subscriptions, configured as a recurring/scheduled job. Guard live sends behind VAPID key presence. In tests, mock the push client and never send a real push.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "PUSH",
+      "depends_on": [
+        "PUSH-01",
+        "LLM-02"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Digest job selects recently scored JobPosts and calls the web-push client with VAPID",
+        "With no VAPID key or no subscriptions the job no-ops",
+        "A recurring schedule entry is configured for the daily digest",
+        "Job spec mocks web push; no real push is sent in tests"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "api/app/jobs",
+        "api/app/services",
+        "api/config/recurring.yml",
+        "api/spec/jobs"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "SUBMIT-01",
+      "title": "Approve and submit dispatch API",
+      "description": "Authenticated POST /api/applications/:id/submit that requires explicit per-application approval, verifies the target ATS is supported and the autofill payload contains no unresolved unknown/sensitive fields, enqueues a worker-dispatch job with the structured payload, and records an AuditEvent. Never dispatches without explicit approval.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "SUBMIT",
+      "depends_on": [
+        "DATA-02",
+        "LLM-03",
+        "AUTH-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Approved + supported + clean payload enqueues a worker dispatch, records an AuditEvent, and returns 200",
+        "Missing approval is refused (422); unsupported ATS is refused",
+        "Unauthenticated request returns 401",
+        "Request spec covers approval-required, unsupported-target, and auth cases; no submit occurs without approval"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md",
+        "docs/PRD.md"
+      ],
+      "files": [
+        "api/app/controllers/api/applications_controller.rb",
+        "api/app/jobs",
+        "api/config/routes.rb",
+        "api/spec/requests/api"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "SUBMIT-02",
+      "title": "Worker task pull and status-report API",
+      "description": "Worker-bearer-authenticated endpoints for the worker to pull approved submit tasks (structured payloads) and to report status, screenshots, and logs back, updating Application status and writing AuditEvents. Uses the WORKER_SERVICE_TOKEN bearer guard from AUTH-01; the human session cookie is not accepted here.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "SUBMIT",
+      "depends_on": [
+        "SUBMIT-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Worker fetches approved tasks with a valid bearer token",
+        "Report endpoint updates Application status and stores audit artifacts (screenshots/logs references)",
+        "Missing/invalid bearer returns 401; the human session cookie is rejected",
+        "Request specs cover pull and report paths"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md"
+      ],
+      "files": [
+        "api/app/controllers/api/worker_tasks_controller.rb",
+        "api/config/routes.rb",
+        "api/spec/requests/api"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "WORKER-01",
+      "title": "Worker poll loop with bearer auth and fetch/report wiring",
+      "description": "Implement the worker entrypoint poll loop (WORKER_POLL_INTERVAL_MS) that authenticates to Rails with Authorization: Bearer <WORKER_SERVICE_TOKEN>, pulls approved tasks from SUBMIT-02, dispatches them to the ATS handler registry, and reports a TaskResult (status/reason/screenshots/logs) back. Idles/exits cleanly when API_INTERNAL_URL is unset. No business logic beyond orchestration.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "WORKER",
+      "depends_on": [
+        "SUBMIT-02"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Worker polls and fetches approved tasks using the bearer token",
+        "Tasks are routed to the ATS handler registry and results reported back",
+        "Unset API_INTERNAL_URL results in a clean idle/exit, not a crash",
+        "Worker tests and typecheck pass"
+      ],
+      "docs": [
+        "docs/CONVENTIONS.md",
+        "docs/ENV_VARS.md"
+      ],
+      "files": [
+        "workers/src/index.ts",
+        "workers/src/worker.ts",
+        "workers/src/config.ts",
+        "workers/src/types.ts"
+      ],
+      "commands": [
+        "cd workers && npm test",
+        "cd workers && npm run typecheck"
+      ]
+    },
+    {
+      "id": "WORKER-02",
+      "title": "Greenhouse/Lever/Ashby ATS fill handlers via safety gating",
+      "description": "Implement per-ATS handlers for Greenhouse, Lever, and Ashby in src/ats/, each implementing the AtsHandler interface and registered in the registry. Fill forms from the backend-generated autofill payload through src/safety.ts gating; pause or fail safely on unknown or sensitive fields; capture screenshots and logs for an auditable TaskResult. Never auto-submit beyond the approved payload.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "WORKER",
+      "depends_on": [
+        "WORKER-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Handlers for greenhouse, lever, and ashby are registered and fill from the autofill payload via safety partitioning",
+        "Unknown or sensitive fields cause a pause with a reason rather than a guess",
+        "Each attempt returns a TaskResult with screenshots and logs",
+        "Playwright fixture tests plus pause/fail tests pass; typecheck clean"
+      ],
+      "docs": [
+        "docs/CONVENTIONS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "workers/src/ats",
+        "workers/src/safety.ts",
+        "workers/src/worker.ts"
+      ],
+      "commands": [
+        "cd workers && npm test",
+        "cd workers && npm run typecheck"
+      ]
+    },
+    {
+      "id": "WORKER-03",
+      "title": "LinkedIn Easy Apply handler behind feature flag",
+      "description": "Add a LinkedIn Easy Apply ATS handler gated by LINKEDIN_EASY_APPLY_ENABLED (default false) per RESOLVED-15. When the flag is off the handler is not registered/active. It enforces the same safety gating and auditable TaskResult contract as the other handlers.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "WORKER",
+      "depends_on": [
+        "WORKER-02"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Handler is inactive when LINKEDIN_EASY_APPLY_ENABLED is off and active when on",
+        "Safety gating and auditable TaskResult contract are enforced",
+        "Tests cover both flag states; typecheck clean"
+      ],
+      "docs": [
+        "docs/CONVENTIONS.md",
+        "docs/ENV_VARS.md",
+        "docs/DECISIONS.md"
+      ],
+      "files": [
+        "workers/src/ats",
+        "workers/src/config.ts"
+      ],
+      "commands": [
+        "cd workers && npm test",
+        "cd workers && npm run typecheck"
+      ]
+    },
+    {
+      "id": "CONTACT-01",
+      "title": "Contact candidates and outreach drafts API",
+      "description": "Authenticated endpoints to save ContactCandidates linked to a JobPost (with a relevance reason) and to generate OutreachDrafts from a loose template via the OpenRouter client. Outreach drafts are prefilled for manual sending only and are never auto-sent. Session-guarded.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "CONTACT",
+      "depends_on": [
+        "DATA-04",
+        "LLM-01",
+        "AUTH-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Authenticated endpoints save and list ContactCandidates for a JobPost",
+        "Outreach draft generation returns a prefilled message (mocked LLM in tests) and never sends it anywhere",
+        "Unauthenticated requests return 401",
+        "Request specs cover save, generate, and auth cases"
+      ],
+      "docs": [
+        "docs/CONVENTIONS.md",
+        "docs/PRD.md"
+      ],
+      "files": [
+        "api/app/controllers/api/contact_candidates_controller.rb",
+        "api/app/controllers/api/outreach_drafts_controller.rb",
+        "api/config/routes.rb",
+        "api/spec/requests/api"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "WEB-01",
+      "title": "PWA shell: manifest, icon, standalone, install and push-permission guide",
+      "description": "Build the installable PWA shell in go-app: web manifest, app icon, full-screen standalone display, an offline-tolerant app shell (service worker generated by go-app), and the iOS install + notification-permission guide flow (detect iOS 16.4+ and home-screen-installed state before requesting push permission). No business logic; stays same-origin via the /api proxy.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "WEB",
+      "depends_on": [],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Manifest, app icon, and full-screen standalone display are present and the service worker registers",
+        "Install/permission guide detects iOS install state and gates the push-permission request",
+        "go vet and go test pass; make wasm builds the frontend"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md"
+      ],
+      "files": [
+        "web/main.go",
+        "web/components",
+        "web/Makefile"
+      ],
+      "commands": [
+        "cd web && go test ./...",
+        "cd web && go vet ./..."
+      ]
+    },
+    {
+      "id": "WEB-02",
+      "title": "Digest, job list, and job detail views with login",
+      "description": "go-app screens for the job feed (scored jobs), job detail (summary, match score, relevant/missing requirements, red flags, resolved route), and the daily digest landing. Fetch via the /api proxy carrying the session cookie and render scored fields. Add a login screen that posts the passphrase to POST /api/session. Mock the Rails client in component tests.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "WEB",
+      "depends_on": [
+        "WEB-01",
+        "LLM-02",
+        "AUTH-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Job list and detail render scored fields from the API (mocked client in tests)",
+        "Login screen posts the passphrase to /api/session and establishes the session",
+        "Component/render tests pass with a mocked Rails client; go vet/test pass"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "web/components",
+        "web/main.go"
+      ],
+      "commands": [
+        "cd web && go test ./...",
+        "cd web && go vet ./..."
+      ]
+    },
+    {
+      "id": "WEB-03",
+      "title": "Application draft review and approve/submit UI",
+      "description": "go-app screen to review a generated ApplicationDraft (resume emphasis, cover letter, structured answers, autofill preview) and explicitly approve and submit via POST /api/applications/:id/submit. Approval is an explicit user action; surface the submit status and audit result. Mock the client in tests.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "WEB",
+      "depends_on": [
+        "WEB-02",
+        "SUBMIT-01",
+        "LLM-03"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Draft review renders the draft fields and autofill preview",
+        "Approve+submit calls the submit endpoint only on explicit user action",
+        "Submit status/audit result is surfaced; component tests pass with a mocked client; go vet/test pass"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/PRD.md"
+      ],
+      "files": [
+        "web/components",
+        "web/main.go"
+      ],
+      "commands": [
+        "cd web && go test ./...",
+        "cd web && go vet ./..."
+      ]
+    },
+    {
+      "id": "WEB-04",
+      "title": "Profile/resume upload and push subscription UI",
+      "description": "go-app screens for resume upload and structured profile editing (via PROFILE-01) and a push-subscription toggle that subscribes using the public VAPID key (via PUSH-01). Stays same-origin through the /api proxy. Mock the client and browser Push API in tests.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "WEB",
+      "depends_on": [
+        "WEB-01",
+        "PROFILE-01",
+        "PUSH-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Profile/resume form reads and writes via the API",
+        "Push toggle subscribes/unsubscribes using the public VAPID key",
+        "Component tests pass with a mocked client and mocked Push API; go vet/test pass"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "web/components",
+        "web/main.go"
+      ],
+      "commands": [
+        "cd web && go test ./...",
+        "cd web && go vet ./..."
+      ]
+    },
+    {
+      "id": "WEB-05",
+      "title": "Contacts and outreach UI (manual send/copy only)",
+      "description": "go-app screen to view ContactCandidates for a job and view/copy generated OutreachDrafts for manual sending. The UI never triggers any send action; outreach is copy/prefill only. Mock the client in tests.",
+      "status": "todo",
+      "priority": "low",
+      "group_id": "WEB",
+      "depends_on": [
+        "WEB-02",
+        "CONTACT-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Contacts and outreach drafts render from the API",
+        "Outreach is copy/manual-send only with no send action in the UI",
+        "Component tests pass with a mocked client; go vet/test pass"
+      ],
+      "docs": [
+        "docs/PRD.md",
+        "docs/CONVENTIONS.md"
+      ],
+      "files": [
+        "web/components",
+        "web/main.go"
+      ],
+      "commands": [
+        "cd web && go test ./...",
+        "cd web && go vet ./..."
+      ]
+    },
+    {
+      "id": "WEB-06",
+      "title": "Manual job entry form",
+      "description": "go-app form to add a job by URL/paste, posting to the MANUAL-01 endpoint and surfacing the resulting JobPost in the feed once processed. Mock the client in tests.",
+      "status": "todo",
+      "priority": "low",
+      "group_id": "WEB",
+      "depends_on": [
+        "WEB-02",
+        "MANUAL-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Form posts URL/text to the manual-entry endpoint",
+        "The resulting job appears in the feed after processing",
+        "Component test passes with a mocked client; go vet/test pass"
+      ],
+      "docs": [
+        "docs/PRD.md",
+        "docs/ARCHITECTURE.md"
+      ],
+      "files": [
+        "web/components",
+        "web/main.go"
+      ],
+      "commands": [
+        "cd web && go test ./...",
+        "cd web && go vet ./..."
+      ]
+    }
+  ]
 }

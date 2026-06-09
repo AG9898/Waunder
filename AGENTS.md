@@ -108,7 +108,7 @@ Docs navigation: [`docs/INDEX.md`](docs/INDEX.md)
 
 ## Architecture
 
-- Rails (`api/`) is the single source of truth: it owns all data, LLM orchestration (OpenRouter), background jobs, Mailgun inbound webhooks, web-push dispatch, and worker dispatch.
+- Rails (`api/`) is the single source of truth: it owns all data, LLM orchestration (OpenRouter), background jobs, Resend inbound webhooks, web-push dispatch, and worker dispatch.
 - The Go web server (`web/`) is app-shell + `/api` reverse proxy only. It holds no business logic and no database access.
 - The browser only ever talks to the `web` origin. `/api/*` is proxied server-side to Rails over Railway's private network — no CORS, and Rails has no public domain.
 - Database schema changes happen exclusively through Rails migrations. Never alter tables directly.
@@ -217,8 +217,8 @@ Stop and report (do not continue) when:
   and the task does not explicitly authorize it.
 - Before any real trusted-submit run that lacks explicit per-application user approval.
 - When a worker task encounters unknown or sensitive fields (legal, demographic, salary, disability, sponsorship, identity).
-- Before introducing Redis/Sidekiq (OPEN-01) or settling the single-user auth/session model (OPEN-02) without explicit owner instruction.
-- Before sending a real web-push notification, real outbound email, or incurring real LLM spend in a test context.
+- Before introducing Redis/Sidekiq (OPEN-01) without explicit owner instruction. (The auth/session model is resolved — RESOLVED-14: shared-secret session cookie + worker bearer token.)
+- Before sending a real web-push notification or incurring real LLM spend in a test context. (Waunder sends no outbound email — Resend is inbound-only.)
 
 ---
 
@@ -235,8 +235,9 @@ Stop and report (do not continue) when:
 
 Names agents commonly need (no values here): `API_INTERNAL_URL` (Rails base URL for the web
 proxy), `PORT` (web server port, default 8000), `OPENROUTER_*` (LLM gateway + `OPENROUTER_MODEL`),
-VAPID keys (web push), Active Record Encryption keys, Mailgun credentials, `DATABASE_URL`, and a
-conditional `REDIS_URL` (only if Redis/Sidekiq is ever introduced — see OPEN-01).
+VAPID keys (web push), Active Record Encryption keys, auth secrets (`APP_SHARED_SECRET`,
+`SESSION_SECRET`, `WORKER_SERVICE_TOKEN`), `RESEND_WEBHOOK_SECRET` (inbound email), `DATABASE_URL`,
+and a conditional `REDIS_URL` (only if Redis/Sidekiq is ever introduced — see OPEN-01).
 
 See [`docs/ENV_VARS.md`](docs/ENV_VARS.md) for the canonical variable and secret matrix.
 
@@ -287,3 +288,9 @@ Do not reorganize or rewrite existing entries — append only.
 Agents: append new discoveries here after each task cycle, one entry each, using the
 `### YYYY-MM-DD — <short title>` format described above. Append only; do not rewrite existing
 entries.
+
+### 2026-06-09 — Rails encryption init output
+`bin/rails db:encryption:init` emits nested `active_record_encryption` YAML keys (`primary_key`,
+`deterministic_key`, and `key_derivation_salt`), not the uppercase env var names. Redirect the
+command to a private temp file and map those keys into `ACTIVE_RECORD_ENCRYPTION_*` values without
+printing the generated secrets.

@@ -1,0 +1,10 @@
+# Local environment files
+/api/.env
+/api/.env.*
+!/api/.env.example
+/web/.env
+/web/.env.*
+!/web/.env.example
+/workers/.env
+/workers/.env.*
+!/workers/.env.example
