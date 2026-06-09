@@ -5,156 +5,202 @@
 > This is not a log — it always reflects the current standard.
 > When a new pattern is established during implementation, update this file, not a task note.
 
+Waunder is a monorepo with three stacks:
+
+- **`web/`** — Go + go-app WebAssembly PWA and a small Go app-shell/proxy server (Go 1.26).
+- **`api/`** — Ruby on Rails 8.1.3 API-only backend (Ruby 3.2.3). The single source of truth.
+- **`workers/`** — Node 22 + TypeScript (ESM) + Playwright automation worker.
+
 ---
 
 ## Universal Rules
 
 These apply across every stack in this project.
 
-- **No secrets in source.** All credentials and tokens come from environment variables only.
+- **No secrets in source.** All credentials and tokens come from environment variables only
+  (VAPID keys, OpenRouter, Mailgun, `DATABASE_URL`, `API_INTERNAL_URL`, etc.).
   See [`ENV_VARS.md`](ENV_VARS.md) for the canonical variable matrix.
-- **No PII in logs.** Never log participant identifiers, names, or other direct identifiers.
-- **No business logic in route handlers.** Route handlers call service functions; service
-  functions call domain modules or data helpers.
+- **No PII in logs.** Never log the user's personal, resume, profile, or contact data — names,
+  contact details, addresses, identifiers, resume contents, or saved contact-candidate
+  information. Never log LLM prompt or completion contents that contain any of this personal
+  data. Log identifiers and status, not payloads.
+- **No business logic outside Rails.** Rails (`api/`) is the single source of truth and owns all
+  data, LLM orchestration, route resolution, scoring, and worker dispatch. The Go web server and
+  the Playwright worker carry no business logic.
 - **No orphaned code.** Dead code is removed — not commented out, not wrapped in a flag.
-- <!-- TODO: Add universal rules specific to this project. -->
+- **Prefer deterministic scripts over the LLM** wherever the input format is predictable (ATS
+  route detection from URL patterns, known-sender email parsing, route-preference ranking).
+  Fall back to the LLM only when no pattern matches or the format is novel/unstructured.
+- **Encrypt sensitive data at rest.** Sensitive resume/profile fields use Active Record
+  Encryption (`encrypts :field`); they are never stored in plaintext.
 
 ---
 
-## <!-- TODO: Stack 1 — e.g. "Frontend (TypeScript / React / Next.js)" -->
+## Stack — web/ (Go + go-app, Go 1.26)
+
+The PWA frontend and its app-shell/proxy server. `main.go` is a dual-target program: the same
+package compiles both to WebAssembly for the browser and to a native server binary.
 
 ### Language and Types
 
-<!-- TODO: Type strictness, lint rules, and disallowed constructs.
-
-Examples:
-- TypeScript strict mode is enabled — no `any`; prefer `unknown` + type narrowing.
-- All exported functions must have explicit return types.
-- Prefer named exports over default exports for non-page modules.
-- `console.log` is banned in production paths — use the project logger.
--->
+- Idiomatic Go. Code must be `gofmt`-clean and pass `go vet` with no findings.
+- Wrap errors with context (`fmt.Errorf("...: %w", err)`); never discard an error silently.
+- No `panic` in request-handling paths — return/handle errors instead.
 
 ### Module and File Organization
 
-<!-- TODO: Where do specific types of files go?
-
-Examples:
-- Components: `src/components/<domain>/<ComponentName>.tsx`
-- Services (API wrappers): `src/services/<domain>.ts`
-- Route Handlers: `src/app/api/<path>/route.ts`
-- Tests: collocated as `<name>.test.ts` or grouped in `src/__tests__/`
-- Shared helpers: `src/lib/<concern>.ts`
--->
+- `main.go` is the single dual-target entry point. It is compiled twice:
+  - to WebAssembly: `GOOS=js GOARCH=wasm go build -o web/app.wasm .` (the browser frontend);
+  - to a native binary: `go build -o bin/server .` (the app-shell + `/api` proxy server).
+- Client-side routing registration and component wiring live above `app.RunWhenOnBrowser()`.
+- **Server-side-only code lives below `app.RunWhenOnBrowser()` in `main.go`.** On the browser,
+  go-app takes over at that call and the server code never runs; on the server it is a no-op.
+- UI components live in the `components/` package — one type per screen (e.g. `Home`), each
+  embedding `app.Compo` and implementing `Render() app.UI`.
 
 ### Naming Conventions
 
-<!-- TODO: Variable, function, file, and component naming rules.
-
-Examples:
-- React components: PascalCase (`SessionCard.tsx`)
-- Utility functions and hooks: camelCase (`useSessionState`)
-- Constants: UPPER_SNAKE_CASE
-- Filenames: kebab-case for utilities (`route-handler-auth.ts`), PascalCase for components
-- Route segments: kebab-case (`/new-session`)
--->
+- Exported component types: PascalCase (`Home`).
+- Source files: lowercase (`home.go`, `main.go`).
+- Go module path: `github.com/ag9898/waunder/web`.
 
 ### Patterns
 
-<!-- TODO: 2–4 idiomatic patterns this stack must follow.
-
-Examples:
-- API calls go through typed service wrappers — never raw `fetch` inside components.
-- Route Handlers share a server-only helper layer for auth, caching, and timeout fetches.
-  Do not re-inline those concerns per handler.
-- State management uses [Zustand / Redux / React Context — pick one and document it here].
-- All same-origin Route Handlers export `maxDuration` to match the backend timeout window.
--->
+- The Go server is an **app-shell server plus reverse proxy only** — no business logic and no
+  direct database access. It serves the app shell (compiled `app.wasm`, generated `wasm_exec.js`,
+  the web manifest, and the service worker) and proxies `/api/*` to Rails.
+- It talks to Rails **exclusively** through the `/api` reverse proxy, keeping the frontend
+  same-origin (no CORS). The Rails base URL comes from `API_INTERNAL_URL`; when unset the proxy
+  is disabled so the PWA still serves standalone in local dev.
+- Build and run through the Makefile targets: `make wasm`, `make server`, `make run`.
+- The service worker and web-push glue are JavaScript generated by go-app. Keep that JS surface
+  small and contained — do not grow hand-written JS beyond what the push/install flow needs.
 
 ---
 
-## <!-- TODO: Stack 2 — e.g. "Backend (Python / FastAPI)" -->
+## Stack — api/ (Ruby on Rails 8.1.3, API-only, Ruby 3.2.3)
+
+The backend and single source of truth. Owns all domain data, LLM orchestration, and worker
+dispatch.
+
+### Style
+
+- Follow `rubocop-rails-omakase`. Run `bin/rubocop` before committing.
+- Security scanning: `bin/brakeman` (static analysis) and `bundler-audit` (vulnerable gems).
+- `bin/ci` runs the full CI gate (style + security + tests) — green before a task is done.
 
 ### Module Structure
 
-<!-- TODO: How routers, services, and schemas are organized.
-
-Examples:
-- One router file per domain: `participants.py`, `sessions.py`, `scoring.py`
-- Register all routers in `main.py` with explicit prefixes
-- Schemas in `app/schemas/`, one file per domain, grouping `*Create` / `*Response` / `*Update`
-- Services in `app/services/`, one file per domain
-- Domain constants in `app/config.py` — never hardcode them in routers or services
--->
+- All client-facing controllers live under `app/controllers/api/` and subclass
+  `Api::BaseController`. Shared auth, error handling, and serialization live in
+  `Api::BaseController` — not duplicated per controller.
+- Routes are namespaced under `/api` in `config/routes.rb`. Inbound webhooks are namespaced
+  under `/webhooks/*` (e.g. `/webhooks/mailgun/inbound`).
+- Domain models cover the resources in the plan: `Profile`, `ResumeDocument`, `JobPost`,
+  `ApplicationRoute`, `Company`, `ContactCandidate`, `Application`, `ApplicationDraft`,
+  `OutreachDraft`, `PushSubscription`, `AuditEvent`.
+- Background work is implemented as ActiveJob jobs in `app/jobs/`, run on `solid_queue`.
+- LLM calls (OpenRouter) and all external-service calls (Mailgun, web push) are isolated in
+  service / client objects — **never inlined in controllers**.
 
 ### Types and Validation
 
-<!-- TODO: Type strictness and validation rules.
-
-Examples:
-- All path functions and Pydantic models must be fully typed.
-- Request bodies: `...Create` schema. Responses: `...Response` schema.
-- Never return SQLAlchemy ORM objects from endpoints — always serialize to `...Response`.
-- Enums for fixed-vocabulary fields (status, role, category).
--->
-
-### Scoring / Pure Modules
-
-<!-- TODO: If the project has pure computation modules, define their contract here.
-
-Example:
-- One file per instrument in `app/scoring/`: `digitspan.py`, `uls8.py`, etc.
-- Each file exposes exactly one public function: `score(raw: ...) -> ScoredResult`
-- Scoring functions are pure — no DB calls, no side effects, testable in isolation.
--->
+- API-only app: controllers render JSON. Keep controllers thin — no business logic in
+  controllers; delegate to models and service objects.
+- Validate request input and return a consistent JSON error shape via `Api::BaseController`.
 
 ### Auth
 
-<!-- TODO: How auth dependencies are structured in route handlers.
-
-Example:
-- `Depends(get_current_lab_member)` on all RA-only endpoints.
-- `Depends(get_current_admin)` on admin-only endpoints.
-- Participant endpoints: validate `session_id` existence + `status == "active"` before accepting data.
-- All Supabase Auth SDK calls isolated in `app/auth.py`.
--->
+- Single-user private app. The auth/session approach is an **open decision** — see
+  [`DECISIONS.md`](DECISIONS.md). Do not invent or hardcode an auth scheme; follow the resolved
+  decision when it lands.
 
 ### DB Access
 
-<!-- TODO: Rules for DB interactions.
+- Schema changes go through Rails migrations **only** — never `ALTER TABLE` or modify the schema
+  directly.
+- Sensitive resume/profile fields use Active Record Encryption (`encrypts :field`) so they are
+  encrypted at rest.
+- `DATABASE_URL` comes from the environment only — never hardcode connection strings.
+- Jobs, cache, and cable are database-backed: `solid_queue`, `solid_cache`, `solid_cable`.
 
-Example:
-- Alembic for all schema changes. Always review generated migration before committing.
-- `DATABASE_URL` from environment only — never hardcode connection strings.
-- FK constraints enforced at DB level, not just application level.
-- All tables get `created_at TIMESTAMPTZ DEFAULT NOW()`.
-- UUIDs generated server-side: `uuid.uuid4()`. Never trust client-generated IDs.
--->
+### Trusted-Submit Safety (Rails side)
+
+- Rails dispatches a submit task to the worker **only after explicit user approval**, and only
+  for a supported ATS where the form contains no unknown or sensitive fields requiring manual
+  review. The worker enforces the matching guard on its side (see below).
+
+---
+
+## Stack — workers/ (Node 22 + TypeScript ESM + Playwright)
+
+The Playwright automation worker. Receives approved tasks from Rails, fills supported ATS forms,
+and reports auditable results back.
+
+### Language and Types
+
+- TypeScript `strict` mode (per `tsconfig.json`, `target` ES2023, `module`/`moduleResolution`
+  NodeNext). No untyped public signatures.
+- ESM throughout: `package.json` sets `"type": "module"`. Local imports use explicit `.js`
+  import specifiers (e.g. `import { ... } from "./safety.js"`), even though the source is `.ts`.
+- Requires Node `>=22`.
+
+### Module and File Organization
+
+- `src/index.ts` — entry point (config load + poll loop).
+- `src/worker.ts` — `processTask` orchestration.
+- `src/types.ts` — shared types mirroring the Rails-approved payloads (`ApplicationTask`,
+  `FieldAnswer`, `TaskResult`, `AtsKind`, `TaskStatus`).
+- `src/safety.ts` — sensitive-field detection.
+- `src/config.ts` — environment-driven configuration.
+- `src/ats/` — one handler per ATS plus the registry (`index.ts`). Each handler implements the
+  `AtsHandler` interface (`kind`, `fill(page, task)`) and registers via `registerHandler`.
+
+### Safety Pattern (CRITICAL)
+
+- The worker must **pause or fail safely rather than guess.** It never auto-submits unknown
+  fields.
+- Sensitive categories — salary/compensation, sponsorship/visa/work authorization, disability,
+  veteran/military, gender/sex/race/ethnicity, sexual orientation, SSN/national id, and
+  DOB/age — are matched by `SENSITIVE_FIELD_PATTERNS` in `src/safety.ts`.
+- Use `isSensitiveField` and `partitionBySensitivity` to classify form fields. A sensitive field
+  is auto-filled **only** when its value was explicitly provided in the approved payload AND
+  approved upstream by the user; otherwise the worker pauses.
+
+### Result Contract
+
+- Every task returns a `TaskResult` with status `submitted | paused | failed`, a `reason`
+  (required for `paused`/`failed`), and `screenshots` + `logs` for auditability.
+
+### Scripts
+
+- `npm run dev` — `tsx watch src/index.ts`.
+- `npm run build` — `tsc`.
+- `npm run typecheck` — `tsc --noEmit`.
+- `npm test` — `node --import tsx --test src/**/*.test.ts`.
 
 ---
 
 ## Database
 
-<!-- TODO: Cross-stack DB rules.
-
-Examples:
-- Migrations only — never ALTER TABLE or DROP COLUMN directly.
-- All schema changes go through the migration tool (Alembic / Flyway / Prisma migrate).
-- FK constraints enforced at the DB level.
-- All tables have a `created_at` timestamp column with server-side default.
--->
+- **Migrations only.** All schema changes go through Rails migrations — never `ALTER TABLE` or
+  drop/alter columns directly.
+- Foreign-key constraints are enforced at the database level, not just in application code.
+- Sensitive resume/profile fields are encrypted at rest via Active Record Encryption.
+- Managed PostgreSQL on Railway; connection comes from `DATABASE_URL` in the environment.
 
 ---
 
 ## Testing
 
-<!-- TODO: Reference TESTING.md rather than restating its conventions here.
-Add only the rules that affect how code is written (not how tests are run).
+Conventions that affect how code is written:
 
-Examples:
-- Every new public service function requires a unit test.
-- Scoring tests are pure input/output — no mocks required.
-- Any route change touching auth must include an assertion in the route-topology test.
--->
+- Every new public endpoint (Rails), service/client object, go-app screen component, or ATS
+  handler needs at least one test before the task is marked done.
+- Worker safety logic is pure input/output over `isSensitiveField` / `partitionBySensitivity` —
+  test it directly, no mocks.
+- Unit tests must not hit live external services — mock OpenRouter, Mailgun, web push, and the
+  Playwright browser where possible.
 
 Full testing guide: [`TESTING.md`](TESTING.md)
 
@@ -166,13 +212,18 @@ Hard rules. Agents follow these unconditionally.
 
 - Never commit secrets or credentials to source control.
 - Never bulk-rewrite `docs/workboard.json` — use targeted edits only.
-- Never bypass or weaken the auth middleware on protected routes.
-- Never use `any` (TypeScript) or untyped function signatures (Python) in new code.
-- <!-- TODO: Add project-specific never rules. -->
+- Never auto-submit an application without explicit user approval.
+- Never auto-answer unknown or sensitive (legal, demographic, salary, disability, sponsorship,
+  identity) fields unless the value was explicitly provided and approved upstream.
+- Never put business logic in the Go web server or the Playwright worker — Rails owns it.
+- Never store sensitive resume/profile fields unencrypted.
+- Never auto-send LinkedIn messages — outreach drafts are presented for manual sending only.
 
 ## Always
 
+- Always prefer a deterministic script over an LLM call when the input format is predictable.
+- Always return an auditable status (status + reason + screenshots/logs) from worker tasks.
+- Always isolate external API calls (OpenRouter, Mailgun, web push) in service / client objects.
+- Always keep the frontend same-origin by talking to Rails through the `/api` proxy.
 - Always run the fast verification suite before marking a task done.
 - Always update `docs/` files when public behavior, interfaces, or invariants change.
-- Always use the project logger — not `console.log` / `print` — in production paths.
-- <!-- TODO: Add project-specific always rules. -->

@@ -4,72 +4,96 @@
 > Read before adding any new test file or modifying an existing one.
 > Code conventions that affect test structure live in [`CONVENTIONS.md`](CONVENTIONS.md).
 
+Waunder has three stacks, each with its own test runner: `api/` (Rails / RSpec),
+`web/` (Go / `go test`), and `workers/` (Node built-in test runner).
+
 ---
 
 ## Quick Start
 
 ```bash
-# TODO: Replace with the actual commands for this project.
+# --- api/ (Rails, RSpec) ---
+cd api && bundle exec rspec                              # all specs
+cd api && bundle exec rspec spec/requests/api/health_spec.rb   # single file
+cd api && bin/ci                                         # full CI gate (style + security + tests)
 
-# Run all tests
-# e.g. npm test
-# e.g. cd backend && PYTHONPATH=. .venv/bin/pytest tests/ -v
-# e.g. cargo test --workspace
+# --- web/ (Go + go-app) ---
+cd web && go test ./...                                  # all Go tests
 
-# Run a single file
-# e.g. npm test -- src/services/scoring.test.ts
-# e.g. PYTHONPATH=. .venv/bin/pytest tests/test_scoring_digitspan.py -v
-
-# Run with coverage
-# e.g. npm run test:coverage
-# e.g. PYTHONPATH=. .venv/bin/pytest tests/ --cov=app
+# --- workers/ (Node + TypeScript) ---
+cd workers && npm test                                   # all tests
+cd workers && node --import tsx --test src/safety.test.ts  # single file
+cd workers && npm run typecheck                          # tsc --noEmit
 ```
 
 ---
 
 ## Test Stacks
 
-<!-- TODO: One row per test stack. -->
-
 | Stack | Tool | Version | Location | Run Command |
 |---|---|---|---|---|
-| <!-- TODO: e.g. Frontend --> | <!-- TODO: e.g. vitest --> | <!-- TODO --> | <!-- TODO: e.g. `src/**/*.test.ts` --> | <!-- TODO: e.g. `npm test` --> |
-| <!-- TODO: e.g. Backend --> | <!-- TODO: e.g. pytest --> | <!-- TODO --> | <!-- TODO: e.g. `backend/tests/` --> | <!-- TODO: e.g. `PYTHONPATH=. .venv/bin/pytest tests/` --> |
+| api (Rails) | RSpec (`rspec-rails ~> 8.0`) | Ruby 3.2.3 / Rails 8.1.3 | `api/spec/` | `cd api && bundle exec rspec` |
+| web (go-app) | Go testing (`go test`) | Go 1.26 | `web/**/*_test.go` | `cd web && go test ./...` |
+| workers | Node built-in test runner (`node --test`) + tsx | Node 22 / TS 5.7 | `workers/src/**/*.test.ts` | `cd workers && npm test` |
 
 ---
 
 ## What Is Covered
 
-<!-- TODO: Describe what the test suite covers at a high level.
-Be honest about gaps — this helps agents make good decisions about where to add tests.
+Be honest about the current state — most of the suite is still to be written.
 
-Example:
-**Backend:** scoring modules (pure unit), service logic (mocked collaborators), router endpoints
-(auth and response shape), import/export flows, analytics parity (fixture-based).
+### Today (actually present)
 
-**Frontend:** same-origin Route Handler auth and cache behavior, route-topology guard assertions,
-utility modules (status mapping, display formatting, error resolution).
+- **api/** — `spec/requests/api/health_spec.rb`: a request spec for `GET /api/health` asserting
+  HTTP 200, the JSON shape (`status: "ok"`, `service: "waunder-api"`), and database connectivity
+  (`database: "connected"`).
+- **workers/** — `src/safety.test.ts`: unit tests for sensitive-field detection
+  (`isSensitiveField`) and answer partitioning (`partitionBySensitivity`).
+- **web/** — **no tests yet.**
 
-**Not covered:** end-to-end browser tests, visual regression, load testing.
--->
+### Planned (from the plan's Testing Plan)
+
+**Rails (`api/`):**
+
+- Request specs for all JSON endpoints.
+- Model specs verifying encrypted profile/resume storage (fields encrypted at rest).
+- Webhook specs covering Mailgun signature validation and inbound email parsing.
+- Job specs for LLM orchestration with mocked OpenRouter responses.
+- Worker-dispatch specs for approved application submissions.
+
+**Web (`web/`, go-app):**
+
+- Component / render tests for the job feed, job detail, approval flow, profile form, and draft
+  review screens.
+- API client tests with mocked Rails responses.
+- Push subscription flow tested behind an abstraction, with the browser Notification/Push APIs
+  mocked.
+- A PWA smoke check: manifest validity, service-worker registration, and installability.
+
+**Automation (`workers/`):**
+
+- Playwright tests against fixture pages for Greenhouse, Lever, Ashby, and a mocked Easy
+  Apply-style flow.
+- Required pause/fail tests for: unknown questions, sensitive fields, missing resume data,
+  expired sessions, and unsupported form states.
+
+### Not covered yet
+
+- Any `web/` (Go) tests at all.
+- Rails model/webhook/job/dispatch specs (only the health request spec exists).
+- Playwright ATS handler and pause/fail tests (only pure safety-helper unit tests exist).
+- The full end-to-end MVP integration scenario (see below).
 
 ---
 
 ## Test File Inventory
 
-<!-- TODO: List every test file with its domain and coverage scope.
 Keep this table up to date — add a row when adding a new test file.
 
 | File | Domain | What It Covers |
 |---|---|---|
-| `test_scoring_foo.py` | Scoring | `score()` pure function — all correct, all wrong, mixed inputs |
-| `test_service_bar.py` | Service | Business logic with mocked DB session |
-| `test_router_baz.py` | Router | Endpoint auth, response shape, error codes |
-| `foo.test.ts` | Frontend | Route Handler cache hit/miss/auth failure |
-| `route-topology.test.ts` | Frontend | Asserts middleware + layout guard wiring on all RA routes |
--->
-
-*(No test files yet — fill in as the suite grows.)*
+| `api/spec/requests/api/health_spec.rb` | API (Rails) | `GET /api/health` — 200 status, JSON shape, database connectivity |
+| `workers/src/safety.test.ts` | Worker safety | `isSensitiveField` detection + `partitionBySensitivity` splitting of answers |
 
 ---
 
@@ -77,38 +101,47 @@ Keep this table up to date — add a row when adding a new test file.
 
 ### Rules
 
-<!-- TODO: Hard rules for tests in this project. Agents follow these unconditionally.
-
-Examples:
-- Unit tests must not hit a live database — use fakes (`SimpleNamespace`, `_FakeAsyncSession`) or mocks.
-- Scoring functions are pure — test with plain input/output; no mocks required.
-- Any route change that touches auth must include an assertion in the route-topology test file.
-- Analytics / parity tests are blocking — a parity failure means the PR does not merge.
-- New public service functions require at least one unit test before the task is marked done.
--->
+- Unit tests must not hit live external services — mock OpenRouter, Mailgun, web push, and the
+  Playwright browser wherever possible.
+- Rails request specs assert both auth and the JSON response shape.
+- Encrypted-storage model specs verify that sensitive profile/resume fields are encrypted at
+  rest (not stored in plaintext).
+- Webhook specs must cover Mailgun signature validation, not just the happy-path body parse.
+- Worker safety tests are pure input/output over `isSensitiveField` / `partitionBySensitivity` —
+  no mocks.
+- Every new public endpoint (Rails), service/client object, go-app screen component, or ATS
+  handler needs at least one test before the task is marked done.
+- The end-to-end MVP scenario is the integration north star: email → ingest/score → push →
+  review → draft → approve → submit → status report.
 
 ### Patterns
 
-<!-- TODO: Idiomatic test patterns for this project.
+**Rails (`api/`):**
 
-Backend (Python) example:
-- Service isolation: mock imported collaborators via `unittest.mock.patch`.
-- Async tests: use `@pytest.mark.anyio` or `IsolatedAsyncioTestCase`.
-- Fake DB session: define `_FakeAsyncSession` inline with the expected method surface only.
+- Request specs use RSpec with `type: :request` and `require "rails_helper"`; drive endpoints
+  over HTTP and assert status + parsed JSON body.
+- Mock external clients (OpenRouter, Mailgun, web push) — never call the live services.
+- Model specs cover encrypted-field behavior directly on the model.
 
-Frontend (TypeScript) example:
-- Module mocking: `vi.mock('../lib/supabase')` at the top of the test file.
-- Route Handler tests: call the exported `GET`/`POST` function directly with a mock `Request`.
-- Avoid testing implementation details — test behavior through the public interface.
--->
+**Web (`web/`, go-app):**
+
+- Use `go test` table-driven tests.
+- Mock the Rails API client behind an interface so component/render tests run without a backend.
+- Mock the browser Notification/Push APIs behind an abstraction for the push-subscription flow.
+
+**Workers (`workers/`):**
+
+- Use the Node built-in runner: `import { test } from "node:test"` and
+  `import assert from "node:assert/strict"`. Local imports use `.js` specifiers.
+- Pure functions (safety helpers) are tested directly with plain input/output.
+- ATS Playwright handlers are tested against local fixture HTML pages, not live ATS sites.
 
 ### Adding a New Test File
 
-<!-- TODO: Step-by-step process for adding a test file.
-
-Example:
-1. Name the file following the project convention (e.g. `test_<domain>_<layer>.py`).
-2. Place it in the correct test directory (e.g. `backend/tests/`).
+1. Name the file per the stack convention:
+   - Rails: `spec/<type>/<area>/<name>_spec.rb` (e.g. `spec/requests/api/jobs_spec.rb`).
+   - Web: `<name>_test.go`, colocated with the package under test.
+   - Workers: `src/<name>.test.ts`, colocated with the module under test.
+2. Place it in the correct directory for its stack.
 3. Add a row to the Test File Inventory table above.
-4. Run the full suite to confirm no regressions before committing.
--->
+4. Run that stack's suite before committing to confirm no regressions.

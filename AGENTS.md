@@ -1,71 +1,90 @@
-# <Project Name> — Agent Working Guide
+# Waunder — Agent Working Guide
 
-<!-- AGENTS.md is the canonical file. CLAUDE.md is a symlink to it.              -->
-<!-- To set up after copying this file: ln -sf AGENTS.md CLAUDE.md               -->
-<!--                                                                              -->
-<!-- This file is a LIVING DOCUMENT — not a static README.                       -->
-<!-- Agents update it after every task cycle with new discoveries and constraints.-->
-<!-- Engineers seed it at project setup with known pitfalls and architecture.     -->
-<!--                                                                              -->
-<!-- TODO: Replace every placeholder marked with TODO before committing.          -->
-<!-- TODO: Delete comment blocks after filling them in.                           -->
+This file is a LIVING DOCUMENT — not a static README. Agents update it after every task
+cycle with new discoveries and constraints; engineers seed it at project setup with known
+pitfalls and architecture.
 
 ---
 
 ## Overview
 
-<!-- TODO: 2–4 sentences. What does this project do? What is the agent's primary -->
-<!-- role here? Where is the canonical task queue?                                -->
-<!--                                                                              -->
-<!-- Example:                                                                     -->
-<!-- This is the backend API for the Acme data pipeline. Agents implement        -->
-<!-- workboard tasks: features, fixes, schema migrations, and infra changes.     -->
-<!-- The canonical task queue is docs/workboard.json.                            -->
-<!-- Skills are available at .claude/skills/ (synced from ag.dev).              -->
+Waunder is a mobile-first, single-user personal job-application assistant: it finds and
+scores relevant job openings, notifies the user, drafts tailored application materials,
+tracks contacts, and performs trusted application submission only after explicit per-application
+approval. It is a monorepo of three services deployed on Railway — `api/` (Rails 8.1 API,
+the single source of truth for all data, LLM orchestration, jobs, and worker dispatch),
+`web/` (a Go + go-app WebAssembly PWA shell plus a small server that reverse-proxies `/api/*`
+to Rails — no business logic), and `workers/` (a Node + Playwright worker that executes only
+pre-approved structured submit tasks). Agents implement workboard tasks: features, fixes,
+schema migrations, and infra changes. The canonical task queue is `docs/workboard.json`, and
+skills are available at `.claude/skills/` (synced from ag.dev).
 
 ---
 
 ## Quick Start
 
-<!-- TODO: Exact commands to get a working dev environment. No prose.            -->
+Prerequisites: Ruby 3.2.3, Go 1.26, Node 22, PostgreSQL.
 
 ```bash
-# Install dependencies
-# TODO: e.g. npm install / pip install -r requirements.txt / cargo build
+# --- api/ (Rails 8.1 API) ---
+cd api && bin/setup          # install gems, prepare the database
+bin/rails s                  # start the API server
+bundle exec rspec            # run the test suite
 
-# Run tests
-# TODO: e.g. npm test / pytest / cargo test --workspace
+# --- web/ (Go + go-app PWA) ---
+cd web && make run           # build app.wasm + server, serve on :8000
 
-# Start local server
-# TODO: e.g. npm run dev / uvicorn app.main:app --reload
+# --- workers/ (Node + Playwright) ---
+cd workers && npm install    # install dependencies
+npm run dev                  # run the worker (tsx watch)
+npm test                     # run worker tests
 
-# Lint / typecheck
-# TODO: e.g. npm run lint / ruff check . / cargo clippy
+# --- Lint / typecheck ---
+cd api && bin/rubocop        # Ruby lint (rubocop-rails-omakase)
+cd web && go vet ./...       # Go static checks
+cd workers && npm run typecheck  # TypeScript type check
 ```
 
 ---
 
 ## Build & Verification Commands
 
-<!-- TODO: Commands agents must run to verify their changes before marking done. -->
-<!-- Mark each as fast (< 10 s) or slow. Agents prefer fast checks.             -->
-<!-- Never skip a fast check. Skip slow checks only when the task says so.      -->
+Run the fast checks for whichever service you touched before marking a task done. Never skip
+a fast check. Skip slow checks only when the task says so.
 
 | Command | What it checks | Speed |
 |---------|---------------|-------|
-| <!-- TODO: `npm test` --> | <!-- TODO: unit + integration tests --> | fast |
-| <!-- TODO: `npm run lint` --> | <!-- TODO: lint + types --> | fast |
-| <!-- TODO: `npm run build` --> | <!-- TODO: production build --> | slow |
+| `cd api && bundle exec rspec` | Rails request / model / job specs | fast |
+| `cd api && bin/rubocop` | Ruby lint (rubocop-rails-omakase) | fast |
+| `cd workers && npm test` | Worker safety / unit tests | fast |
+| `cd workers && npm run typecheck` | TypeScript types (`tsc --noEmit`) | fast |
+| `cd web && go test ./...` | Go tests | fast |
+| `cd web && go vet ./...` | Go static checks | fast |
+| `cd api && bin/ci` | Full CI incl. brakeman + bundler-audit | slow |
+| `cd web && make wasm` | WASM frontend build (`GOOS=js GOARCH=wasm`) | slow |
 
 ---
 
 ## Repository Structure
 
-<!-- TODO: Top-level directory map. One line per entry. Be precise.              -->
-
 ```
-<!-- TODO:
-src/           Application source
+web/           Go + go-app WebAssembly PWA (frontend) + small Go server
+  main.go         App routing + HTTP server that reverse-proxies /api/* to Rails
+  components/     go-app UI components (compiled to WASM)
+  Makefile        wasm / server / run build targets
+  Dockerfile      Two-target (WASM + native server) build for Railway
+api/           Rails 8.1 API-only app (single source of truth)
+  app/controllers/api/  Client-facing JSON endpoints (under /api)
+  app/jobs/             solid_queue background jobs
+  config/routes.rb      Route definitions
+  spec/                 RSpec test suite
+workers/       Node + TypeScript + Playwright automation worker
+  src/index.ts    Worker entrypoint
+  src/worker.ts   Task execution loop
+  src/safety.ts   Unknown/sensitive-field gating
+  src/types.ts    Shared task/payload types
+  src/config.ts   Worker configuration
+  src/ats/        Per-ATS form-fill logic
 docs/          Project docs and task queue
   INDEX.md        Documentation navigation map
   PRD.md          Product requirements and scope
@@ -77,11 +96,10 @@ docs/          Project docs and task queue
   workboard.json  Canonical task queue
   workboard.schema.json JSON Schema for task queue
   workboard.md    Workboard field definitions and usage rules
-tests/         Test suite
-scripts/       Utility scripts
+initial_plan.md  Authoritative original build plan
+README.md      Repository overview
 .claude/       Claude harness config
   skills/      Synced skills (do not edit here — edit source in ag.dev)
--->
 ```
 
 Docs navigation: [`docs/INDEX.md`](docs/INDEX.md)
@@ -90,15 +108,13 @@ Docs navigation: [`docs/INDEX.md`](docs/INDEX.md)
 
 ## Architecture
 
-<!-- TODO: 5–10 bullets summarizing the constraints that matter most for day-to-day   -->
-<!-- implementation. Focus on constraints, not descriptions. Keep this section brief — -->
-<!-- the deep-dive lives in docs/ARCHITECTURE.md.                                      -->
-
-- <!-- TODO: e.g. "All external I/O goes through the adapter layer in src/adapters/." -->
-- <!-- TODO: e.g. "Database schema lives in db/migrations/. Never alter tables directly." -->
-- <!-- TODO: e.g. "Public API surface is defined in src/api/schema.ts. Do not break it." -->
-- <!-- TODO: e.g. "Auth is handled exclusively in src/middleware/auth.ts." -->
-- <!-- TODO: e.g. "Config is read from environment variables only. No hardcoded values." -->
+- Rails (`api/`) is the single source of truth: it owns all data, LLM orchestration (OpenRouter), background jobs, Mailgun inbound webhooks, web-push dispatch, and worker dispatch.
+- The Go web server (`web/`) is app-shell + `/api` reverse proxy only. It holds no business logic and no database access.
+- The browser only ever talks to the `web` origin. `/api/*` is proxied server-side to Rails over Railway's private network — no CORS, and Rails has no public domain.
+- Database schema changes happen exclusively through Rails migrations. Never alter tables directly.
+- Sensitive resume/profile fields are encrypted at rest with Active Record Encryption.
+- Configuration is read from environment variables only. No hardcoded URLs, keys, or model names.
+- The worker (`workers/`) executes only pre-approved structured submit tasks and pauses/fails safely on unknown or sensitive fields.
 
 Full topology, component responsibilities, data flow, and deployment targets: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 
@@ -106,32 +122,30 @@ Full topology, component responsibilities, data flow, and deployment targets: [`
 
 ## Code Style & Constraints
 
-<!-- TODO: Hard rules for this codebase. Agents follow these unconditionally.         -->
-<!-- Keep this section to the most critical never/always rules only.                  -->
-<!-- Full conventions, naming rules, and per-stack patterns: docs/CONVENTIONS.md      -->
-
 ### Never
 
 - Never commit secrets or credentials.
 - Never bulk-rewrite `docs/workboard.json`; use targeted edits only.
-- <!-- TODO: e.g. "Never use `any` in TypeScript." -->
-- <!-- TODO: e.g. "Never use `console.log` in production paths; use the logger." -->
-- <!-- TODO: e.g. "Never mutate shared state outside the store layer." -->
+- Never put business logic in the Go web server or the worker — all logic and data live in Rails.
+- Never auto-submit an application without explicit per-application user approval.
+- Never auto-answer unknown or sensitive fields (legal, demographic, salary, disability, sponsorship, identity) unless the user explicitly provided and approved those answers.
+- Never store sensitive resume/profile fields unencrypted.
+- Never auto-send LinkedIn messages; outreach is prefilled for manual sending only.
 
 ### Always
 
 - Always run the fast verification suite before marking a task done.
 - Always update relevant `docs/` files when behavior changes.
-- <!-- TODO: e.g. "Always write a test for new public functions." -->
-- <!-- TODO: e.g. "Always use the project logger (src/lib/logger.ts), not console." -->
+- Always prefer deterministic scripts over LLM calls where input formats are predictable (ATS detection, known-sender email parsing, route ranking, supported-ATS form fill).
+- Always return an auditable worker status (screenshots and logs) for every submit attempt.
+- Always keep the frontend same-origin by routing through the `/api` proxy.
+- Always update the relevant `docs/` file in the same commit as a behavior change.
 
 ### Patterns
 
-<!-- TODO: 2–4 idiomatic patterns agents should follow.                         -->
-<!-- Examples:                                                                   -->
-<!-- - Error handling: use Result<T, AppError>, not thrown exceptions.          -->
-<!-- - API routes: follow the pattern in src/api/routes/example.ts.            -->
-<!-- - DB queries: use the repository pattern in src/db/repositories/.         -->
+- API endpoints live under the `/api` namespace in `api/config/routes.rb` and controllers in `app/controllers/api/`.
+- Background work goes through solid_queue jobs in `app/jobs/`, not inline in controllers.
+- Worker tasks flow through `src/safety.ts` gating before any form interaction; per-ATS logic lives in `src/ats/`.
 
 Full convention guide: [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md)
 
@@ -178,10 +192,6 @@ Targeted edit rules:
 - Only update the status fields of the task currently being worked.
 - Roll back `in_progress → todo` if blocked mid-task and unresolved.
 
-<!-- TODO: Note any project-specific workboard conventions here.                -->
-<!-- e.g. "Group IDs in this project: ENGINE, MODEL, INFRA, FOUND."            -->
-<!-- e.g. "Critical tasks in the INFRA group are never skipped mid-sprint."    -->
-
 ---
 
 ## Agent Workflow
@@ -189,15 +199,14 @@ Targeted edit rules:
 Standard task cycle for this project:
 
 1. Read this file (`AGENTS.md` / `CLAUDE.md`) at the start of every session.
-2. Run `{{CMD_PREFIX}}query-workboard` to find the next startable task.
-3. Run `{{CMD_PREFIX}}start-task` to execute it (reads docs, implements, verifies, updates board).
+2. Run `/query-workboard` to find the next startable task.
+3. Run `/start-task` to execute it (reads docs, implements, verifies, updates board).
 4. Update this file if you discovered a constraint, pattern, or pitfall worth encoding.
 5. Commit changes. Summarize: what was done, what was skipped, what is next.
 
-For multi-task runs: `{{CMD_PREFIX}}ralphloop start-task iterations:N`.
+For multi-task runs: `/ralphloop start-task iterations:N`.
 
-<!-- NOTE: {{CMD_PREFIX}} is rendered by sync-skills.sh: → `/` for Claude, `$` for Codex. -->
-<!-- Skills are sourced from ag.dev and synced into .claude/skills/ or .agents/skills/.   -->
+Skills are sourced from ag.dev and synced into `.claude/skills/`.
 
 ### Stopping Conditions
 
@@ -206,28 +215,28 @@ Stop and report (do not continue) when:
 - A verification command fails and the fix is not obvious.
 - An irreversible action (migration, destructive write, external publish) is required
   and the task does not explicitly authorize it.
-- <!-- TODO: Add project-specific stop conditions. -->
+- Before any real trusted-submit run that lacks explicit per-application user approval.
+- When a worker task encounters unknown or sensitive fields (legal, demographic, salary, disability, sponsorship, identity).
+- Before introducing Redis/Sidekiq (OPEN-01) or settling the single-user auth/session model (OPEN-02) without explicit owner instruction.
+- Before sending a real web-push notification, real outbound email, or incurring real LLM spend in a test context.
 
 ---
 
 ## Debugging & Gotchas
 
-<!-- TODO: Known traps, environment quirks, or non-obvious behaviors.           -->
-<!-- This section grows over time as agents discover issues.                    -->
-<!-- Examples:                                                                   -->
-<!-- - "The test suite requires a local Postgres instance on port 5432.         -->
-<!--    Run `docker compose up -d db` before running tests."                    -->
-<!-- - "The linter is strict about import order. Run `npm run lint:fix`         -->
-<!--    to auto-fix before committing."                                          -->
-<!-- - "Migration files must be named YYYYMMDD_NNN_description.sql or the      -->
-<!--    runner will silently skip them."                                         -->
+- The `web/` service is one Go package compiled twice: to WebAssembly (`GOOS=js GOARCH=wasm`) for the frontend, and to a native binary for the server. On the client `app.RunWhenOnBrowser()` takes over and the server code never runs; on the server it is a no-op and HTTP starts.
+- The Go server reads `API_INTERNAL_URL` to proxy `/api/*`. When unset, the proxy is disabled and the PWA still serves standalone in local dev — so a missing API_INTERNAL_URL is not a crash, just no backend.
+- The Go server listens on `$PORT` (default 8000).
+- There is no staging environment: only Production (Railway) and local dev.
 
 ---
 
 ## Environment Variables
 
-<!-- TODO: List any variable whose name agents need to know to run the project locally. -->
-<!-- Do not put secret values here. Full matrix with ownership and defaults:            -->
+Names agents commonly need (no values here): `API_INTERNAL_URL` (Rails base URL for the web
+proxy), `PORT` (web server port, default 8000), `OPENROUTER_*` (LLM gateway + `OPENROUTER_MODEL`),
+VAPID keys (web push), Active Record Encryption keys, Mailgun credentials, `DATABASE_URL`, and a
+conditional `REDIS_URL` (only if Redis/Sidekiq is ever introduced — see OPEN-01).
 
 See [`docs/ENV_VARS.md`](docs/ENV_VARS.md) for the canonical variable and secret matrix.
 
@@ -235,7 +244,9 @@ See [`docs/ENV_VARS.md`](docs/ENV_VARS.md) for the canonical variable and secret
 
 ## Testing
 
-<!-- TODO: Fast check agents must run before marking any task done.             -->
+Before marking any task done, run the fast checks for the service you changed: `cd api &&
+bundle exec rspec` and `cd api && bin/rubocop` for Rails; `cd workers && npm test` and `npm run
+typecheck` for the worker; `cd web && go test ./...` and `go vet ./...` for the web service.
 
 Full test strategy, file inventory, and patterns for writing new tests: [`docs/TESTING.md`](docs/TESTING.md)
 
@@ -243,13 +254,11 @@ Full test strategy, file inventory, and patterns for writing new tests: [`docs/T
 
 ## Deployment
 
-<!-- TODO: How to deploy — or confirm it is CI-only and agents must not deploy. -->
-<!-- If agents should never deploy, say so explicitly.                          -->
-<!--                                                                            -->
-<!-- Example (CI-only):                                                         -->
-<!-- Deployments are CI-only. Never manually push to production.               -->
-<!-- Staging deploys automatically on merge to `main`.                         -->
-<!-- Production requires a tagged release via the GitHub release workflow.     -->
+Deployment target is Railway: three services (`web`, `api`, `worker`) in one project plus
+managed PostgreSQL, communicating over Railway's private network. There is no staging — only
+Production and local dev. Agents must not deploy or perform irreversible production actions
+(migrations against production, destructive writes, external publishes) unless a task explicitly
+authorizes it.
 
 ---
 
@@ -275,5 +284,6 @@ Do not reorganize or rewrite existing entries — append only.
 
 ## Discoveries
 
-<!-- Agents: append new discoveries here after each task cycle.                 -->
-<!-- Engineers: seed this section with known pitfalls at project setup time.    -->
+Agents: append new discoveries here after each task cycle, one entry each, using the
+`### YYYY-MM-DD — <short title>` format described above. Append only; do not rewrite existing
+entries.
