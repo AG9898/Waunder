@@ -304,3 +304,8 @@ until real integration secrets exist.
 Rails `presence` validation treats empty JSON arrays and objects (`[]`/`{}`) as blank. For JSONB
 columns that default to empty payloads, validate the Ruby shape (`Array`/`Hash`) instead of
 requiring presence.
+
+### 2026-06-09 — Svix Ruby verified payload keys
+The `svix` Ruby gem verifies Resend webhook signatures against the raw request body, but the
+verified JSON payload may come back with symbol keys. Normalize the verified event with
+`deep_stringify_keys` before checking Resend fields like `type`, `id`, and `data`.

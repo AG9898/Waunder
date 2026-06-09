@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_09_121000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_09_122000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -84,6 +84,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_09_121000) do
     t.string "website_url"
     t.index ["domain"], name: "index_companies_on_domain"
     t.index ["name"], name: "index_companies_on_name"
+  end
+
+  create_table "inbound_emails", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "event_id", null: false
+    t.string "event_type", null: false
+    t.string "provider", default: "resend", null: false
+    t.string "provider_email_id"
+    t.jsonb "raw_payload", null: false
+    t.datetime "updated_at", null: false
+    t.index ["event_type"], name: "index_inbound_emails_on_event_type"
+    t.index ["provider", "event_id"], name: "index_inbound_emails_on_provider_and_event_id", unique: true
+    t.index ["provider_email_id"], name: "index_inbound_emails_on_provider_email_id"
+    t.check_constraint "jsonb_typeof(raw_payload) = 'object'::text", name: "inbound_emails_raw_payload_json_object"
   end
 
   create_table "job_posts", force: :cascade do |t|

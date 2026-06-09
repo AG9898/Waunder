@@ -11,6 +11,8 @@ Rails.application.routes.draw do
     resource :session, only: %i[create destroy]
   end
 
+  post "webhooks/resend/inbound", to: "webhooks/resend#inbound"
+
   # Defines the root path route ("/")
   # root "posts#index"
 end

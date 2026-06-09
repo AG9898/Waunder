@@ -20,6 +20,9 @@ gem "solid_cache"
 gem "solid_queue"
 gem "solid_cable"
 
+# Verify Svix-signed webhook payloads from Resend inbound email.
+gem "svix"
+
 # Reduces boot times through caching; required in config/boot.rb
 gem "bootsnap", require: false
 

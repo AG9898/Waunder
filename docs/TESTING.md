@@ -49,6 +49,9 @@ Be honest about the current state — most of the suite is still to be written.
   (`database: "connected"`).
 - **api/** — `spec/requests/api/auth_spec.rb`: request specs for `POST /api/session`,
   protected endpoint gating, health bypass, and the worker bearer guard.
+- **api/** — `spec/requests/webhooks/resend_spec.rb`: request specs for the Resend inbound
+  webhook, covering Svix signature verification, raw inbound-email persistence, parse-job
+  enqueueing, unauthenticated provider auth, missing-secret handling, and PII-safe logging.
 - **api/** — `spec/models/company_spec.rb`, `spec/models/job_post_spec.rb`, and
   `spec/models/application_route_spec.rb`: model specs for the core job-posting associations,
   validations, route-type allowlist, and score/confidence bounds.
@@ -65,7 +68,7 @@ Be honest about the current state — most of the suite is still to be written.
 
 - Request specs for all JSON endpoints.
 - Model specs verifying encrypted profile/resume storage (fields encrypted at rest).
-- Webhook specs covering Mailgun signature validation and inbound email parsing.
+- Job specs for downstream inbound email parsing and normalization.
 - Job specs for LLM orchestration with mocked OpenRouter responses.
 - Worker-dispatch specs for approved application submissions.
 
@@ -108,6 +111,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `api/spec/models/job_post_spec.rb` | API (Rails) | job post company/title validations, application-route association, match-score bounds |
 | `api/spec/requests/api/auth_spec.rb` | API (Rails) | shared-secret session success/failure, protected endpoint gating, health bypass, worker bearer guard |
 | `api/spec/requests/api/health_spec.rb` | API (Rails) | `GET /api/health` — 200 status, JSON shape, database connectivity |
+| `api/spec/requests/webhooks/resend_spec.rb` | API (Rails) | Resend inbound webhook Svix verification, raw inbound-email persistence, parse-job enqueueing, provider-only auth, and PII-safe logging |
 | `workers/src/safety.test.ts` | Worker safety | `isSensitiveField` detection + `partitionBySensitivity` splitting of answers |
 
 ---

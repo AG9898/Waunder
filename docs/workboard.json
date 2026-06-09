@@ -224,7 +224,7 @@
       "id": "INGEST-01",
       "title": "Resend inbound webhook endpoint with Svix verification",
       "description": "Add POST /webhooks/resend/inbound (outside session auth) that verifies the Svix signature (svix-id/svix-timestamp/svix-signature) against RESEND_WEBHOOK_SECRET, parses the email.received payload, persists the raw inbound email, and enqueues a solid_queue parse job. Reject invalid or missing signatures with 401. Guard live behavior behind presence of RESEND_WEBHOOK_SECRET. Log identifiers and status only, never email PII.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "INGEST",
       "depends_on": [
