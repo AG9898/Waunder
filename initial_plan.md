@@ -6,17 +6,19 @@ Waunder is a mobile-first personal job application assistant. It should find and
 
 Initial direction:
 
-- Mobile app: Flutter, iOS-first, distributed through TestFlight.
+- Frontend: **Go + go-app**, a WebAssembly PWA (Progressive Web App), installable to the iPhone home screen. No native build, no App Store / TestFlight.
 - Backend: Ruby on Rails API in the same monorepo.
 - Hosting: Railway.
 - Database and jobs: PostgreSQL plus Rails background jobs, with Redis/Sidekiq if needed.
-- Notifications: Firebase Cloud Messaging configured for iOS/APNs.
+- Notifications: **Web Push API** via the service worker that go-app generates (VAPID keys). Replaces the earlier FCM/APNs plan.
 - Email ingestion: Mailgun inbound routes for forwarded job-alert emails.
 - LLM provider: OpenRouter, using structured JSON responses where supported.
 - Privacy: single-user app with encrypted backend storage for resume/profile data.
 - Automation boundary: LLM drafts, scores, tailors, prepares autofill data, and can perform trusted submit only after explicit user approval.
 
-Current environment note: `/home/ag9898/projects` exists. This file lives in `/home/ag9898/projects/Waunder`. At planning time, local `flutter`, `ruby`, and `rails` commands were not found, so environment setup should be part of the first implementation pass.
+Why PWA instead of native iOS: this is a solo, single-user app, so the cost of the Apple native pipeline (Apple Developer account, macOS/Xcode signing, TestFlight distribution) buys nothing. A PWA installs to the iPhone home screen with its own icon, runs full-screen, and supports web push — without any of that overhead.
+
+Current environment note: `/home/ag9898/projects` exists. This file lives in `/home/ag9898/projects/Waunder`. At planning time, local `go`, `ruby`, and `rails` commands should be verified; environment setup (Go toolchain for WASM builds, Ruby/Rails, PostgreSQL) should be part of the first implementation pass.
 
 ## Repository Shape
 
@@ -24,13 +26,36 @@ Create Waunder as a monorepo:
 
 ```txt
 Waunder/
-  mobile/      # Flutter app
+  web/         # Go + go-app PWA (WebAssembly frontend + small Go server)
   api/         # Rails API-only app
   workers/     # Playwright automation worker, likely Node-based
   docs/        # Architecture notes, setup guide, service decisions
   initial_plan.md
   README.md
 ```
+
+The `web/` service is a small Go HTTP server using go-app's `app.Handler` to serve the compiled WASM bundle, the auto-generated PWA manifest, and the service worker. The PWA's Go components talk to the Rails API over HTTP/JSON; Rails remains the single source of truth and owns all data, LLM, and worker orchestration. The Go server holds no business logic beyond serving the app shell and proxying API calls (see Deployment).
+
+## Deployment (Railway)
+
+Everything on Railway runs as a container. Each service becomes its own OCI image with its own environment variables, and services in the same project communicate over Railway's **private network** without traversing the public internet.
+
+Service topology — three Railway services in one project:
+
+- `web` — Go + go-app PWA server.
+- `api` — Rails API.
+- `worker` — Playwright automation worker.
+
+Plus managed PostgreSQL (and Redis if Sidekiq is introduced).
+
+Build model:
+
+- `web` uses an explicit **Dockerfile**, because go-app is a two-target build that Railway's auto-builder (Nixpacks/Railpack) does not handle on its own:
+  1. Compile the frontend to WebAssembly: `GOOS=js GOARCH=wasm go build -o app.wasm ./cmd/app`.
+  2. Build the server binary that serves `app.wasm`, go-app's `wasm_exec.js`, the manifest, and the service worker.
+- `api` and `worker` can use Railway auto-build or their own Dockerfiles.
+
+**Routing decision — the `web` Go server proxies `/api` to Rails over the private network.** The browser only ever talks to the `web` origin; requests under `/api/*` are forwarded server-side to the `api` service. This keeps the frontend same-origin (no CORS), keeps the service worker scope and push registration clean, and means the Rails API does not need a public domain. The Rails API base URL is supplied to the Go server via an environment variable (e.g. `API_INTERNAL_URL`).
 
 ## Product Scope
 
@@ -149,7 +174,7 @@ Rails API should own:
 - Application drafts.
 - Outreach drafts.
 - Resume/profile storage.
-- Device tokens.
+- Web push subscriptions (endpoint + keys per installed PWA).
 - Audit events.
 - Mailgun inbound webhook handling.
 - LLM orchestration through OpenRouter.
@@ -158,9 +183,9 @@ Rails API should own:
 
 Sensitive resume/profile fields should use Rails encryption.
 
-## Core Mobile Responsibilities
+## Core Web (PWA) Responsibilities
 
-Flutter should provide:
+The go-app PWA should provide:
 
 - Daily job digest view.
 - Job feed and job detail screens.
@@ -170,10 +195,11 @@ Flutter should provide:
 - Outreach draft review.
 - Resume upload.
 - Structured profile form.
-- Notification registration.
+- Web push subscription / notification permission flow.
 - Application/contact status tracking.
+- Installable PWA shell: manifest, app icon, full-screen standalone display, and offline-tolerant app shell (service worker generated by go-app).
 
-The first implementation target is iOS, but the app should avoid iOS-only UI assumptions unless required for TestFlight or notification setup.
+The primary device target is the user's iPhone (installed to home screen), but the UI should stay responsive so it also works on desktop browsers. iOS web push requires iOS 16.4+ and that the PWA be added to the home screen; the notification flow should detect and guide the user through install when push is requested.
 
 ## Core Worker Responsibilities
 
@@ -201,7 +227,7 @@ Suggested starting endpoints:
 - `POST /api/contacts/:id/outreach_draft`
 - `POST /api/profile`
 - `POST /api/resume_documents`
-- `POST /api/notification_devices`
+- `POST /api/push_subscriptions`
 - `POST /webhooks/mailgun/inbound`
 
 Suggested starting resources:
@@ -215,7 +241,7 @@ Suggested starting resources:
 - `Application`
 - `ApplicationDraft`
 - `OutreachDraft`
-- `NotificationDevice`
+- `PushSubscription`
 - `AuditEvent`
 
 ## Background Jobs
@@ -241,11 +267,12 @@ Rails:
 - Job specs for mocked OpenRouter responses.
 - Worker dispatch specs for approved application submissions.
 
-Flutter:
+Web (go-app):
 
-- Widget tests for job feed, job detail, approval flow, profile form, and draft review.
+- Go component/render tests for job feed, job detail, approval flow, profile form, and draft review.
 - API client tests with mocked Rails responses.
-- Notification registration tested behind a platform abstraction.
+- Push subscription flow tested behind an abstraction (browser Notification/Push APIs mocked).
+- A PWA smoke check: manifest validity, service worker registration, and installability.
 
 Automation:
 
@@ -257,7 +284,7 @@ End-to-end MVP scenario:
 - Forward job alert email to Mailgun.
 - Rails ingests and scores job.
 - Push notification is sent.
-- User reviews job in Flutter.
+- User reviews job in the PWA.
 - Waunder generates tailored application draft.
 - User approves submit.
 - Worker attempts supported form fill/submit.
@@ -266,7 +293,9 @@ End-to-end MVP scenario:
 ## Assumptions
 
 - Waunder is initially personal/single-user, not a public SaaS.
-- TestFlight requires Apple Developer setup and macOS/Xcode access. The current Linux environment can host the repo and backend work but cannot complete iOS signing/builds alone.
+- The frontend is a go-app WebAssembly PWA, installed to the iPhone home screen — no native build, App Store, or TestFlight. The Linux environment can fully build, run, and deploy both the PWA and the backend.
+- iOS web push requires iOS 16.4+ and the PWA to be installed (added to home screen). Push when the app is fully closed is supported but less aggressive than native; acceptable for a once-daily digest.
+- The service worker and any browser push glue run in JavaScript (no WASM Web Push API); go-app generates the service worker, keeping this to a small contained surface.
 - Railway is the default deployment target.
 - Mailgun is the first inbound email provider.
 - OpenRouter is the first LLM gateway; model choice should remain configurable by environment variable.
