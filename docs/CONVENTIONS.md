@@ -154,6 +154,19 @@ dispatch.
   configured it skips gracefully (no draft created, no raise); on an `OpenrouterClient::Error` it
   returns a `failed` result without creating a draft. It never logs prompt/completion contents or
   Profile/ResumeDocument PII.
+- Resume ingest is deterministic and isolated in `ResumeJsonImporter`
+  (`app/services/resume_json_importer.rb`), invoked by `Api::ResumeDocumentsController#create`
+  (`POST /api/profile/resume`). The external portfolio project pushes a canonical **JSON Resume**
+  object (plus exported PDF/markdown) on every resume export; the importer maps it straight into the
+  singleton `Profile` and a primary `ResumeDocument` — **no LLM, no PDF/OCR parsing**, because the
+  JSON is already clean structure (RESOLVED-08, RESOLVED-18). The JSON becomes `parsed_structure`,
+  the markdown becomes `raw_text`, and the PDF is attached via Active Storage (`has_one_attached
+  :file`) as the file a worker later uploads to an ATS form. Sensitive fields persist encrypted;
+  the document is `parse_status: "parsed"` on arrival. Re-syncs upsert the same singleton rows
+  rather than duplicating.
+- Sensitive contact details are **never serialized back** to clients in full. `Api::ProfileController`
+  exposes structured non-sensitive fields directly but returns only presence flags
+  (`contact.email_present`, etc.) for encrypted PII (email/phone/street_address).
 
 ### Types and Validation
 

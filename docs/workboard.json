@@ -1,7 +1,7 @@
 {
   "$schema": "./workboard.schema.json",
   "schema_version": "1.0.0",
-  "last_updated": "2026-06-09",
+  "last_updated": "2026-06-10",
   "tasks": [
     {
       "id": "INFRA-01",
@@ -449,8 +449,8 @@
     {
       "id": "PROFILE-01",
       "title": "Resume upload and structured profile API",
-      "description": "Authenticated endpoints to upload a resume (stored as ResumeDocument with sensitive fields encrypted) and to read/update the structured Profile. Session-guarded; consistent JSON shapes; sensitive data never stored in plaintext and never logged.",
-      "status": "todo",
+      "description": "Ingest the resume from the external portfolio project's canonical JSON Resume, pushed to POST /api/profile/resume (push-on-export). ResumeJsonImporter maps it deterministically (no LLM, no PDF/OCR parsing) into the singleton Profile and a primary ResumeDocument: structured fields + parsed_structure from the JSON, raw_text from the markdown, and the PDF attached via Active Storage. Session-guarded; GET/PATCH /api/profile read/update the structured Profile exposing encrypted PII as presence flags only; sensitive data encrypted at rest and never logged. Manual upload (WEB-04) is a fallback on the same endpoint. See RESOLVED-18.",
+      "status": "done",
       "priority": "medium",
       "group_id": "PROFILE",
       "depends_on": [

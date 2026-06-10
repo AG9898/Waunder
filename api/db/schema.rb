@@ -10,9 +10,37 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_10_090000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_10_161441) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "active_storage_attachments", force: :cascade do |t|
+    t.bigint "blob_id", null: false
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.bigint "record_id", null: false
+    t.string "record_type", null: false
+    t.index ["blob_id"], name: "index_active_storage_attachments_on_blob_id"
+    t.index ["record_type", "record_id", "name", "blob_id"], name: "index_active_storage_attachments_uniqueness", unique: true
+  end
+
+  create_table "active_storage_blobs", force: :cascade do |t|
+    t.bigint "byte_size", null: false
+    t.string "checksum"
+    t.string "content_type"
+    t.datetime "created_at", null: false
+    t.string "filename", null: false
+    t.string "key", null: false
+    t.text "metadata"
+    t.string "service_name", null: false
+    t.index ["key"], name: "index_active_storage_blobs_on_key", unique: true
+  end
+
+  create_table "active_storage_variant_records", force: :cascade do |t|
+    t.bigint "blob_id", null: false
+    t.string "variation_digest", null: false
+    t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
+  end
 
   create_table "application_drafts", force: :cascade do |t|
     t.bigint "application_id", null: false
@@ -40,7 +68,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_10_090000) do
     t.datetime "updated_at", null: false
     t.index ["job_post_id"], name: "index_application_routes_on_job_post_id", unique: true
     t.check_constraint "route_confidence IS NULL OR route_confidence >= 0::numeric AND route_confidence <= 1::numeric", name: "application_routes_route_confidence_range"
-    t.check_constraint "route_type::text = ANY (ARRAY['company_careers'::character varying, 'greenhouse'::character varying, 'lever'::character varying, 'ashby'::character varying, 'workday'::character varying, 'linkedin_easy_apply'::character varying, 'indeed_apply'::character varying, 'glassdoor_apply'::character varying, 'unknown'::character varying]::text[])", name: "application_routes_route_type_check"
+    t.check_constraint "route_type::text = ANY (ARRAY['company_careers'::character varying::text, 'greenhouse'::character varying::text, 'lever'::character varying::text, 'ashby'::character varying::text, 'workday'::character varying::text, 'linkedin_easy_apply'::character varying::text, 'indeed_apply'::character varying::text, 'glassdoor_apply'::character varying::text, 'unknown'::character varying::text])", name: "application_routes_route_type_check"
   end
 
   create_table "applications", force: :cascade do |t|
@@ -53,7 +81,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_10_090000) do
     t.datetime "updated_at", null: false
     t.index ["job_post_id"], name: "index_applications_on_job_post_id"
     t.index ["status"], name: "index_applications_on_status"
-    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying, 'approved'::character varying, 'submitted'::character varying, 'paused'::character varying, 'failed'::character varying]::text[])", name: "applications_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying::text, 'approved'::character varying::text, 'submitted'::character varying::text, 'paused'::character varying::text, 'failed'::character varying::text])", name: "applications_status_check"
   end
 
   create_table "audit_events", force: :cascade do |t|
@@ -72,7 +100,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_10_090000) do
     t.check_constraint "jsonb_typeof(logs) = 'array'::text", name: "audit_events_logs_json_array"
     t.check_constraint "jsonb_typeof(metadata) = 'object'::text", name: "audit_events_metadata_json_object"
     t.check_constraint "jsonb_typeof(screenshots) = 'array'::text", name: "audit_events_screenshots_json_array"
-    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying, 'approved'::character varying, 'submitted'::character varying, 'paused'::character varying, 'failed'::character varying]::text[])", name: "audit_events_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying::text, 'approved'::character varying::text, 'submitted'::character varying::text, 'paused'::character varying::text, 'failed'::character varying::text])", name: "audit_events_status_check"
   end
 
   create_table "companies", force: :cascade do |t|
@@ -169,6 +197,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_10_090000) do
     t.index ["profile_id"], name: "index_resume_documents_on_profile_id"
   end
 
+  add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "application_drafts", "applications"
   add_foreign_key "application_routes", "job_posts"
   add_foreign_key "applications", "job_posts"

@@ -9,6 +9,11 @@ Rails.application.routes.draw do
   namespace :api do
     get "health", to: "health#show"
     resource :session, only: %i[create destroy]
+
+    # Single-user structured profile and resume ingest. The portfolio export
+    # pipeline pushes its JSON Resume + PDF to POST /api/profile/resume.
+    resource :profile, only: %i[show update], controller: "profile"
+    post "profile/resume", to: "resume_documents#create"
   end
 
   post "webhooks/resend/inbound", to: "webhooks/resend#inbound"

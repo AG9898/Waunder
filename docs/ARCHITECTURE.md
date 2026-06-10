@@ -30,7 +30,7 @@ only if Sidekiq later replaces solid_queue.
   Built from an explicit two-target Dockerfile (`GOOS=js GOARCH=wasm go build -o web/app.wasm .`
   for the frontend, then a native server binary). Listens on `$PORT` (default `8000`).
 - **api** (Railway — Rails 8.1.3 API-only, Ruby 3.2.3, Puma): owns all data, LLM
-  orchestration via OpenRouter, notification dispatch, Mailgun inbound webhook handling,
+  orchestration via OpenRouter, notification dispatch, Resend inbound webhook handling,
   background jobs, and worker dispatch. Jobs run on `solid_queue`, cache on `solid_cache`,
   cable on `solid_cable` — all database-backed, so no Redis is required initially.
   Currently exposes only `/api/health` (custom JSON: `status`/`service`/`database`/`time`)
@@ -63,8 +63,8 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 - Owns **all** business logic: job/company/contact/application records, application and
   outreach drafts, resume/profile storage, push subscriptions, and audit events.
 - Orchestrates LLM calls through OpenRouter (structured JSON for scoring, summaries, drafts).
-- Handles the Mailgun inbound webhook (signature-validated), notification dispatch (web push),
-  background jobs (`solid_queue`), and worker dispatch.
+- Handles the Resend inbound webhook (`/webhooks/resend/inbound`, Svix-signature-validated),
+  notification dispatch (web push), background jobs (`solid_queue`), and worker dispatch.
 - Encrypts sensitive resume/profile fields with Active Record Encryption — never plaintext.
 - Owns the database schema; all changes go through Rails migrations.
 
@@ -93,11 +93,25 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 5. The response flows back through the proxy to the browser.
 
 **Inbound email ingestion**:
-1. A forwarded job-alert email hits a Mailgun inbound route.
-2. Mailgun POSTs to `/webhooks/mailgun/inbound` on Rails; the signature is validated.
+1. A forwarded job-alert email hits the Resend-verified receiving domain (`RESEND_INBOUND_DOMAIN`).
+2. Resend parses it and POSTs an `email.received` event to `/webhooks/resend/inbound` on Rails;
+   the Svix signature (`svix-id`/`svix-timestamp`/`svix-signature`) is validated against
+   `RESEND_WEBHOOK_SECRET`.
 3. Rails enqueues background jobs: parse alert → normalize job → resolve application route →
    LLM score via OpenRouter → generate draft.
 4. A daily web-push digest is eventually sent to subscribed PWA installs.
+
+**Resume sync (from the portfolio project)**:
+1. The external portfolio project (`My_Portfolio`, a Next.js app) maintains the resume as a
+   canonical JSON Resume object (`src/data/resume.json`) and exports `cv.pdf` + `CV_AG.md`.
+2. After an export, its `npm run sync:resume` step opens a Waunder session (shared secret →
+   `POST /api/session`) and pushes the three artifacts to `POST /api/profile/resume`.
+3. Rails maps the JSON Resume **deterministically** (no LLM, no PDF parsing) into the singleton
+   `Profile` and a primary `ResumeDocument` via `ResumeJsonImporter`: structured fields +
+   `parsed_structure` from the JSON, `raw_text` from the markdown, and the PDF attached via
+   Active Storage (the file a worker later uploads to an ATS form). Sensitive fields stay
+   encrypted at rest. Re-syncs upsert the same singleton rows. See RESOLVED-18 in
+   [`DECISIONS.md`](DECISIONS.md).
 
 **Trusted submit**:
 1. User reviews and approves a prepared application in the PWA.
@@ -117,9 +131,12 @@ all `/api/*` traffic is forwarded server-side by the Go proxy to the `api` servi
 the frontend is same-origin, there is **no CORS** to configure, the service-worker scope and
 web-push registration stay clean, and Rails needs no public domain.
 
-A session mechanism (`POST /api/session`) is planned, but the **exact mechanism is an open
-decision** — it has not been chosen and must not be invented ad hoc. See
-[`DECISIONS.md`](DECISIONS.md) for the open question and its eventual resolution.
+The owner authenticates with a single shared passphrase (`APP_SHARED_SECRET`) exchanged at
+`POST /api/session` for a signed, HTTP-only session cookie (signed with `SESSION_SECRET`).
+`Api::BaseController` enforces that session on every `/api` endpoint except health. The `worker`
+authenticates service-to-service with a static `WORKER_SERVICE_TOKEN` bearer on its task-pull and
+status-report endpoints — it does not use the human session. See RESOLVED-14 in
+[`DECISIONS.md`](DECISIONS.md).
 
 ---
 
@@ -128,9 +145,11 @@ decision** — it has not been chosen and must not be invented ad hoc. See
 | Service | Purpose | Required / Optional |
 |---|---|---|
 | Railway managed PostgreSQL | Primary datastore; also backs solid_queue/solid_cache/solid_cable | Required |
-| Mailgun | Inbound email routes for forwarded job alerts (`POST /webhooks/mailgun/inbound`, signature-validated) — the first ingestion path | Required for email ingestion |
+| Resend | Inbound email for forwarded job alerts (`email.received` → `POST /webhooks/resend/inbound`, Svix-signature-validated) — the first ingestion path. Inbound-only; the app sends no email (RESOLVED-13). | Required for email ingestion |
 | OpenRouter | LLM gateway for scoring, summaries, and drafts (structured JSON); model configurable by env | Required for scoring/drafting features |
 | Web Push (VAPID) | Push notifications via the go-app service worker (iOS 16.4+, PWA installed to home screen) | Required for the push digest |
+| Portfolio project (`My_Portfolio`) | External source of truth for the resume; pushes its JSON Resume + exported PDF/markdown to `POST /api/profile/resume` (push-on-export). Waunder never reaches back into it. | Optional — provides the resume; manual upload is the fallback |
+| Active Storage (local disk service) | Stores the resume PDF blob attached to `ResumeDocument`. On Railway the local disk is ephemeral, but the portfolio re-pushes the PDF on every export, so it self-heals (RESOLVED-18). | Required to hold the worker-uploadable resume file |
 | Redis / Sidekiq | Background-job backend only if needs outgrow solid_queue | Optional — not used initially; database-backed solid_queue is the default |
 
 ---

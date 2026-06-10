@@ -70,71 +70,6 @@ What existing code or docs does this affect?>
 
 ---
 
-### OPEN-02 — Single-user auth / session model for `POST /api/session`
-
-**Question:** What credential issuance and verification mechanism should back the single-user session at `POST /api/session`?
-
-**Context:** Waunder is single-user and same-origin behind the Go web proxy (browser only ever talks to the web origin; `/api/*` is proxied to Rails, which has no public domain). That removes CORS concerns but does not specify how the user authenticates or how the session is represented. The worker also needs an authenticated channel to pull approved tasks from Rails, so whatever is chosen must cover service-to-service auth too.
-
-**Options under consideration:**
-1. **Shared-secret session cookie** — single passphrase exchanged for a signed cookie. Tradeoff: simplest; secret management and cookie scoping must be correct.
-2. **Token-based** — issue a signed token (e.g. JWT/opaque) used as a bearer for both browser and worker. Tradeoff: uniform for service-to-service auth; token lifecycle/rotation to manage.
-3. **OS-level / device-bound** — bind the session to the installed PWA / device. Tradeoff: strongest device binding; more complex on iOS PWA.
-
-**Blocking:** All protected API endpoints (everything under `/api` except health) and the worker's authenticated task pull.
-
-**See also:** [`ARCHITECTURE.md`](ARCHITECTURE.md), Initial API Surface in [`PRD.md`](PRD.md)
-
----
-
-### OPEN-03 — Ship LinkedIn Easy Apply trusted-submit in the MVP?
-
-**Question:** Should LinkedIn Easy Apply trusted-submit be included in the MVP, or deferred to a later phase?
-
-**Context:** The plan flags LinkedIn Easy Apply as higher-risk than the ATS targets (Greenhouse, Lever, Ashby) and requires it to sit behind an explicit feature flag (`LINKEDIN_EASY_APPLY_ENABLED`). The other trusted-submit targets are lower-risk and are in scope per RESOLVED-12.
-
-**Options under consideration:**
-1. **Ship behind a flag (default off) in MVP** — code present but disabled until manually enabled. Tradeoff: ready to enable; carries the higher-risk surface in the MVP codebase.
-2. **Defer to a later phase** — exclude entirely from MVP. Tradeoff: smaller, lower-risk MVP; LinkedIn submit comes later.
-
-**Blocking:** Nothing currently blocked; affects worker scope for the MVP.
-
-**See also:** RESOLVED-12, [`PRD.md`](PRD.md), [`ENV_VARS.md`](ENV_VARS.md)
-
----
-
-### OPEN-04 — Timing of manual job/link entry fallback
-
-**Question:** Should lightweight manual job/link entry land in Phase 1, or be deferred to Phase 2?
-
-**Context:** Email ingestion via Mailgun is the first discovery path (RESOLVED-05), but it will miss postings the user finds directly. The plan defers manual entry to "later." Manual entry is the fallback for those misses.
-
-**Options under consideration:**
-1. **Include lightweight manual entry in Phase 1** — small form to add a job by URL/paste. Tradeoff: covers ingestion gaps immediately; small added scope up front.
-2. **Defer to Phase 2** — rely solely on email ingestion for the MVP. Tradeoff: leaner MVP; user cannot capture self-found jobs until later.
-
-**Blocking:** Nothing currently blocked.
-
-**See also:** RESOLVED-05, [`PRD.md`](PRD.md)
-
----
-
-### OPEN-05 — Default OpenRouter model and per-task tiering
-
-**Question:** What should the default OpenRouter model be, and should scoring and drafting use the same model or separate cost/quality tiers?
-
-**Context:** The model is environment-configurable via `OPENROUTER_MODEL` (RESOLVED-06), but a sensible default is undecided, as is whether cheaper scoring/summarization and higher-quality drafting should run on different models.
-
-**Options under consideration:**
-1. **Single default model** — one `OPENROUTER_MODEL` for all LLM tasks. Tradeoff: simplest config; either over-pays on cheap tasks or under-serves quality on hard ones.
-2. **Per-task model tiers** — separate models for scoring/summarization vs. cover-letter/draft generation. Tradeoff: better cost/quality balance; more configuration and routing logic.
-
-**Blocking:** Nothing currently blocked.
-
-**See also:** RESOLVED-06, [`ENV_VARS.md`](ENV_VARS.md)
-
----
-
 ## Resolved Decisions
 
 ### RESOLVED-01 — Frontend is a go-app WebAssembly PWA, not a native iOS app
@@ -206,6 +141,8 @@ What existing code or docs does this affect?>
 **Alternatives rejected:** Broad web scraping as the first ingestion path — higher fragility, maintenance, and policy risk.
 
 **Affects:** `api/` (Mailgun inbound webhook handling, `POST /webhooks/mailgun/inbound`), [`PRD.md`](PRD.md) scope.
+
+**Superseded by:** RESOLVED-13 (2026-06-09) — the inbound email *provider* changed from Mailgun to Resend (`POST /webhooks/resend/inbound`, Svix-signed). The email-first, deterministic-parse ingestion principle from this decision still holds; only the vendor and webhook/signature mechanics changed.
 
 ---
 
@@ -299,8 +236,90 @@ What existing code or docs does this affect?>
 
 **Decision:** Automated trusted submit is allowed only when all hold: the user explicitly approves the prepared application (per application), the target platform is supported, the form contains no unknown or sensitive fields requiring manual review, and the worker can produce an auditable status result. Initial targets: Greenhouse, Lever, Ashby, and LinkedIn Easy Apply.
 
-**Why:** Submitting an application is an irreversible, identity-bearing action; gating it on explicit per-application approval and auditable status prevents unintended or incorrect submissions. LinkedIn Easy Apply is higher-risk and sits behind an explicit feature flag (see OPEN-03).
+**Why:** Submitting an application is an irreversible, identity-bearing action; gating it on explicit per-application approval and auditable status prevents unintended or incorrect submissions. LinkedIn Easy Apply is higher-risk and sits behind an explicit feature flag (see RESOLVED-15).
 
 **Alternatives rejected:** Fully autonomous submission without per-application approval — unacceptable risk of incorrect or unwanted applications.
 
-**Affects:** `workers/` (safety gating), [`PRD.md`](PRD.md), [`CONVENTIONS.md`](CONVENTIONS.md). See also OPEN-03.
+**Affects:** `workers/` (safety gating), [`PRD.md`](PRD.md), [`CONVENTIONS.md`](CONVENTIONS.md). See also RESOLVED-15.
+
+---
+
+### RESOLVED-13 — Inbound email provider is Resend (inbound-only), replacing Mailgun
+
+**Resolved:** 2026-06-09
+
+**Decision:** Use Resend for inbound job-alert email ingestion. Forwarded alerts hit a Resend-verified receiving domain; Resend parses them and POSTs an `email.received` event to Rails at `POST /webhooks/resend/inbound`, verified via the Svix signature headers (`svix-id`, `svix-timestamp`, `svix-signature`). This supersedes the Mailgun choice in RESOLVED-05. Outbound email is **out of scope** for the MVP — the app sends no email (owner notifications are Web Push per RESOLVED-04, LinkedIn outreach is manual-send per RESOLVED-12), so no Resend sending domain or `RESEND_API_KEY` is configured.
+
+**Why:** Resend supports inbound parsing with Svix-signed webhooks and durable storage if the webhook is down, with simpler DX than Mailgun for this single-user app. Since Waunder never sends email, only the inbound surface is wired.
+
+**Alternatives rejected:** Mailgun inbound (RESOLVED-05) — superseded for DX. Adding Resend outbound — unused surface for the MVP; revisit only if an email digest fallback to Web Push is ever wanted (Phase 2).
+
+**Affects:** `api/` (`POST /webhooks/resend/inbound`, Svix signature validation), `RESEND_WEBHOOK_SECRET` / `RESEND_INBOUND_DOMAIN` in [`ENV_VARS.md`](ENV_VARS.md), [`ARCHITECTURE.md`](ARCHITECTURE.md), [`PRD.md`](PRD.md).
+
+---
+
+### RESOLVED-14 — Single-user auth: shared-secret session cookie + worker bearer token
+
+**Resolved:** 2026-06-09
+
+**Decision:** Authenticate the single owner via a shared passphrase exchanged at `POST /api/session` for a signed, HTTP-only session cookie; `Api::BaseController` enforces the session on all `/api` endpoints except health. The worker authenticates service-to-service with a static `WORKER_SERVICE_TOKEN` bearer on its task-pull/report endpoints. This resolves the former OPEN-02 to its Option 1.
+
+**Why:** Simplest model that fits a single-user, same-origin app behind the Go proxy. The shared secret (`APP_SHARED_SECRET`) plus a cookie-signing secret (`SESSION_SECRET`) cover the browser; a separate worker token cleanly scopes machine-to-machine access without entangling it with the human session.
+
+**Alternatives rejected:** Single bearer token for both browser and worker (Option 2) — conflates human and machine sessions. Device-bound PWA session (Option 3) — more complex on iOS PWA for no single-user benefit.
+
+**Affects:** `api/` (`Api::BaseController`, `POST /api/session`, worker auth guard), `APP_SHARED_SECRET` / `SESSION_SECRET` / `WORKER_SERVICE_TOKEN` in [`ENV_VARS.md`](ENV_VARS.md), [`ARCHITECTURE.md`](ARCHITECTURE.md) (Auth), [`CONVENTIONS.md`](CONVENTIONS.md).
+
+---
+
+### RESOLVED-15 — Ship LinkedIn Easy Apply trusted-submit behind a flag (default off) in the MVP
+
+**Resolved:** 2026-06-09
+
+**Decision:** Include the LinkedIn Easy Apply worker handler in the MVP codebase, gated behind `LINKEDIN_EASY_APPLY_ENABLED` (default `false`). The Greenhouse/Lever/Ashby handlers ship enabled. This resolves the former OPEN-03 to its Option 1.
+
+**Why:** Keeps the higher-risk path present and ready to enable without exposing it by default, while the lower-risk ATS targets carry the MVP.
+
+**Alternatives rejected:** Deferring LinkedIn Easy Apply entirely — would require a later re-integration pass; the flag default-off already neutralizes the risk.
+
+**Affects:** `workers/` (`src/ats/`), `LINKEDIN_EASY_APPLY_ENABLED` in [`ENV_VARS.md`](ENV_VARS.md), [`PRD.md`](PRD.md). See also RESOLVED-12.
+
+---
+
+### RESOLVED-16 — Include lightweight manual job/link entry in Phase 1
+
+**Resolved:** 2026-06-09
+
+**Decision:** Add a lightweight manual job/link entry path (an authenticated endpoint plus a small PWA form) in Phase 1 as a fallback to email ingestion, so the owner can capture self-found postings. The submitted URL/paste flows into the same normalize → route-resolve → score pipeline. This resolves the former OPEN-04 to its Option 1.
+
+**Why:** Email ingestion misses postings the owner finds directly; a small manual-entry surface closes that gap immediately for little added scope.
+
+**Alternatives rejected:** Deferring to Phase 2 — leaves an ingestion gap through the entire MVP.
+
+**Affects:** `api/` (manual-entry endpoint), `web/` (entry form), [`PRD.md`](PRD.md).
+
+---
+
+### RESOLVED-17 — Single OpenRouter model; default `google/gemma-4-31b-it:free`
+
+**Resolved:** 2026-06-09
+
+**Decision:** Use a single `OPENROUTER_MODEL` for all LLM calls (scoring, summaries, drafts) — no per-task model tiers. The default is `google/gemma-4-31b-it:free`, staying on OpenRouter's free tier. This resolves the former OPEN-05 to its Option 1. Because free-tier models impose rate limits and looser structured-output guarantees, the OpenRouter client requests structured JSON where supported and degrades gracefully (retry / parse-fallback) rather than assuming strict schema enforcement.
+
+**Why:** Single-user, cost-sensitive app; a free model keeps spend at zero and one model keeps configuration and routing simple. Per-task tiering is premature.
+
+**Alternatives rejected:** Per-task model tiers (Option 2) — extra config/routing for no current benefit. A paid default — unnecessary spend for the MVP.
+
+**Affects:** `api/` (OpenRouter client, scoring/draft jobs), `OPENROUTER_MODEL` default in [`ENV_VARS.md`](ENV_VARS.md). See also RESOLVED-06.
+
+### RESOLVED-18 — Resume comes from the portfolio's JSON Resume via push-on-export, not PDF parsing
+
+**Resolved:** 2026-06-10
+
+**Decision:** The owner's external portfolio project (`My_Portfolio`, a Next.js app) is the single source of truth for the resume. It maintains a canonical JSON Resume object (`src/data/resume.json`) and exports `cv.pdf` + `CV_AG.md`. A `sync:resume` step in its export pipeline pushes all three artifacts to Waunder at `POST /api/profile/resume` (authenticated by opening a shared-secret session). Rails maps them **deterministically** into the singleton `Profile` and a primary `ResumeDocument` via `ResumeJsonImporter` — **no LLM and no PDF/OCR parsing** — because the JSON is already clean structure. The JSON becomes `parsed_structure`, the markdown becomes `raw_text`, and the PDF is attached via Active Storage as the file a worker uploads to an ATS form. This reshapes PROFILE-01 from "upload a PDF and LLM-parse it" to "ingest a JSON Resume + PDF and map it." A manual upload UI (WEB-04) remains a fallback on the same endpoint.
+
+**Why:** The portfolio already produces clean, canonical structured data; re-deriving it by OCR/LLM-parsing the exported PDF would be strictly lossy and add cost/failure surface for no benefit. Push-on-export triggers a sync exactly when the resume changes, needs no polling job, and never exposes the resume JSON (which carries email/phone PII) at a public URL.
+
+**Alternatives rejected:** Upload-and-parse a PDF (original PROFILE-01 scope) — lossy and unnecessary given canonical JSON exists. Pull from a published portfolio URL — requires exposing PII-bearing JSON and a polling/refresh job. Local file import (`../My_Portfolio`) — works only in dev; the portfolio repo is absent in Railway production. Active Storage local disk is ephemeral on Railway, accepted because the portfolio re-pushes the PDF on every export (self-healing); object storage is the durable upgrade if needed later.
+
+**Affects:** `api/` (`ResumeJsonImporter`, `Api::ProfileController`, `Api::ResumeDocumentsController`, Active Storage, routes), the external `My_Portfolio` repo (`scripts/sync-resume.js`, `sync:resume`/`publish:resume` npm scripts, its own `ENV_VARS.md`/`ARCHITECTURE.md`), [`ARCHITECTURE.md`](ARCHITECTURE.md), [`CONVENTIONS.md`](CONVENTIONS.md), PROFILE-01/WEB-04 on the workboard. See also RESOLVED-07, RESOLVED-08, RESOLVED-16.

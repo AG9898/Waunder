@@ -337,6 +337,17 @@ the values in use are `pending` (set at ingest), `scored`, `skipped` (no API key
 `Model.create!` and inject a mocked client via the `client:` keyword (mirroring the
 OpenrouterClient fake-transport seam).
 
+### 2026-06-10 — Resume ingested from the portfolio's JSON Resume, not parsed from PDF
+The resume's source of truth is the external `My_Portfolio` repo, which maintains a JSON Resume
+(`src/data/resume.json`) and pushes it + the exported `cv.pdf`/`CV_AG.md` to `POST /api/profile/resume`
+on every export (`scripts/sync-resume.js` → `npm run sync:resume`). `ResumeJsonImporter` maps it
+deterministically (no LLM/OCR) into the singleton `Profile` + a primary `ResumeDocument`; the JSON is
+`parsed_structure`, markdown is `raw_text`, PDF is an Active Storage attachment (`has_one_attached
+:file`). Active Storage was NOT installed before this — run `bin/rails active_storage:install` + migrate
+(done). The ingest reuses the shared-secret session (the portfolio logs in via `POST /api/session`),
+so no new auth surface. Profile reads expose encrypted PII as presence flags only, never the raw value.
+Cross-repo: changes to `My_Portfolio` are documented in ITS docs (ENV_VARS/ARCHITECTURE/Discoveries) too.
+
 ### 2026-06-10 — OpenrouterClient uses stdlib net/http (no Faraday/HTTParty in bundle)
 The api/ Gemfile has no HTTP client gem, so `OpenrouterClient` uses stdlib `Net::HTTP`. Tests must
 not hit the network: the client exposes an `http:` transport seam so specs inject a fake transport
