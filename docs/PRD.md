@@ -6,7 +6,7 @@
 > |---|---|
 > | Shipped | Nothing shipped yet. All three services are skeletons: `api/` exposes only `GET /api/health` and the Rails `/up` healthcheck; `web/` renders a placeholder Home component; `workers/` has types, safety guards, and a handler registry but an empty ATS handler registry and no poll loop. `docs/workboard.json` is empty. |
 > | In Progress | See `docs/workboard.json`. |
-> | Planned | Phase 1 (MVP) — end-to-end flow from forwarded job-alert email to trusted submit. |
+> | Planned | Phase 1 (MVP) — end-to-end flow from forwarded job-alert email to trusted submit. The Phase 1 task graph is seeded in `docs/workboard.json`. Direction-setting decisions are resolved: auth is a shared-secret session cookie + worker bearer token (RESOLVED-14); inbound email is Resend, not Mailgun (RESOLVED-13); LinkedIn Easy Apply ships behind a default-off flag (RESOLVED-15); lightweight manual job entry is in scope (RESOLVED-16); a single free OpenRouter model is used (RESOLVED-17). |
 
 ---
 
@@ -18,7 +18,7 @@ Waunder is a mobile-first, single-user personal job application assistant for it
 
 ## Users
 
-- **The owner (single user)** — the only user of the app. Reviews the daily digest, inspects scored jobs, requests and reviews tailored application drafts and outreach messages, and explicitly approves any application before it is submitted. There is no multi-tenant model, no roles, and no public signup. The authentication model for this single user is still open (see `docs/DECISIONS.md`).
+- **The owner (single user)** — the only user of the app. Reviews the daily digest, inspects scored jobs, requests and reviews tailored application drafts and outreach messages, and explicitly approves any application before it is submitted. There is no multi-tenant model, no roles, and no public signup. The single user authenticates with a shared-secret passphrase exchanged for a signed session cookie (RESOLVED-14 in `docs/DECISIONS.md`).
 
 ---
 
@@ -26,9 +26,9 @@ Waunder is a mobile-first, single-user personal job application assistant for it
 
 ### Phase 1 — MVP (end-to-end pipeline)
 
-Phase 1 delivers the full plan scenario: forward a job-alert email → Mailgun inbound webhook → Rails ingests, normalizes, and resolves the application route → LLM scores the job → a daily web-push digest is delivered → the owner reviews in the PWA → Waunder generates a tailored application draft / autofill payload → the owner approves → the Playwright worker fills/submits on a supported ATS → Rails reports final status.
+Phase 1 delivers the full plan scenario: forward a job-alert email → Resend inbound webhook → Rails ingests, normalizes, and resolves the application route → LLM scores the job → a daily web-push digest is delivered → the owner reviews in the PWA → Waunder generates a tailored application draft / autofill payload → the owner approves → the Playwright worker fills/submits on a supported ATS → Rails reports final status.
 
-- **Job discovery** via forwarded job-alert emails through Mailgun inbound webhooks; inbound alerts parsed into normalized job records.
+- **Job discovery** via forwarded job-alert emails through Resend inbound webhooks (RESOLVED-13); inbound alerts parsed into normalized job records. A lightweight manual job/link entry path is also available as a fallback (RESOLVED-16).
 - **Application route resolution** separating where a job was discovered from where it should be submitted. Stores source URL, canonical posting URL, application URL, route type, recommended route, and route confidence. Route types: `company_careers`, `greenhouse`, `lever`, `ashby`, `workday`, `linkedin_easy_apply`, `indeed_apply`, `glassdoor_apply`, `unknown`. Preference order: Direct ATS/company application URL > company careers page > job-board external apply URL > LinkedIn Easy Apply / Indeed Apply / Glassdoor Apply > manual apply only.
 - **LLM scoring and summaries** via OpenRouter (structured JSON where supported): job summary, match score, relevant requirements, missing/weak requirements, resume alignment notes, suggested application strategy, and red flags.
 - **Application assistance**: tailored resume emphasis notes, cover letter / message drafts where relevant, structured application answers, and autofill payloads for known form systems.
