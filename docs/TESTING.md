@@ -66,6 +66,10 @@ Be honest about the current state — most of the suite is still to be written.
 - **api/** — `spec/services/application_route_resolver_spec.rb`: deterministic route-type
   detection from URL fixtures, recommended-route preference ordering, posting/source URL tie-breaks,
   unknown→manual LLM-fallback flagging, determinism, and ApplicationRoute persistence/idempotency.
+- **api/** — `spec/services/openrouter_client_spec.rb`: OpenRouter client specs covering missing/blank
+  API-key typed error, env model default/override, structured-JSON parsing, parse fallback for
+  prose/code-fence-wrapped JSON, retry on 429/5xx then exhaustion, and PII-safe logging — all against
+  an injected fake transport with no live network calls.
 - **workers/** — `src/safety.test.ts`: unit tests for sensitive-field detection
   (`isSensitiveField`) and answer partitioning (`partitionBySensitivity`).
 - **web/** — **no tests yet.**
@@ -123,6 +127,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `api/spec/services/inbound_email_parser_spec.rb` | API (Rails) | Deterministic known-sender (LinkedIn/Indeed/Glassdoor) parsing into normalized JobPosts, company reuse, and LLM-fallback flagging |
 | `api/spec/jobs/parse_inbound_email_job_spec.rb` | API (Rails) | ParseInboundEmailJob wiring to the parser service for known-sender and fallback paths |
 | `api/spec/services/application_route_resolver_spec.rb` | API (Rails) | Deterministic ATS route-type detection from URL fixtures, recommended-route preference ranking, confidence, unknown→manual LLM fallback, and ApplicationRoute persistence/idempotency |
+| `api/spec/services/openrouter_client_spec.rb` | API (Rails) | OpenRouter client: missing-key typed error, env model default/override, structured-JSON parse, prose/code-fence parse fallback, retry/exhaustion, and PII-safe logging via injected fake transport (no live calls) |
 | `workers/src/safety.test.ts` | Worker safety | `isSensitiveField` detection + `partitionBySensitivity` splitting of answers |
 
 ---

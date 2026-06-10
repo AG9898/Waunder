@@ -117,6 +117,14 @@ dispatch.
   preference order **direct ATS > company careers > job-board external apply > LinkedIn/Indeed/
   Glassdoor apply > manual**, with a `route_confidence`. It performs no network or LLM calls; the
   LLM is the fallback only when no host pattern matches (`route_type == "unknown"`).
+- The OpenRouter LLM gateway is reached only through `OpenrouterClient`
+  (`app/services/openrouter_client.rb`) — never inlined in controllers or jobs. It reads
+  `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` (default `google/gemma-4-31b-it:free`), requests
+  structured JSON (`response_format: json_object`), and degrades gracefully for free-tier limits:
+  it retries transient/rate-limit responses (408/429/5xx) and, when a model wraps JSON in prose or
+  code fences, recovers the first balanced JSON value (parse fallback). It raises the typed
+  `OpenrouterClient::MissingApiKeyError` when no key is configured so callers can guard/skip, and
+  never logs prompt/completion contents or the API key (PII safety).
 
 ### Types and Validation
 

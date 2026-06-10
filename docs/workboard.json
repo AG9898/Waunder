@@ -352,7 +352,7 @@
       "id": "LLM-01",
       "title": "OpenRouter client (structured JSON, env model, key-guarded)",
       "description": "Implement an OpenRouter client service reading OPENROUTER_API_KEY and OPENROUTER_MODEL (default google/gemma-4-31b-it:free). Request structured JSON where supported and degrade gracefully (retry / parse-fallback) given free-tier rate limits and looser schema guarantees. Raise a typed error when the API key is absent so callers can guard/skip. Isolate as a client object, never inline in controllers. Never log prompt/completion contents containing PII.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "LLM",
       "depends_on": [

@@ -99,11 +99,13 @@ RSpec.describe ApplicationRouteResolver do
       job_post = job_post_with(posting_url: "https://jobs.ashbyhq.com/acme/p")
       resolver = described_class.new(job_post)
 
+      # The deterministic resolver must never construct or call the LLM client.
+      expect(OpenrouterClient).not_to receive(:new)
+
       first = resolver.resolve
       second = resolver.resolve
 
       expect(first.to_h).to eq(second.to_h)
-      expect(defined?(OpenrouterClient)).to be_nil.or be_falsey
     end
 
     it "tolerates malformed URLs without raising" do
