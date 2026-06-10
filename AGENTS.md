@@ -352,3 +352,13 @@ fallback keys in the test env so the suite is hermetic. To encrypt a JSON field,
 `text` column with `serialize :col, coder: JSON` declared *before* `encrypts :col` — encrypting a
 `jsonb` column fails because ciphertext is not valid JSON. Verify encryption-at-rest in specs by
 selecting the column via raw SQL and asserting the plaintext is absent.
+
+### 2026-06-10 — ApplicationDraft autofill payload mirrors the worker, not the ATS form
+The `application_drafts.autofill_payload` jsonb is worker-shaped (`application_id`, `ats`,
+`apply_url`, `answers: [{field, value}]`, optional `resume_ref`), matching `workers/src/types.ts`
+`ApplicationTask`. `ats` is the worker `AtsKind` (`greenhouse`/`lever`/`ashby`/`linkedin_easy_apply`),
+NOT every `ApplicationRoute#route_type` — `ApplicationDraftGenerator::ATS_BY_ROUTE_TYPE` maps only
+those four and falls back to `"manual"` for everything else (workday, unknown, job boards). Profile
+contact/URL fields are merged into `answers` deterministically (never via the LLM), and the system
+prompt instructs the model to OMIT sensitive questions so they never reach the payload. The generator
+creates no draft and never raises when no API key is configured (returns a `skipped` Result).

@@ -79,6 +79,12 @@ Be honest about the current state — most of the suite is still to be written.
   coercion, parser-flagged fallback scoring, graceful skip (marked `skipped`, no raise) when no API
   key is configured, `failed` marking on client errors, and PII-safe logging — using a mocked
   OpenRouter client (no live calls).
+- **api/** — `spec/jobs/generate_application_draft_job_spec.rb`: ApplicationDraftGenerator +
+  GenerateApplicationDraftJob specs covering draft creation from mocked LLM JSON, ATS-shaped
+  autofill payload keyed to the resolved route (greenhouse/lever, manual fallback for unknown
+  routes), Profile data merged into autofill answers, malformed structured-answer dropping, graceful
+  skip (no draft, no raise) when no API key is configured, `failed` result on client errors, and
+  PII-safe logging — using a mocked OpenRouter client (no live calls).
 - **workers/** — `src/safety.test.ts`: unit tests for sensitive-field detection
   (`isSensitiveField`) and answer partitioning (`partitionBySensitivity`).
 - **web/** — **no tests yet.**
@@ -140,6 +146,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `api/spec/services/application_route_resolver_spec.rb` | API (Rails) | Deterministic ATS route-type detection from URL fixtures, recommended-route preference ranking, confidence, unknown→manual LLM fallback, and ApplicationRoute persistence/idempotency |
 | `api/spec/services/openrouter_client_spec.rb` | API (Rails) | OpenRouter client: missing-key typed error, env model default/override, structured-JSON parse, prose/code-fence parse fallback, retry/exhaustion, and PII-safe logging via injected fake transport (no live calls) |
 | `api/spec/jobs/score_job_post_job_spec.rb` | API (Rails) | JobScorer/ScoreJobPostJob: scoring-field population from mocked LLM JSON, match_score clamping, string-list coercion, fallback-posting scoring, graceful skip with no API key, failed-on-error, PII-safe logging (mocked client) |
+| `api/spec/jobs/generate_application_draft_job_spec.rb` | API (Rails) | ApplicationDraftGenerator/GenerateApplicationDraftJob: draft generation from mocked LLM JSON, ATS-shaped autofill payload keyed to the resolved route (manual fallback for unknown), Profile data merged into autofill answers, malformed-answer dropping, graceful skip with no API key, failed-on-error, PII-safe logging (mocked client) |
 | `workers/src/safety.test.ts` | Worker safety | `isSensitiveField` detection + `partitionBySensitivity` splitting of answers |
 
 ---

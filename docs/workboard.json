@@ -416,7 +416,7 @@
       "id": "LLM-03",
       "title": "Application draft and autofill payload generation",
       "description": "solid_queue job/service generating an ApplicationDraft for a JobPost + Profile: tailored resume emphasis notes, a cover letter/message draft, structured application answers, and an autofill payload keyed to the resolved route's ATS shape. Uses encrypted Profile/ResumeDocument data and never logs PII. Skips gracefully when no API key is configured.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "LLM",
       "depends_on": [

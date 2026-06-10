@@ -140,6 +140,20 @@ dispatch.
   also the LLM fallback for parser-flagged postings. When no API key is configured it skips
   gracefully (`scoring_status: "skipped"`, no raise); on an `OpenrouterClient::Error` it marks the
   post `failed`. It never logs prompt/completion contents (resume PII).
+- Application draft generation is isolated in `ApplicationDraftGenerator`
+  (`app/services/application_draft_generator.rb`) and dispatched by `GenerateApplicationDraftJob`
+  (`app/jobs/generate_application_draft_job.rb`, `solid_queue`). Given an `Application` (+ `Profile`),
+  it calls `OpenrouterClient` and writes an `ApplicationDraft`: `resume_emphasis_notes`,
+  `cover_letter`, `message`, `structured_answers` (array of `{question, answer}`), and an
+  `autofill_payload` keyed to the resolved route's ATS shape (`ats` is the worker-facing kind —
+  `greenhouse`/`lever`/`ashby`/`linkedin_easy_apply`, or `manual` for unknown/non-automatable
+  routes — with `answers` as `{field, value}` pairs and an optional `resume_ref`). Profile-derived
+  autofill fields (name, email, phone, location, profile URLs) are added deterministically, never via
+  the LLM. The generator never invents sensitive-field answers (legal, demographic, salary,
+  disability, sponsorship, identity); the prompt instructs the model to omit them. When no API key is
+  configured it skips gracefully (no draft created, no raise); on an `OpenrouterClient::Error` it
+  returns a `failed` result without creating a draft. It never logs prompt/completion contents or
+  Profile/ResumeDocument PII.
 
 ### Types and Validation
 
