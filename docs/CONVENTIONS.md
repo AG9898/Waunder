@@ -110,6 +110,13 @@ dispatch.
   no postings, the raw content stays persisted on the `InboundEmail` and a `parse_result` entry
   (with `needs_llm_fallback: true`) is written into its `raw_payload` so LLM scoring can pick it
   up. Inbound content is never silently dropped.
+- Application-route resolution is deterministic and runs in the ingest pipeline right after
+  JobPost normalization, via `ApplicationRouteResolver` (`app/services/application_route_resolver.rb`).
+  It detects `route_type` from URL host patterns (greenhouse/lever/ashby/workday plus
+  linkedin/indeed/glassdoor apply, else `unknown`) and records a `recommended_route` using the
+  preference order **direct ATS > company careers > job-board external apply > LinkedIn/Indeed/
+  Glassdoor apply > manual**, with a `route_confidence`. It performs no network or LLM calls; the
+  LLM is the fallback only when no host pattern matches (`route_type == "unknown"`).
 
 ### Types and Validation
 

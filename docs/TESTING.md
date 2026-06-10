@@ -63,6 +63,9 @@ Be honest about the current state — most of the suite is still to be written.
   reuse, and LLM-fallback flagging for unknown senders and empty parses.
 - **api/** — `spec/jobs/parse_inbound_email_job_spec.rb`: job spec wiring the inbound parse job
   to the parser service for both the known-sender and LLM-fallback paths.
+- **api/** — `spec/services/application_route_resolver_spec.rb`: deterministic route-type
+  detection from URL fixtures, recommended-route preference ordering, posting/source URL tie-breaks,
+  unknown→manual LLM-fallback flagging, determinism, and ApplicationRoute persistence/idempotency.
 - **workers/** — `src/safety.test.ts`: unit tests for sensitive-field detection
   (`isSensitiveField`) and answer partitioning (`partitionBySensitivity`).
 - **web/** — **no tests yet.**
@@ -119,6 +122,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `api/spec/requests/webhooks/resend_spec.rb` | API (Rails) | Resend inbound webhook Svix verification, raw inbound-email persistence, parse-job enqueueing, provider-only auth, and PII-safe logging |
 | `api/spec/services/inbound_email_parser_spec.rb` | API (Rails) | Deterministic known-sender (LinkedIn/Indeed/Glassdoor) parsing into normalized JobPosts, company reuse, and LLM-fallback flagging |
 | `api/spec/jobs/parse_inbound_email_job_spec.rb` | API (Rails) | ParseInboundEmailJob wiring to the parser service for known-sender and fallback paths |
+| `api/spec/services/application_route_resolver_spec.rb` | API (Rails) | Deterministic ATS route-type detection from URL fixtures, recommended-route preference ranking, confidence, unknown→manual LLM fallback, and ApplicationRoute persistence/idempotency |
 | `workers/src/safety.test.ts` | Worker safety | `isSensitiveField` detection + `partitionBySensitivity` splitting of answers |
 
 ---

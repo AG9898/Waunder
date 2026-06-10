@@ -47,7 +47,7 @@ class InboundEmailParser
   def persist(postings)
     postings.map do |posting|
       company = Company.find_or_create_by!(name: posting[:company])
-      JobPost.create!(
+      job_post = JobPost.create!(
         company: company,
         title: posting[:title],
         location: posting[:location],
@@ -56,6 +56,10 @@ class InboundEmailParser
         source: posting[:source],
         scoring_status: "pending"
       )
+      # Resolve the application route deterministically right after
+      # normalization so downstream scoring/draft jobs have a recommended route.
+      ApplicationRouteResolver.new(job_post).call
+      job_post
     end
   end
 

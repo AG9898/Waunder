@@ -288,7 +288,7 @@
       "id": "ROUTE-01",
       "title": "Deterministic ATS detection and route-preference ranking",
       "description": "Implement deterministic ApplicationRoute resolution: detect route_type from URL patterns (greenhouse/lever/ashby/workday/linkedin/indeed/glassdoor/company_careers/unknown) and rank to a recommended application route using the preference order (direct ATS/company application URL > company careers > job-board external apply > LinkedIn/Indeed/Glassdoor apply > manual only), recording a route confidence. Fall back to the LLM only when no pattern matches. Runs in the ingest pipeline after normalization.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "ROUTE",
       "depends_on": [

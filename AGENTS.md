@@ -316,3 +316,13 @@ Inbound email parsing flags LLM fallback by writing a `parse_result` object into
 objects under `app/services/inbound_email_parsers/` autoload via Zeitwerk — do NOT add
 `require_relative` between them or you get "already loaded" / redefinition errors; rely on the
 namespace-matching path (`linked_in.rb` → `InboundEmailParsers::LinkedIn`).
+
+### 2026-06-10 — ApplicationRoute schema already complete; no migration for ROUTE-01
+The `application_routes` table already ships every column route resolution needs (`route_type`
+default `unknown` + check constraint, `route_confidence` decimal(4,3) range constraint,
+`recommended_route`, `application_url`, `canonical_posting_url`, `source_url`), so deterministic
+resolution (`ApplicationRouteResolver`) needs no migration. Note `route_type` uses the
+`*_easy_apply`/`*_apply` enum values (`linkedin_easy_apply`, `indeed_apply`, `glassdoor_apply`),
+while `recommended_route` is a separate free string capturing *how* to apply (`direct_ats`,
+`job_board_apply`, `manual`). Resolution is hooked into `InboundEmailParser#persist` right after
+JobPost creation.
