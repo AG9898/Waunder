@@ -383,7 +383,7 @@
       "id": "LLM-02",
       "title": "Job scoring and summary background job",
       "description": "solid_queue job that scores a normalized JobPost via the OpenRouter client and writes structured results to the JobPost: summary, match score, relevant requirements, missing/weak requirements, resume alignment notes, suggested application strategy, and red flags. Also serves as the LLM fallback for postings the deterministic parser flagged. Skips gracefully (marks skipped, no error) when no API key is configured.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "LLM",
       "depends_on": [

@@ -70,6 +70,11 @@ Be honest about the current state — most of the suite is still to be written.
   API-key typed error, env model default/override, structured-JSON parsing, parse fallback for
   prose/code-fence-wrapped JSON, retry on 429/5xx then exhaustion, and PII-safe logging — all against
   an injected fake transport with no live network calls.
+- **api/** — `spec/jobs/score_job_post_job_spec.rb`: JobScorer + ScoreJobPostJob specs covering
+  population of the scoring/summary fields from mocked LLM JSON, match_score clamping and string-list
+  coercion, parser-flagged fallback scoring, graceful skip (marked `skipped`, no raise) when no API
+  key is configured, `failed` marking on client errors, and PII-safe logging — using a mocked
+  OpenRouter client (no live calls).
 - **workers/** — `src/safety.test.ts`: unit tests for sensitive-field detection
   (`isSensitiveField`) and answer partitioning (`partitionBySensitivity`).
 - **web/** — **no tests yet.**
@@ -128,6 +133,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `api/spec/jobs/parse_inbound_email_job_spec.rb` | API (Rails) | ParseInboundEmailJob wiring to the parser service for known-sender and fallback paths |
 | `api/spec/services/application_route_resolver_spec.rb` | API (Rails) | Deterministic ATS route-type detection from URL fixtures, recommended-route preference ranking, confidence, unknown→manual LLM fallback, and ApplicationRoute persistence/idempotency |
 | `api/spec/services/openrouter_client_spec.rb` | API (Rails) | OpenRouter client: missing-key typed error, env model default/override, structured-JSON parse, prose/code-fence parse fallback, retry/exhaustion, and PII-safe logging via injected fake transport (no live calls) |
+| `api/spec/jobs/score_job_post_job_spec.rb` | API (Rails) | JobScorer/ScoreJobPostJob: scoring-field population from mocked LLM JSON, match_score clamping, string-list coercion, fallback-posting scoring, graceful skip with no API key, failed-on-error, PII-safe logging (mocked client) |
 | `workers/src/safety.test.ts` | Worker safety | `isSensitiveField` detection + `partitionBySensitivity` splitting of answers |
 
 ---

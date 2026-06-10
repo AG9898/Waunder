@@ -327,6 +327,16 @@ while `recommended_route` is a separate free string capturing *how* to apply (`d
 `job_board_apply`, `manual`). Resolution is hooked into `InboundEmailParser#persist` right after
 JobPost creation.
 
+### 2026-06-10 — JobPost scoring fields already exist; no migration for LLM-02
+The `job_posts` table already has every scoring column (`summary`, `match_score` with a 0–100
+check constraint, `relevant_requirements`/`missing_requirements`/`red_flags` jsonb arrays,
+`resume_alignment_notes`, `application_strategy`, `scoring_status` default `pending`, `scored_at`),
+so `JobScorer`/`ScoreJobPostJob` needed no migration. `scoring_status` is a free string column —
+the values in use are `pending` (set at ingest), `scored`, `skipped` (no API key), and `failed`
+(client error). The repo has no FactoryBot; job/service specs build records with plain
+`Model.create!` and inject a mocked client via the `client:` keyword (mirroring the
+OpenrouterClient fake-transport seam).
+
 ### 2026-06-10 — OpenrouterClient uses stdlib net/http (no Faraday/HTTParty in bundle)
 The api/ Gemfile has no HTTP client gem, so `OpenrouterClient` uses stdlib `Net::HTTP`. Tests must
 not hit the network: the client exposes an `http:` transport seam so specs inject a fake transport

@@ -125,6 +125,14 @@ dispatch.
   code fences, recovers the first balanced JSON value (parse fallback). It raises the typed
   `OpenrouterClient::MissingApiKeyError` when no key is configured so callers can guard/skip, and
   never logs prompt/completion contents or the API key (PII safety).
+- Job scoring is isolated in `JobScorer` (`app/services/job_scorer.rb`) and dispatched by
+  `ScoreJobPostJob` (`app/jobs/score_job_post_job.rb`, `solid_queue`). The scorer builds the prompt,
+  calls `OpenrouterClient`, and writes the structured results onto the JobPost (`summary`,
+  `match_score` clamped to 0–100, `relevant_requirements`, `missing_requirements`,
+  `resume_alignment_notes`, `application_strategy`, `red_flags`, `scoring_status`, `scored_at`). It is
+  also the LLM fallback for parser-flagged postings. When no API key is configured it skips
+  gracefully (`scoring_status: "skipped"`, no raise); on an `OpenrouterClient::Error` it marks the
+  post `failed`. It never logs prompt/completion contents (resume PII).
 
 ### Types and Validation
 
