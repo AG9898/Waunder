@@ -1,3 +1,8 @@
 # Build artifacts
 /web/app.wasm
 /bin/
+
+# Local env (never commit secrets)
+.env
+.env.*
+!.env.example
