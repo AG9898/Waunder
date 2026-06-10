@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_09_122000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_10_090000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -132,9 +132,47 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_09_122000) do
     t.check_constraint "match_score IS NULL OR match_score >= 0 AND match_score <= 100", name: "job_posts_match_score_range"
   end
 
+  create_table "profiles", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.jsonb "education", default: [], null: false
+    t.string "email"
+    t.string "full_name"
+    t.string "github_url"
+    t.string "headline"
+    t.string "linkedin_url"
+    t.string "location"
+    t.string "phone"
+    t.string "portfolio_url"
+    t.jsonb "skills", default: [], null: false
+    t.text "street_address"
+    t.text "summary"
+    t.datetime "updated_at", null: false
+    t.jsonb "work_history", default: [], null: false
+    t.check_constraint "jsonb_typeof(education) = 'array'::text", name: "profiles_education_json_array"
+    t.check_constraint "jsonb_typeof(skills) = 'array'::text", name: "profiles_skills_json_array"
+    t.check_constraint "jsonb_typeof(work_history) = 'array'::text", name: "profiles_work_history_json_array"
+  end
+
+  create_table "resume_documents", force: :cascade do |t|
+    t.string "content_type"
+    t.datetime "created_at", null: false
+    t.string "filename"
+    t.string "parse_status", default: "pending", null: false
+    t.datetime "parsed_at"
+    t.text "parsed_structure"
+    t.boolean "primary", default: false, null: false
+    t.bigint "profile_id", null: false
+    t.text "raw_text"
+    t.string "storage_key"
+    t.string "title", null: false
+    t.datetime "updated_at", null: false
+    t.index ["profile_id"], name: "index_resume_documents_on_profile_id"
+  end
+
   add_foreign_key "application_drafts", "applications"
   add_foreign_key "application_routes", "job_posts"
   add_foreign_key "applications", "job_posts"
   add_foreign_key "audit_events", "applications"
   add_foreign_key "job_posts", "companies"
+  add_foreign_key "resume_documents", "profiles"
 end

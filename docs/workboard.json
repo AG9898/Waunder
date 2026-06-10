@@ -161,7 +161,7 @@
       "id": "DATA-03",
       "title": "Profile and ResumeDocument with encrypted sensitive fields",
       "description": "Migrations and models for Profile (structured profile capture) and ResumeDocument (uploaded resume plus parsed structure). Sensitive resume/profile fields use Active Record Encryption (encrypts :field, deterministic where the field must remain queryable). Sensitive fields are never stored in plaintext.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "DATA",
       "depends_on": [

@@ -58,6 +58,10 @@ Be honest about the current state — most of the suite is still to be written.
 - **api/** — `spec/models/application_spec.rb`, `spec/models/application_draft_spec.rb`, and
   `spec/models/audit_event_spec.rb`: model specs for the application lifecycle, draft JSON
   payload shape, audit payload shape, and associations.
+- **api/** — `spec/models/profile_spec.rb` and `spec/models/resume_document_spec.rb`: model specs
+  for the encrypted-at-rest profile/resume fields. They assert the underlying column holds
+  ciphertext (raw SQL select) while the accessor returns plaintext, and that deterministic email
+  encryption stays queryable.
 - **api/** — `spec/services/inbound_email_parser_spec.rb`: service specs for the deterministic
   known-sender (LinkedIn/Indeed/Glassdoor) email parser, normalized JobPost persistence, company
   reuse, and LLM-fallback flagging for unknown senders and empty parses.
@@ -126,6 +130,8 @@ Keep this table up to date — add a row when adding a new test file.
 | `api/spec/models/audit_event_spec.rb` | API (Rails) | audit event application/status validation plus screenshot/log/metadata JSON shapes |
 | `api/spec/models/company_spec.rb` | API (Rails) | company name validation and job-post association |
 | `api/spec/models/job_post_spec.rb` | API (Rails) | job post company/title validations, application-route association, match-score bounds |
+| `api/spec/models/profile_spec.rb` | API (Rails) | profile name/JSON-shape validation, encrypted-at-rest ciphertext check for email/phone/address, deterministic-email queryability |
+| `api/spec/models/resume_document_spec.rb` | API (Rails) | resume document profile/title validation, parsed_structure default, encrypted-at-rest ciphertext check for raw_text/parsed_structure |
 | `api/spec/requests/api/auth_spec.rb` | API (Rails) | shared-secret session success/failure, protected endpoint gating, health bypass, worker bearer guard |
 | `api/spec/requests/api/health_spec.rb` | API (Rails) | `GET /api/health` — 200 status, JSON shape, database connectivity |
 | `api/spec/requests/webhooks/resend_spec.rb` | API (Rails) | Resend inbound webhook Svix verification, raw inbound-email persistence, parse-job enqueueing, provider-only auth, and PII-safe logging |

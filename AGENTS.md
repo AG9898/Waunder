@@ -343,3 +343,12 @@ not hit the network: the client exposes an `http:` transport seam so specs injec
 returning canned responses — there is no WebMock/VCR in this repo. Class name is `OpenrouterClient`
 (Zeitwerk-cased from `openrouter_client.rb`). The route-resolver determinism spec was updated to
 assert `OpenrouterClient` is never `.new`'d rather than asserting the constant is undefined.
+
+### 2026-06-10 — Active Record Encryption was unwired until DATA-03
+The `ACTIVE_RECORD_ENCRYPTION_*` env vars existed in `.env` but Rails read none of them (no dotenv
+gem, `.env` not auto-loaded, keys not in credentials). `config/initializers/active_record_encryption.rb`
+now maps those env vars into `config.active_record.encryption` and provides fixed non-secret
+fallback keys in the test env so the suite is hermetic. To encrypt a JSON field, store it in a
+`text` column with `serialize :col, coder: JSON` declared *before* `encrypts :col` — encrypting a
+`jsonb` column fails because ciphertext is not valid JSON. Verify encryption-at-rest in specs by
+selecting the column via raw SQL and asserting the plaintext is absent.

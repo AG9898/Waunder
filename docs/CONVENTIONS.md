@@ -32,7 +32,14 @@ These apply across every stack in this project.
   route detection from URL patterns, known-sender email parsing, route-preference ranking).
   Fall back to the LLM only when no pattern matches or the format is novel/unstructured.
 - **Encrypt sensitive data at rest.** Sensitive resume/profile fields use Active Record
-  Encryption (`encrypts :field`); they are never stored in plaintext.
+  Encryption (`encrypts :field`); they are never stored in plaintext. Use
+  `encrypts :field, deterministic: true` only when the field must stay queryable (e.g.
+  `Profile#email`); all other sensitive fields use the default non-deterministic encryption.
+  Encrypted JSON (e.g. `ResumeDocument#parsed_structure`) is stored in a `text` column with
+  `serialize ..., coder: JSON` underneath `encrypts`, not in a `jsonb` column. Encryption keys
+  are wired from `ACTIVE_RECORD_ENCRYPTION_*` env vars in
+  `config/initializers/active_record_encryption.rb` (the test env falls back to fixed non-secret
+  keys so the suite is hermetic).
 
 ---
 

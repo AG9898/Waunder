@@ -57,7 +57,10 @@ variables. Copy the relevant template to `.env` for local development; never com
    locally (`OPENROUTER_API_KEY`, `RESEND_WEBHOOK_SECRET`, and VAPID keys for those flows).
 3. Provide the Active Record Encryption keys. `bin/rails db:encryption:init` generates nested
    `active_record_encryption` YAML values that map to the `ACTIVE_RECORD_ENCRYPTION_*`
-   environment variables in the template.
+   environment variables in the template. These env vars are read by
+   `config/initializers/active_record_encryption.rb` into `config.active_record.encryption`;
+   the test environment falls back to fixed non-secret keys so the suite needs no populated
+   `.env`.
 4. Keep the local `RAILS_MASTER_KEY` in `api/config/master.key` (already gitignored).
 5. Never commit `api/.env`.
 
