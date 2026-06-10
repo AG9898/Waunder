@@ -258,7 +258,7 @@
       "id": "INGEST-02",
       "title": "Deterministic known-sender email parser to normalized JobPost",
       "description": "Implement deterministic parsers for known job-alert senders (LinkedIn, Indeed, Glassdoor) that extract postings from a forwarded alert into normalized JobPost records (title, company, location, source URL, posting URL). Prefer deterministic parsing; when no known-sender parser matches, persist the raw content and flag it for LLM fallback (consumed by LLM scoring). Isolate parsing in a tested service object; no live external calls in tests.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "INGEST",
       "depends_on": [

@@ -58,6 +58,11 @@ Be honest about the current state — most of the suite is still to be written.
 - **api/** — `spec/models/application_spec.rb`, `spec/models/application_draft_spec.rb`, and
   `spec/models/audit_event_spec.rb`: model specs for the application lifecycle, draft JSON
   payload shape, audit payload shape, and associations.
+- **api/** — `spec/services/inbound_email_parser_spec.rb`: service specs for the deterministic
+  known-sender (LinkedIn/Indeed/Glassdoor) email parser, normalized JobPost persistence, company
+  reuse, and LLM-fallback flagging for unknown senders and empty parses.
+- **api/** — `spec/jobs/parse_inbound_email_job_spec.rb`: job spec wiring the inbound parse job
+  to the parser service for both the known-sender and LLM-fallback paths.
 - **workers/** — `src/safety.test.ts`: unit tests for sensitive-field detection
   (`isSensitiveField`) and answer partitioning (`partitionBySensitivity`).
 - **web/** — **no tests yet.**
@@ -112,6 +117,8 @@ Keep this table up to date — add a row when adding a new test file.
 | `api/spec/requests/api/auth_spec.rb` | API (Rails) | shared-secret session success/failure, protected endpoint gating, health bypass, worker bearer guard |
 | `api/spec/requests/api/health_spec.rb` | API (Rails) | `GET /api/health` — 200 status, JSON shape, database connectivity |
 | `api/spec/requests/webhooks/resend_spec.rb` | API (Rails) | Resend inbound webhook Svix verification, raw inbound-email persistence, parse-job enqueueing, provider-only auth, and PII-safe logging |
+| `api/spec/services/inbound_email_parser_spec.rb` | API (Rails) | Deterministic known-sender (LinkedIn/Indeed/Glassdoor) parsing into normalized JobPosts, company reuse, and LLM-fallback flagging |
+| `api/spec/jobs/parse_inbound_email_job_spec.rb` | API (Rails) | ParseInboundEmailJob wiring to the parser service for known-sender and fallback paths |
 | `workers/src/safety.test.ts` | Worker safety | `isSensitiveField` detection + `partitionBySensitivity` splitting of answers |
 
 ---
@@ -120,12 +127,12 @@ Keep this table up to date — add a row when adding a new test file.
 
 ### Rules
 
-- Unit tests must not hit live external services — mock OpenRouter, Mailgun, web push, and the
+- Unit tests must not hit live external services — mock OpenRouter, Resend, web push, and the
   Playwright browser wherever possible.
 - Rails request specs assert both auth and the JSON response shape.
 - Encrypted-storage model specs verify that sensitive profile/resume fields are encrypted at
   rest (not stored in plaintext).
-- Webhook specs must cover Mailgun signature validation, not just the happy-path body parse.
+- Webhook specs must cover Resend inbound Svix signature validation, not just the happy-path body parse.
 - Worker safety tests are pure input/output over `isSensitiveField` / `partitionBySensitivity` —
   no mocks.
 - Every new public endpoint (Rails), service/client object, go-app screen component, or ATS
@@ -139,7 +146,7 @@ Keep this table up to date — add a row when adding a new test file.
 
 - Request specs use RSpec with `type: :request` and `require "rails_helper"`; drive endpoints
   over HTTP and assert status + parsed JSON body.
-- Mock external clients (OpenRouter, Mailgun, web push) — never call the live services.
+- Mock external clients (OpenRouter, Resend, web push) — never call the live services.
 - Model specs cover encrypted-field behavior directly on the model.
 
 **Web (`web/`, go-app):**

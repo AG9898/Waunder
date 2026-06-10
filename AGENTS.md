@@ -309,3 +309,10 @@ requiring presence.
 The `svix` Ruby gem verifies Resend webhook signatures against the raw request body, but the
 verified JSON payload may come back with symbol keys. Normalize the verified event with
 `deep_stringify_keys` before checking Resend fields like `type`, `id`, and `data`.
+
+### 2026-06-10 — Inbound parse fallback flag without a migration
+Inbound email parsing flags LLM fallback by writing a `parse_result` object into the existing
+`inbound_emails.raw_payload` jsonb (no schema change), keeping the raw content persisted. Service
+objects under `app/services/inbound_email_parsers/` autoload via Zeitwerk — do NOT add
+`require_relative` between them or you get "already loaded" / redefinition errors; rely on the
+namespace-matching path (`linked_in.rb` → `InboundEmailParsers::LinkedIn`).

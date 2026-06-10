@@ -18,7 +18,7 @@ Waunder is a monorepo with three stacks:
 These apply across every stack in this project.
 
 - **No secrets in source.** All credentials and tokens come from environment variables only
-  (VAPID keys, OpenRouter, Mailgun, `DATABASE_URL`, `API_INTERNAL_URL`, etc.).
+  (VAPID keys, OpenRouter, Resend, auth secrets, `DATABASE_URL`, `API_INTERNAL_URL`, etc.).
   See [`ENV_VARS.md`](ENV_VARS.md) for the canonical variable matrix.
 - **No PII in logs.** Never log the user's personal, resume, profile, or contact data — names,
   contact details, addresses, identifiers, resume contents, or saved contact-candidate
@@ -95,13 +95,21 @@ dispatch.
   `Api::BaseController`. Shared auth, error handling, and serialization live in
   `Api::BaseController` — not duplicated per controller.
 - Routes are namespaced under `/api` in `config/routes.rb`. Inbound webhooks are namespaced
-  under `/webhooks/*` (e.g. `/webhooks/mailgun/inbound`).
+  under `/webhooks/*` (e.g. `/webhooks/resend/inbound`).
 - Domain models cover the resources in the plan: `Profile`, `ResumeDocument`, `JobPost`,
   `ApplicationRoute`, `Company`, `ContactCandidate`, `Application`, `ApplicationDraft`,
   `OutreachDraft`, `PushSubscription`, `AuditEvent`.
 - Background work is implemented as ActiveJob jobs in `app/jobs/`, run on `solid_queue`.
-- LLM calls (OpenRouter) and all external-service calls (Mailgun, web push) are isolated in
+- LLM calls (OpenRouter) and all external-service calls (Resend, web push) are isolated in
   service / client objects — **never inlined in controllers**.
+- Domain logic invoked from jobs is isolated in service objects under `app/services/`. Inbound
+  email ingestion uses `InboundEmailParser` (the dispatcher) plus per-sender deterministic parsers
+  under `app/services/inbound_email_parsers/` (one class per known sender, subclassing
+  `InboundEmailParsers::Base`). Parsers perform no network calls — they extract postings purely
+  from the persisted email body. When no known-sender parser matches, or a matched parser yields
+  no postings, the raw content stays persisted on the `InboundEmail` and a `parse_result` entry
+  (with `needs_llm_fallback: true`) is written into its `raw_payload` so LLM scoring can pick it
+  up. Inbound content is never silently dropped.
 
 ### Types and Validation
 
@@ -112,9 +120,14 @@ dispatch.
 
 ### Auth
 
-- Single-user private app. The auth/session approach is an **open decision** — see
-  [`DECISIONS.md`](DECISIONS.md). Do not invent or hardcode an auth scheme; follow the resolved
-  decision when it lands.
+- Single-user private app. Auth is a shared-secret session cookie plus a worker bearer token
+  (RESOLVED-14). The owner POSTs the `APP_SHARED_SECRET` passphrase to `POST /api/session`,
+  receiving a signed, HTTP-only session cookie (signed with `SESSION_SECRET`). `Api::BaseController`
+  enforces the session via a `before_action` on every `/api` endpoint **except** health.
+- The worker authenticates with a static `WORKER_SERVICE_TOKEN` bearer (`Authorization: Bearer`)
+  on its task-pull/report endpoints — never the human session cookie. Webhook endpoints under
+  `/webhooks/*` are not session-guarded; they authenticate by provider signature instead.
+- Read secrets from the environment only — never hardcode the passphrase, signing key, or token.
 
 ### DB Access
 
@@ -205,7 +218,7 @@ Conventions that affect how code is written:
   handler needs at least one test before the task is marked done.
 - Worker safety logic is pure input/output over `isSensitiveField` / `partitionBySensitivity` —
   test it directly, no mocks.
-- Unit tests must not hit live external services — mock OpenRouter, Mailgun, web push, and the
+- Unit tests must not hit live external services — mock OpenRouter, Resend, web push, and the
   Playwright browser where possible.
 
 Full testing guide: [`TESTING.md`](TESTING.md)
@@ -229,7 +242,7 @@ Hard rules. Agents follow these unconditionally.
 
 - Always prefer a deterministic script over an LLM call when the input format is predictable.
 - Always return an auditable status (status + reason + screenshots/logs) from worker tasks.
-- Always isolate external API calls (OpenRouter, Mailgun, web push) in service / client objects.
+- Always isolate external API calls (OpenRouter, Resend, web push) in service / client objects.
 - Always keep the frontend same-origin by talking to Rails through the `/api` proxy.
 - Always run the fast verification suite before marking a task done.
 - Always update `docs/` files when public behavior, interfaces, or invariants change.
