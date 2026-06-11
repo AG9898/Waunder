@@ -56,6 +56,9 @@ Be honest about the current state — most of the suite is still to be written.
 - **api/** — `spec/requests/api/job_posts_spec.rb`: request specs for authenticated manual
   `POST /api/job_posts`, covering deterministic JobPost creation, route resolution, scoring-job
   enqueueing, unauthenticated refusal, and invalid-input JSON errors.
+- **api/** — `spec/requests/api/push_subscriptions_spec.rb`: request specs for public
+  `GET /api/push/vapid_public_key`, authenticated `POST`/`DELETE /api/push_subscription`,
+  idempotent endpoint updates, and auth gating.
 - **api/** — `spec/requests/api/worker_tasks_spec.rb`: request specs for worker bearer-only
   task pull/report endpoints, covering task payload shape, missing/invalid bearer rejection,
   human-session rejection, application status updates, and audit artifact persistence.
@@ -161,6 +164,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `api/spec/requests/api/auth_spec.rb` | API (Rails) | shared-secret session success/failure, protected endpoint gating, health bypass, worker bearer guard |
 | `api/spec/requests/api/applications_spec.rb` | API (Rails) | `POST /api/applications/:id/submit` approved clean-payload dispatch, audit event recording, approval-required/unsupported/unsafe refusal paths, and 401 auth gating with no enqueue on refusal |
 | `api/spec/requests/api/job_posts_spec.rb` | API (Rails) | `POST /api/job_posts` authenticated manual URL/text ingestion, route resolution, scoring enqueue, 401 auth gating, and invalid-input JSON error shape |
+| `api/spec/requests/api/push_subscriptions_spec.rb` | API (Rails) | `GET /api/push/vapid_public_key` public VAPID key read; `POST`/`DELETE /api/push_subscription` authenticated subscribe/unsubscribe, idempotent endpoint update, and 401 auth gating |
 | `api/spec/requests/api/worker_tasks_spec.rb` | API (Rails) | `GET /api/worker_tasks` worker-shaped task pull with bearer-only auth; `POST /api/worker_tasks/:id/report` status updates, audit screenshots/log refs, and human-session rejection |
 | `api/spec/requests/api/profile_spec.rb` | API (Rails) | `POST /api/profile/resume` JSON Resume → Profile + primary ResumeDocument mapping, PDF Active Storage attachment, encrypted-at-rest contact/raw_text check, idempotent re-sync, 401 unauth, 422 invalid/malformed; `GET`/`PATCH /api/profile` structured read/update with PII presence-flags only |
 | `api/spec/requests/api/health_spec.rb` | API (Rails) | `GET /api/health` — 200 status, JSON shape, database connectivity |

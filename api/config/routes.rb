@@ -14,6 +14,8 @@ Rails.application.routes.draw do
     # pipeline pushes its JSON Resume + PDF to POST /api/profile/resume.
     resource :profile, only: %i[show update], controller: "profile"
     post "profile/resume", to: "resume_documents#create"
+    get "push/vapid_public_key", to: "push_subscriptions#public_key"
+    resource :push_subscription, only: %i[create destroy]
     resources :job_posts, only: %i[create]
     resources :applications, only: [] do
       post :submit, on: :member

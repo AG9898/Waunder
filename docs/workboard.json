@@ -483,7 +483,7 @@
       "id": "PUSH-01",
       "title": "PushSubscription model, subscribe endpoints, and VAPID config",
       "description": "Migration and PushSubscription model plus authenticated endpoints to register and remove a Web Push subscription, and an endpoint exposing the public VAPID_PUBLIC_KEY to the client. Configure VAPID from env only. Subscription endpoints are session-guarded; the public-key read is available to the client as needed.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "PUSH",
       "depends_on": [

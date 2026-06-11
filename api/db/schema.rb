@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_11_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_11_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -201,6 +201,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_11_120000) do
     t.check_constraint "jsonb_typeof(education) = 'array'::text", name: "profiles_education_json_array"
     t.check_constraint "jsonb_typeof(skills) = 'array'::text", name: "profiles_skills_json_array"
     t.check_constraint "jsonb_typeof(work_history) = 'array'::text", name: "profiles_work_history_json_array"
+  end
+
+  create_table "push_subscriptions", force: :cascade do |t|
+    t.text "auth_key", null: false
+    t.string "content_encoding", default: "aes128gcm", null: false
+    t.datetime "created_at", null: false
+    t.string "endpoint", null: false
+    t.datetime "expires_at"
+    t.text "p256dh_key", null: false
+    t.datetime "updated_at", null: false
+    t.string "user_agent"
+    t.index ["endpoint"], name: "index_push_subscriptions_on_endpoint", unique: true
   end
 
   create_table "resume_documents", force: :cascade do |t|

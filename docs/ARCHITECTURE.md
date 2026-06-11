@@ -112,6 +112,15 @@ The full topology and the rationale for the `/api` proxy routing decision live i
    `ScoreJobPostJob`, so manual entries enter the same route-resolution and scoring path as
    email-ingested postings.
 
+**Web push subscription**:
+1. The PWA reads the public VAPID key from `GET /api/push/vapid_public_key`. This value is
+   public by design; Rails reads it from `VAPID_PUBLIC_KEY` and exposes no private VAPID secret.
+2. After browser permission, the authenticated owner posts the browser subscription JSON to
+   `POST /api/push_subscription`; Rails stores the endpoint and browser keys in
+   `push_subscriptions`.
+3. The authenticated owner can remove the current browser subscription with
+   `DELETE /api/push_subscription`; digest dispatch jobs use the stored subscriptions later.
+
 **Resume sync (from the portfolio project)**:
 1. The external portfolio project (`My_Portfolio`, a Next.js app) maintains the resume as a
    canonical JSON Resume object (`src/data/resume.json`) and exports `cv.pdf` + `CV_AG.md`.
