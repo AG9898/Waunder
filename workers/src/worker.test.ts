@@ -148,7 +148,7 @@ test("runWorkerLoop fetches, processes, and reports one polling cycle", async ()
 });
 
 test("processTask fails safely when no ATS handler is registered", async () => {
-  const result = await processTask(task);
+  const result = await processTask({ ...task, ats: "linkedin_easy_apply" });
 
   assert.equal(result.applicationId, "42");
   assert.equal(result.status, "failed");

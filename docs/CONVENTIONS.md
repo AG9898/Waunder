@@ -243,6 +243,10 @@ and reports auditable results back.
 - `src/config.ts` — environment-driven configuration.
 - `src/ats/` — one handler per ATS plus the registry (`index.ts`). Each handler implements the
   `AtsHandler` interface (`kind`, `fill(page, task)`) and registers via `registerHandler`.
+  Greenhouse, Lever, and Ashby share the deterministic form driver in `src/ats/form.ts`: handlers
+  inspect visible controls, pause on sensitive or unknown required fields, fill only approved
+  non-sensitive payload answers, click only a known ATS submit selector, and return screenshot file
+  paths plus logs in the `TaskResult`.
 - The entry point loads env config and starts the poll loop. When `API_INTERNAL_URL` is unset, the
   worker logs an idle message and exits cleanly; when it is set, `WORKER_SERVICE_TOKEN` is required
   and is sent as `Authorization: Bearer <token>` on task pull/report calls.
@@ -257,6 +261,9 @@ and reports auditable results back.
 - Use `isSensitiveField` and `partitionBySensitivity` to classify form fields. A sensitive field
   is auto-filled **only** when its value was explicitly provided in the approved payload AND
   approved upstream by the user; otherwise the worker pauses.
+- ATS handlers also classify discovered page controls before filling. Any sensitive control or
+  required control without a matching approved answer pauses the task with a human-readable reason
+  and a screenshot path for audit review.
 
 ### Result Contract
 
@@ -270,7 +277,7 @@ and reports auditable results back.
 - `npm run dev` — `tsx watch src/index.ts`.
 - `npm run build` — `tsc`.
 - `npm run typecheck` — `tsc --noEmit`.
-- `npm test` — `node --import tsx --test src/**/*.test.ts`.
+- `npm test` — `node --import tsx --test src/*.test.ts src/**/*.test.ts`.
 
 ---
 

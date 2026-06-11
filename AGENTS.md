@@ -385,3 +385,9 @@ Rails app object.
 JSON-ish metadata submitted as normal Rails request params may have scalar values coerced to
 strings in request specs. Assert metadata keys/values the way Rails receives them unless the
 endpoint is explicitly changed to parse a raw JSON body.
+
+### 2026-06-11 — ATS handler registration avoids top-level await cycles
+Worker ATS handlers import the registry from `workers/src/ats/registry.ts`; `workers/src/ats/index.ts`
+then imports handler modules for side-effect registration and re-exports registry helpers. Do not
+register handlers by dynamically importing from `index.ts` with top-level await, because Node's test
+runner can exit with an unsettled top-level await cycle.

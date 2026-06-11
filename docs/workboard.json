@@ -648,7 +648,7 @@
       "id": "WORKER-02",
       "title": "Greenhouse/Lever/Ashby ATS fill handlers via safety gating",
       "description": "Implement per-ATS handlers for Greenhouse, Lever, and Ashby in src/ats/, each implementing the AtsHandler interface and registered in the registry. Fill forms from the backend-generated autofill payload through src/safety.ts gating; pause or fail safely on unknown or sensitive fields; capture screenshots and logs for an auditable TaskResult. Never auto-submit beyond the approved payload.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "WORKER",
       "depends_on": [

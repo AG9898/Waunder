@@ -34,7 +34,7 @@ cd workers && npm run typecheck                          # tsc --noEmit
 |---|---|---|---|---|
 | api (Rails) | RSpec (`rspec-rails ~> 8.0`) | Ruby 3.2.3 / Rails 8.1.3 | `api/spec/` | `cd api && bundle exec rspec` |
 | web (go-app) | Go testing (`go test`) | Go 1.26 | `web/**/*_test.go` | `cd web && go test ./...` |
-| workers | Node built-in test runner (`node --test`) + tsx | Node 22 / TS 5.7 | `workers/src/**/*.test.ts` | `cd workers && npm test` |
+| workers | Node built-in test runner (`node --test`) + tsx | Node 22 / TS 5.7 | `workers/src/*.test.ts`, `workers/src/**/*.test.ts` | `cd workers && npm test` |
 
 ---
 
@@ -97,6 +97,9 @@ Be honest about the current state — most of the suite is still to be written.
 - **workers/** — `src/worker.test.ts`: unit tests for worker config loading, bearer-auth task
   fetch/report calls, clean idle when `API_INTERNAL_URL` is unset, one-cycle poll orchestration, and
   unsupported-ATS safe failure.
+- **workers/** — `src/ats/handlers.test.ts`: Playwright fixture tests for Greenhouse, Lever, and
+  Ashby handler registration, approved-answer fill/submit behavior, and required unknown /
+  sensitive-field pause behavior.
 - **web/** — **no tests yet.**
 
 ### Planned (from the plan's Testing Plan)
@@ -129,7 +132,6 @@ Be honest about the current state — most of the suite is still to be written.
 
 - Any `web/` (Go) tests at all.
 - Rails webhook/job/dispatch specs.
-- Playwright ATS handler and pause/fail tests (only pure safety-helper unit tests exist).
 - The full end-to-end MVP integration scenario (see below).
 
 ---
@@ -162,6 +164,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `api/spec/jobs/generate_application_draft_job_spec.rb` | API (Rails) | ApplicationDraftGenerator/GenerateApplicationDraftJob: draft generation from mocked LLM JSON, ATS-shaped autofill payload keyed to the resolved route (manual fallback for unknown), Profile data merged into autofill answers, malformed-answer dropping, graceful skip with no API key, failed-on-error, PII-safe logging (mocked client) |
 | `workers/src/safety.test.ts` | Worker safety | `isSensitiveField` detection + `partitionBySensitivity` splitting of answers |
 | `workers/src/worker.test.ts` | Worker orchestration | config loading, bearer-auth task fetch/report calls, clean idle without `API_INTERNAL_URL`, one-cycle poll orchestration, and unsupported-ATS safe failure |
+| `workers/src/ats/handlers.test.ts` | Worker ATS handlers | Playwright fixture coverage for Greenhouse/Lever/Ashby registration, approved field fill/submit, unknown required field pauses, and sensitive-field pauses |
 
 ---
 
