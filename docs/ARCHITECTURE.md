@@ -33,8 +33,9 @@ only if Sidekiq later replaces solid_queue.
   orchestration via OpenRouter, notification dispatch, Resend inbound webhook handling,
   background jobs, and worker dispatch. Jobs run on `solid_queue`, cache on `solid_cache`,
   cable on `solid_cable` — all database-backed, so no Redis is required initially.
-  Currently exposes only `/api/health` (custom JSON: `status`/`service`/`database`/`time`)
-  and the Rails `/up` boot check. Has **no public domain** — reachable only through `web`'s
+  Client-facing endpoints live under `/api` and include health, session, profile/resume,
+  manual job entry, application submit, and worker task handoff/status APIs. Rails also
+  exposes the `/up` boot check. It has **no public domain** — reachable only through `web`'s
   proxy on the private network.
 - **worker** (Railway — Node 22 + TypeScript ESM + Playwright): polls Rails for approved
   application tasks, fills supported ATS forms (`greenhouse`, `lever`, `ashby`,
@@ -100,6 +101,16 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 3. Rails enqueues background jobs: parse alert → normalize job → resolve application route →
    LLM score via OpenRouter → generate draft.
 4. A daily web-push digest is eventually sent to subscribed PWA installs.
+
+**Manual job/link entry**:
+1. The authenticated owner posts a URL and/or pasted posting text to `POST /api/job_posts`
+   through the same-origin web proxy.
+2. Rails deterministically normalizes the input into a `JobPost` with `source: "manual"`.
+   URL-only submissions use the posting host as a fallback title/company label; pasted text
+   uses its first nonblank line as the fallback title.
+3. Rails immediately runs `ApplicationRouteResolver` for the new post and enqueues
+   `ScoreJobPostJob`, so manual entries enter the same route-resolution and scoring path as
+   email-ingested postings.
 
 **Resume sync (from the portfolio project)**:
 1. The external portfolio project (`My_Portfolio`, a Next.js app) maintains the resume as a

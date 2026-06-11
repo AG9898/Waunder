@@ -28,7 +28,7 @@ Waunder is a mobile-first, single-user personal job application assistant for it
 
 Phase 1 delivers the full plan scenario: forward a job-alert email → Resend inbound webhook → Rails ingests, normalizes, and resolves the application route → LLM scores the job → a daily web-push digest is delivered → the owner reviews in the PWA → Waunder generates a tailored application draft / autofill payload → the owner approves → the Playwright worker fills/submits on a supported ATS → Rails reports final status.
 
-- **Job discovery** via forwarded job-alert emails through Resend inbound webhooks (RESOLVED-13); inbound alerts parsed into normalized job records. A lightweight manual job/link entry path is also available as a fallback (RESOLVED-16).
+- **Job discovery** via forwarded job-alert emails through Resend inbound webhooks (RESOLVED-13); inbound alerts parsed into normalized job records. An authenticated manual job/link entry endpoint is also available as a fallback, accepting a URL and/or pasted posting text and sending the resulting job through route resolution and scoring (RESOLVED-16).
 - **Application route resolution** separating where a job was discovered from where it should be submitted. Stores source URL, canonical posting URL, application URL, route type, recommended route, and route confidence. Route types: `company_careers`, `greenhouse`, `lever`, `ashby`, `workday`, `linkedin_easy_apply`, `indeed_apply`, `glassdoor_apply`, `unknown`. Preference order: Direct ATS/company application URL > company careers page > job-board external apply URL > LinkedIn Easy Apply / Indeed Apply / Glassdoor Apply > manual apply only.
 - **LLM scoring and summaries** via OpenRouter (structured JSON where supported): job summary, match score, relevant requirements, missing/weak requirements, resume alignment notes, suggested application strategy, and red flags.
 - **Application assistance**: tailored resume emphasis notes, cover letter / message drafts where relevant, structured application answers, and autofill payloads for known form systems.
@@ -40,7 +40,7 @@ Phase 1 delivers the full plan scenario: forward a job-alert email → Resend in
 
 ### Phase 2 — Later
 
-- Manual job/link entry as a discovery fallback.
+- Richer manual-entry and job-management UX beyond the lightweight Phase 1 fallback.
 - Broader ATS platform support beyond Greenhouse/Lever/Ashby.
 - Redis/Sidekiq for background jobs if needs outgrow Rails' built-in `solid_queue`.
 

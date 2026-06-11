@@ -320,7 +320,7 @@
       "id": "MANUAL-01",
       "title": "Manual job/link entry endpoint",
       "description": "Add an authenticated POST /api/job_posts accepting a URL and/or pasted text (RESOLVED-16), creating a JobPost and running it through the same normalize -> route-resolve -> score pipeline as email ingestion. Session-guarded; consistent JSON error shape on invalid input.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "MANUAL",
       "depends_on": [
