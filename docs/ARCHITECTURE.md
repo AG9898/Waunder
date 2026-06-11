@@ -116,11 +116,15 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 **Trusted submit**:
 1. User reviews and approves a prepared application in the PWA.
 2. Browser POSTs `POST /api/applications/:id/submit` (through the proxy) to Rails.
-3. Rails enqueues a worker dispatch job with a structured autofill payload.
-4. The `worker` polls/receives the approved task and uses Playwright to fill the supported
+3. Rails verifies the application has explicit approval (`status: approved` plus
+   `approved_at`), the draft has a supported ATS payload, and the payload contains no blank,
+   unresolved, or sensitive fields requiring manual review.
+4. Rails records a `submit_dispatched` `AuditEvent` and enqueues `WorkerDispatchJob` with the
+   structured autofill payload.
+5. The `worker` polls/receives the approved task and uses Playwright to fill the supported
    ATS form.
-5. The worker reports status, logs, and screenshots back to Rails.
-6. Rails records an `AuditEvent` and the final application status.
+6. The worker reports status, logs, and screenshots back to Rails.
+7. Rails records an `AuditEvent` and the final application status.
 
 ---
 

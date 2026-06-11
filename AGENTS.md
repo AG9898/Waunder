@@ -373,3 +373,9 @@ those four and falls back to `"manual"` for everything else (workday, unknown, j
 contact/URL fields are merged into `answers` deterministically (never via the LLM), and the system
 prompt instructs the model to OMIT sensitive questions so they never reach the payload. The generator
 creates no draft and never raises when no API key is configured (returns a `skipped` Result).
+
+### 2026-06-11 — Use ::Application in API controllers
+The Rails domain model is named `Application`, which can be ambiguous from controller/request
+contexts because Rails also has application-level helpers. In API controllers that load job
+applications, reference the model as `::Application` to avoid accidentally resolving through the
+Rails app object.

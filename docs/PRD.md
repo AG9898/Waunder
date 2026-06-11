@@ -61,7 +61,9 @@ Phase 1 delivers the full plan scenario: forward a job-alert email → Resend in
 - The owner can review a scored job and a generated application draft, and must approve before any submit occurs.
 - The worker fills supported ATS forms (Greenhouse, Lever, Ashby) and pauses or fails safely on unknown or sensitive fields, reporting an auditable status with logs/screenshots back to Rails.
 - Sensitive resume/profile fields are encrypted at rest (Rails encryption).
-- Trusted submit never fires without explicit per-application approval.
+- Trusted submit never fires without explicit per-application approval and the Rails submit gate
+  rejects unsupported ATS targets or payloads with unresolved/sensitive fields before any worker
+  dispatch job is enqueued.
 
 ---
 

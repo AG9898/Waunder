@@ -550,7 +550,7 @@
       "id": "SUBMIT-01",
       "title": "Approve and submit dispatch API",
       "description": "Authenticated POST /api/applications/:id/submit that requires explicit per-application approval, verifies the target ATS is supported and the autofill payload contains no unresolved unknown/sensitive fields, enqueues a worker-dispatch job with the structured payload, and records an AuditEvent. Never dispatches without explicit approval.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "SUBMIT",
       "depends_on": [

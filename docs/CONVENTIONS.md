@@ -204,7 +204,12 @@ dispatch.
 
 - Rails dispatches a submit task to the worker **only after explicit user approval**, and only
   for a supported ATS where the form contains no unknown or sensitive fields requiring manual
-  review. The worker enforces the matching guard on its side (see below).
+  review. `ApplicationSubmitDispatcher` is the Rails-side gate for `POST
+  /api/applications/:id/submit`: it requires `status: "approved"` and `approved_at`, checks the
+  `ApplicationDraft#autofill_payload` ATS against the supported allowlist (Greenhouse, Lever,
+  Ashby; LinkedIn Easy Apply only when the feature flag is enabled), rejects malformed/blank,
+  unresolved, or sensitive answers, records a `submit_dispatched` `AuditEvent`, and enqueues
+  `WorkerDispatchJob`. The worker enforces the matching guard on its side (see below).
 
 ---
 
