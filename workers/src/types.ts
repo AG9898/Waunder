@@ -25,6 +25,11 @@ export interface ApplicationTask {
   resumeRef?: string;
 }
 
+/** Rails response for the worker task poll endpoint. */
+export interface WorkerTaskResponse {
+  tasks: ApplicationTask[];
+}
+
 /** Terminal outcome of attempting a task. */
 export type TaskStatus = "submitted" | "paused" | "failed";
 

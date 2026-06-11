@@ -94,6 +94,9 @@ Be honest about the current state — most of the suite is still to be written.
   PII-safe logging — using a mocked OpenRouter client (no live calls).
 - **workers/** — `src/safety.test.ts`: unit tests for sensitive-field detection
   (`isSensitiveField`) and answer partitioning (`partitionBySensitivity`).
+- **workers/** — `src/worker.test.ts`: unit tests for worker config loading, bearer-auth task
+  fetch/report calls, clean idle when `API_INTERNAL_URL` is unset, one-cycle poll orchestration, and
+  unsupported-ATS safe failure.
 - **web/** — **no tests yet.**
 
 ### Planned (from the plan's Testing Plan)
@@ -158,6 +161,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `api/spec/jobs/score_job_post_job_spec.rb` | API (Rails) | JobScorer/ScoreJobPostJob: scoring-field population from mocked LLM JSON, match_score clamping, string-list coercion, fallback-posting scoring, graceful skip with no API key, failed-on-error, PII-safe logging (mocked client) |
 | `api/spec/jobs/generate_application_draft_job_spec.rb` | API (Rails) | ApplicationDraftGenerator/GenerateApplicationDraftJob: draft generation from mocked LLM JSON, ATS-shaped autofill payload keyed to the resolved route (manual fallback for unknown), Profile data merged into autofill answers, malformed-answer dropping, graceful skip with no API key, failed-on-error, PII-safe logging (mocked client) |
 | `workers/src/safety.test.ts` | Worker safety | `isSensitiveField` detection + `partitionBySensitivity` splitting of answers |
+| `workers/src/worker.test.ts` | Worker orchestration | config loading, bearer-auth task fetch/report calls, clean idle without `API_INTERNAL_URL`, one-cycle poll orchestration, and unsupported-ATS safe failure |
 
 ---
 

@@ -73,7 +73,9 @@ variables. Copy the relevant template to `.env` for local development; never com
 **worker (Node + Playwright):**
 1. Create `workers/.env` from `workers/.env.example`.
 2. Set `API_INTERNAL_URL` to your local Rails URL so the worker can poll and report, and use the
-   same `WORKER_SERVICE_TOKEN` value as `api/.env`.
+   same `WORKER_SERVICE_TOKEN` value as `api/.env`. If `API_INTERNAL_URL` is set but
+   `WORKER_SERVICE_TOKEN` is blank, the worker exits with a configuration error instead of polling
+   unauthenticated.
 3. Optionally set `WORKER_HEADLESS=false` to watch the browser, and adjust
    `WORKER_POLL_INTERVAL_MS` for faster local iteration.
 

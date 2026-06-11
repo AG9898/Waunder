@@ -243,6 +243,9 @@ and reports auditable results back.
 - `src/config.ts` — environment-driven configuration.
 - `src/ats/` — one handler per ATS plus the registry (`index.ts`). Each handler implements the
   `AtsHandler` interface (`kind`, `fill(page, task)`) and registers via `registerHandler`.
+- The entry point loads env config and starts the poll loop. When `API_INTERNAL_URL` is unset, the
+  worker logs an idle message and exits cleanly; when it is set, `WORKER_SERVICE_TOKEN` is required
+  and is sent as `Authorization: Bearer <token>` on task pull/report calls.
 
 ### Safety Pattern (CRITICAL)
 
@@ -259,6 +262,8 @@ and reports auditable results back.
 
 - Every task returns a `TaskResult` with status `submitted | paused | failed`, a `reason`
   (required for `paused`/`failed`), and `screenshots` + `logs` for auditability.
+- Polling uses `GET /api/worker_tasks`; every processed task is reported to
+  `POST /api/worker_tasks/:id/report` with the `TaskResult` status, reason, screenshots, and logs.
 
 ### Scripts
 

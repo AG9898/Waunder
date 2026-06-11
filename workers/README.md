@@ -13,7 +13,7 @@ safely on unknown fields. See `../initial_plan.md` (Core Worker Responsibilities
 ```
 workers/
   src/
-    index.ts        # entry point (config + readiness; poll loop TODO)
+    index.ts        # entry point (config + poll loop)
     config.ts       # env-sourced configuration
     worker.ts       # processTask(): dispatch a task to its ATS handler
     types.ts        # ApplicationTask / TaskResult shapes
@@ -45,11 +45,14 @@ The Docker image already includes the browsers.
 
 - `API_INTERNAL_URL` — Rails API base URL (task source + status reporting).
   When unset, the worker logs readiness and exits (no task source).
+- `WORKER_SERVICE_TOKEN` — bearer token shared with Rails. Required when
+  `API_INTERNAL_URL` is set.
 - `WORKER_POLL_INTERVAL_MS` — task poll interval (default `15000`).
 - `WORKER_HEADLESS` — set to `false` to run headed locally (default headless).
 
 ## Status
 
-Skeleton: types, safety guard, ATS handler registry, and entry point are in
-place. The poll loop and per-ATS handlers (Greenhouse, Lever, Ashby, and the
-feature-flagged LinkedIn Easy Apply) come next, alongside the Rails task API.
+The worker loads env config, polls Rails for approved tasks, dispatches each
+task to the ATS handler registry, and reports terminal task results back to
+Rails with bearer authentication. Per-ATS handlers (Greenhouse, Lever, Ashby,
+and the feature-flagged LinkedIn Easy Apply) are still implemented separately.

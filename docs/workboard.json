@@ -616,7 +616,7 @@
       "id": "WORKER-01",
       "title": "Worker poll loop with bearer auth and fetch/report wiring",
       "description": "Implement the worker entrypoint poll loop (WORKER_POLL_INTERVAL_MS) that authenticates to Rails with Authorization: Bearer <WORKER_SERVICE_TOKEN>, pulls approved tasks from SUBMIT-02, dispatches them to the ATS handler registry, and reports a TaskResult (status/reason/screenshots/logs) back. Idles/exits cleanly when API_INTERNAL_URL is unset. No business logic beyond orchestration.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "WORKER",
       "depends_on": [
