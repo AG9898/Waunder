@@ -193,7 +193,7 @@
       "id": "DATA-04",
       "title": "ContactCandidate and OutreachDraft schema and models",
       "description": "Migrations and models for ContactCandidate (a LinkedIn contact candidate linked to a JobPost, with a relevance reason) and OutreachDraft (a tailored outreach message generated from a loose template, prefilled for manual sending only). Enforce foreign keys at the database level.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "DATA",
       "depends_on": [

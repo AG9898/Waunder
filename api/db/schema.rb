@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_10_161441) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_11_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -68,7 +68,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_10_161441) do
     t.datetime "updated_at", null: false
     t.index ["job_post_id"], name: "index_application_routes_on_job_post_id", unique: true
     t.check_constraint "route_confidence IS NULL OR route_confidence >= 0::numeric AND route_confidence <= 1::numeric", name: "application_routes_route_confidence_range"
-    t.check_constraint "route_type::text = ANY (ARRAY['company_careers'::character varying::text, 'greenhouse'::character varying::text, 'lever'::character varying::text, 'ashby'::character varying::text, 'workday'::character varying::text, 'linkedin_easy_apply'::character varying::text, 'indeed_apply'::character varying::text, 'glassdoor_apply'::character varying::text, 'unknown'::character varying::text])", name: "application_routes_route_type_check"
+    t.check_constraint "route_type::text = ANY (ARRAY['company_careers'::character varying, 'greenhouse'::character varying, 'lever'::character varying, 'ashby'::character varying, 'workday'::character varying, 'linkedin_easy_apply'::character varying, 'indeed_apply'::character varying, 'glassdoor_apply'::character varying, 'unknown'::character varying]::text[])", name: "application_routes_route_type_check"
   end
 
   create_table "applications", force: :cascade do |t|
@@ -81,7 +81,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_10_161441) do
     t.datetime "updated_at", null: false
     t.index ["job_post_id"], name: "index_applications_on_job_post_id"
     t.index ["status"], name: "index_applications_on_status"
-    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying::text, 'approved'::character varying::text, 'submitted'::character varying::text, 'paused'::character varying::text, 'failed'::character varying::text])", name: "applications_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying, 'approved'::character varying, 'submitted'::character varying, 'paused'::character varying, 'failed'::character varying]::text[])", name: "applications_status_check"
   end
 
   create_table "audit_events", force: :cascade do |t|
@@ -100,7 +100,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_10_161441) do
     t.check_constraint "jsonb_typeof(logs) = 'array'::text", name: "audit_events_logs_json_array"
     t.check_constraint "jsonb_typeof(metadata) = 'object'::text", name: "audit_events_metadata_json_object"
     t.check_constraint "jsonb_typeof(screenshots) = 'array'::text", name: "audit_events_screenshots_json_array"
-    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying::text, 'approved'::character varying::text, 'submitted'::character varying::text, 'paused'::character varying::text, 'failed'::character varying::text])", name: "audit_events_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying, 'approved'::character varying, 'submitted'::character varying, 'paused'::character varying, 'failed'::character varying]::text[])", name: "audit_events_status_check"
   end
 
   create_table "companies", force: :cascade do |t|
@@ -112,6 +112,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_10_161441) do
     t.string "website_url"
     t.index ["domain"], name: "index_companies_on_domain"
     t.index ["name"], name: "index_companies_on_name"
+  end
+
+  create_table "contact_candidates", force: :cascade do |t|
+    t.string "company_name"
+    t.datetime "created_at", null: false
+    t.bigint "job_post_id", null: false
+    t.string "linkedin_url"
+    t.string "name", null: false
+    t.text "relevance_reason", null: false
+    t.string "title"
+    t.datetime "updated_at", null: false
+    t.index ["job_post_id"], name: "index_contact_candidates_on_job_post_id"
+    t.index ["linkedin_url"], name: "index_contact_candidates_on_linkedin_url"
   end
 
   create_table "inbound_emails", force: :cascade do |t|
@@ -160,6 +173,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_10_161441) do
     t.check_constraint "match_score IS NULL OR match_score >= 0 AND match_score <= 100", name: "job_posts_match_score_range"
   end
 
+  create_table "outreach_drafts", force: :cascade do |t|
+    t.bigint "contact_candidate_id", null: false
+    t.datetime "created_at", null: false
+    t.text "loose_template"
+    t.text "message", null: false
+    t.datetime "updated_at", null: false
+    t.index ["contact_candidate_id"], name: "index_outreach_drafts_on_contact_candidate_id"
+  end
+
   create_table "profiles", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.jsonb "education", default: [], null: false
@@ -203,6 +225,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_10_161441) do
   add_foreign_key "application_routes", "job_posts"
   add_foreign_key "applications", "job_posts"
   add_foreign_key "audit_events", "applications"
+  add_foreign_key "contact_candidates", "job_posts"
   add_foreign_key "job_posts", "companies"
+  add_foreign_key "outreach_drafts", "contact_candidates"
   add_foreign_key "resume_documents", "profiles"
 end

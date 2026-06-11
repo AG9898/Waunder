@@ -154,6 +154,11 @@ dispatch.
   configured it skips gracefully (no draft created, no raise); on an `OpenrouterClient::Error` it
   returns a `failed` result without creating a draft. It never logs prompt/completion contents or
   Profile/ResumeDocument PII.
+- Contact candidates are persisted as `ContactCandidate` records linked directly to a `JobPost`;
+  each record must include the reason the contact is relevant. Outreach text is persisted as
+  `OutreachDraft` records linked to a contact candidate, with the loose source template and final
+  message retained for manual-send presentation only. Waunder never sends LinkedIn outreach
+  automatically.
 - Resume ingest is deterministic and isolated in `ResumeJsonImporter`
   (`app/services/resume_json_importer.rb`), invoked by `Api::ResumeDocumentsController#create`
   (`POST /api/profile/resume`). The external portfolio project pushes a canonical **JSON Resume**

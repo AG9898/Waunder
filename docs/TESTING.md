@@ -69,6 +69,9 @@ Be honest about the current state — most of the suite is still to be written.
   for the encrypted-at-rest profile/resume fields. They assert the underlying column holds
   ciphertext (raw SQL select) while the accessor returns plaintext, and that deterministic email
   encryption stays queryable.
+- **api/** — `spec/models/contact_candidate_spec.rb` and `spec/models/outreach_draft_spec.rb`:
+  model specs for contact-candidate job linkage, relevance-reason validation, outreach-draft
+  association, and manual-send message validation.
 - **api/** — `spec/services/inbound_email_parser_spec.rb`: service specs for the deterministic
   known-sender (LinkedIn/Indeed/Glassdoor) email parser, normalized JobPost persistence, company
   reuse, and LLM-fallback flagging for unknown senders and empty parses.
@@ -147,7 +150,9 @@ Keep this table up to date — add a row when adding a new test file.
 | `api/spec/models/application_spec.rb` | API (Rails) | application status lifecycle validation and draft/audit associations |
 | `api/spec/models/audit_event_spec.rb` | API (Rails) | audit event application/status validation plus screenshot/log/metadata JSON shapes |
 | `api/spec/models/company_spec.rb` | API (Rails) | company name validation and job-post association |
+| `api/spec/models/contact_candidate_spec.rb` | API (Rails) | contact candidate job-post association, relevance reason validation, and owned outreach drafts |
 | `api/spec/models/job_post_spec.rb` | API (Rails) | job post company/title validations, application-route association, match-score bounds |
+| `api/spec/models/outreach_draft_spec.rb` | API (Rails) | outreach draft contact-candidate association and manual-send message validation |
 | `api/spec/models/profile_spec.rb` | API (Rails) | profile name/JSON-shape validation, encrypted-at-rest ciphertext check for email/phone/address, deterministic-email queryability |
 | `api/spec/models/resume_document_spec.rb` | API (Rails) | resume document profile/title validation, parsed_structure default, encrypted-at-rest ciphertext check for raw_text/parsed_structure |
 | `api/spec/requests/api/auth_spec.rb` | API (Rails) | shared-secret session success/failure, protected endpoint gating, health bypass, worker bearer guard |
