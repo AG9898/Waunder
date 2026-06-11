@@ -182,8 +182,11 @@ dispatch.
   receiving a signed, HTTP-only session cookie (signed with `SESSION_SECRET`). `Api::BaseController`
   enforces the session via a `before_action` on every `/api` endpoint **except** health.
 - The worker authenticates with a static `WORKER_SERVICE_TOKEN` bearer (`Authorization: Bearer`)
-  on its task-pull/report endpoints — never the human session cookie. Webhook endpoints under
-  `/webhooks/*` are not session-guarded; they authenticate by provider signature instead.
+  on its task-pull/report endpoints (`GET /api/worker_tasks` and
+  `POST /api/worker_tasks/:id/report`) — never the human session cookie. Worker-only
+  controllers skip `authenticate_session!` and require `authenticate_worker!`. Webhook
+  endpoints under `/webhooks/*` are not session-guarded; they authenticate by provider signature
+  instead.
 - Read secrets from the environment only — never hardcode the passphrase, signing key, or token.
 
 ### DB Access
@@ -209,7 +212,11 @@ dispatch.
   `ApplicationDraft#autofill_payload` ATS against the supported allowlist (Greenhouse, Lever,
   Ashby; LinkedIn Easy Apply only when the feature flag is enabled), rejects malformed/blank,
   unresolved, or sensitive answers, records a `submit_dispatched` `AuditEvent`, and enqueues
-  `WorkerDispatchJob`. The worker enforces the matching guard on its side (see below).
+  `WorkerDispatchJob`. `Api::WorkerTasksController#index` exposes only approved applications with
+  a `submit_dispatched` audit event as worker-shaped tasks, and `#report` accepts only terminal
+  worker statuses (`submitted`, `paused`, `failed`), updates the `Application`, and stores
+  screenshots/log refs on a `worker_status_reported` `AuditEvent`. The worker enforces the
+  matching guard on its side (see below).
 
 ---
 

@@ -17,6 +17,9 @@ Rails.application.routes.draw do
     resources :applications, only: [] do
       post :submit, on: :member
     end
+    resources :worker_tasks, only: %i[index] do
+      post :report, on: :member
+    end
   end
 
   post "webhooks/resend/inbound", to: "webhooks/resend#inbound"

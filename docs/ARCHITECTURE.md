@@ -121,10 +121,13 @@ The full topology and the rationale for the `/api` proxy routing decision live i
    unresolved, or sensitive fields requiring manual review.
 4. Rails records a `submit_dispatched` `AuditEvent` and enqueues `WorkerDispatchJob` with the
    structured autofill payload.
-5. The `worker` polls/receives the approved task and uses Playwright to fill the supported
-   ATS form.
-6. The worker reports status, logs, and screenshots back to Rails.
-7. Rails records an `AuditEvent` and the final application status.
+5. The `worker` polls `GET /api/worker_tasks` with its `WORKER_SERVICE_TOKEN` bearer. Rails
+   returns approved, dispatched applications as worker-shaped tasks; the human session cookie is
+   not accepted on this endpoint.
+6. The worker uses Playwright to fill the supported ATS form, then posts its terminal result to
+   `POST /api/worker_tasks/:id/report` with status, reason, screenshot references, and logs.
+7. Rails updates the final application status and records a `worker_status_reported`
+   `AuditEvent` containing the audit artifacts.
 
 ---
 

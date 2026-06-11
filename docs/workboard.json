@@ -585,7 +585,7 @@
       "id": "SUBMIT-02",
       "title": "Worker task pull and status-report API",
       "description": "Worker-bearer-authenticated endpoints for the worker to pull approved submit tasks (structured payloads) and to report status, screenshots, and logs back, updating Application status and writing AuditEvents. Uses the WORKER_SERVICE_TOKEN bearer guard from AUTH-01; the human session cookie is not accepted here.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "SUBMIT",
       "depends_on": [

@@ -379,3 +379,9 @@ The Rails domain model is named `Application`, which can be ambiguous from contr
 contexts because Rails also has application-level helpers. In API controllers that load job
 applications, reference the model as `::Application` to avoid accidentally resolving through the
 Rails app object.
+
+### 2026-06-11 — Worker report API metadata follows Rails params coercion
+`Api::WorkerTasksController#report` stores worker screenshots/logs directly as audit arrays, but
+JSON-ish metadata submitted as normal Rails request params may have scalar values coerced to
+strings in request specs. Assert metadata keys/values the way Rails receives them unless the
+endpoint is explicitly changed to parse a raw JSON body.
