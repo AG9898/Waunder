@@ -30,7 +30,20 @@ test("loads worker API configuration from the environment", () => {
     workerServiceToken: "worker-token",
     pollIntervalMs: 250,
     headless: false,
+    linkedInEasyApplyEnabled: false,
   });
+});
+
+test("loadConfig enables LinkedIn Easy Apply only when the flag is truthy", () => {
+  assert.equal(loadConfig({}).linkedInEasyApplyEnabled, false);
+  assert.equal(
+    loadConfig({ LINKEDIN_EASY_APPLY_ENABLED: "false" }).linkedInEasyApplyEnabled,
+    false,
+  );
+  assert.equal(
+    loadConfig({ LINKEDIN_EASY_APPLY_ENABLED: "true" }).linkedInEasyApplyEnabled,
+    true,
+  );
 });
 
 test("fetches approved tasks with bearer auth", async () => {
@@ -46,6 +59,7 @@ test("fetches approved tasks with bearer auth", async () => {
       workerServiceToken: "worker-token",
       pollIntervalMs: 100,
       headless: true,
+      linkedInEasyApplyEnabled: false,
     },
     fetchFn,
   );
@@ -69,6 +83,7 @@ test("reports task results to Rails", async () => {
       workerServiceToken: "worker-token",
       pollIntervalMs: 100,
       headless: true,
+      linkedInEasyApplyEnabled: false,
     },
     {
       applicationId: "42",
@@ -100,6 +115,7 @@ test("runWorkerLoop idles cleanly when API_INTERNAL_URL is unset", async () => {
       workerServiceToken: "",
       pollIntervalMs: 100,
       headless: true,
+      linkedInEasyApplyEnabled: false,
     },
     { logger: { log: (message) => logs.push(message), error: () => undefined }, once: true },
   );
@@ -130,6 +146,7 @@ test("runWorkerLoop fetches, processes, and reports one polling cycle", async ()
       workerServiceToken: "worker-token",
       pollIntervalMs: 100,
       headless: true,
+      linkedInEasyApplyEnabled: false,
     },
     {
       fetch: fetchFn,

@@ -8,6 +8,17 @@ export interface WorkerConfig {
   pollIntervalMs: number;
   /** Run browsers headless (always true in deployment). */
   headless: boolean;
+  /**
+   * Feature flag gating the higher-risk LinkedIn Easy Apply trusted-submit
+   * handler. Default false: when off, the handler is not registered/active.
+   * See RESOLVED-15.
+   */
+  linkedInEasyApplyEnabled: boolean;
+}
+
+/** Parses a boolean env flag; only an explicit truthy value enables it. */
+export function isFlagEnabled(value: string | undefined): boolean {
+  return /^(1|true|yes|on)$/i.test((value ?? "").trim());
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): WorkerConfig {
@@ -16,5 +27,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WorkerConfig {
     workerServiceToken: env.WORKER_SERVICE_TOKEN ?? "",
     pollIntervalMs: Number(env.WORKER_POLL_INTERVAL_MS ?? 15000),
     headless: env.WORKER_HEADLESS !== "false",
+    linkedInEasyApplyEnabled: isFlagEnabled(env.LINKEDIN_EASY_APPLY_ENABLED),
   };
 }

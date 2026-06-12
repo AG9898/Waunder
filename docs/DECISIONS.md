@@ -284,6 +284,8 @@ What existing code or docs does this affect?>
 
 **Affects:** `workers/` (`src/ats/`), `LINKEDIN_EASY_APPLY_ENABLED` in [`ENV_VARS.md`](ENV_VARS.md), [`PRD.md`](PRD.md). See also RESOLVED-12.
 
+**Implemented (WORKER-03):** `workers/src/ats/linkedin_easy_apply.ts` provides the handler and `registerLinkedInEasyApplyIfEnabled(env)`; it does not self-register on import (unlike the always-on handlers). `index.ts` invokes the helper once at load, registering the handler only when `LINKEDIN_EASY_APPLY_ENABLED` is truthy. When off, the handler is absent from the registry and `processTask` fails safely as for any unsupported ATS.
+
 ---
 
 ### RESOLVED-16 — Include lightweight manual job/link entry in Phase 1

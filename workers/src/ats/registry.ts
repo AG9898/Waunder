@@ -14,6 +14,10 @@ export function registerHandler(handler: AtsHandler): void {
   handlers.set(handler.kind, handler);
 }
 
+export function unregisterHandler(kind: AtsKind): void {
+  handlers.delete(kind);
+}
+
 export function getHandler(kind: AtsKind): AtsHandler | undefined {
   return handlers.get(kind);
 }

@@ -679,7 +679,7 @@
       "id": "WORKER-03",
       "title": "LinkedIn Easy Apply handler behind feature flag",
       "description": "Add a LinkedIn Easy Apply ATS handler gated by LINKEDIN_EASY_APPLY_ENABLED (default false) per RESOLVED-15. When the flag is off the handler is not registered/active. It enforces the same safety gating and auditable TaskResult contract as the other handlers.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "WORKER",
       "depends_on": [

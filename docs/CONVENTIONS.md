@@ -252,6 +252,14 @@ and reports auditable results back.
   inspect visible controls, pause on sensitive or unknown required fields, fill only approved
   non-sensitive payload answers, click only a known ATS submit selector, and return screenshot file
   paths plus logs in the `TaskResult`.
+- **Feature-flagged handlers must not self-register.** Greenhouse/Lever/Ashby self-register at
+  import time (always enabled). LinkedIn Easy Apply (`src/ats/linkedin_easy_apply.ts`) is gated by
+  `LINKEDIN_EASY_APPLY_ENABLED` (default `false`, RESOLVED-15): it exports the handler plus
+  `registerLinkedInEasyApplyIfEnabled(env)`, which `index.ts` calls once at load. When the flag is
+  off the handler is never registered, so `getHandler("linkedin_easy_apply")` returns `undefined`
+  and `processTask` fails safely as for any unsupported ATS. Use `unregisterHandler(kind)` on the
+  registry to gate or reset a handler. The flagged handler reuses `fillAtsForm`, so it enforces the
+  same safety gating and auditable `TaskResult` contract as the others.
 - The entry point loads env config and starts the poll loop. When `API_INTERNAL_URL` is unset, the
   worker logs an idle message and exits cleanly; when it is set, `WORKER_SERVICE_TOKEN` is required
   and is sent as `Authorization: Bearer <token>` on task pull/report calls.
