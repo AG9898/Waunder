@@ -9,19 +9,29 @@ RSpec.describe "Api profile and resume ingest", type: :request do
     }
   end
 
+  # Personal fixture data is read from the environment so no real PII is
+  # committed; the defaults are deliberately anonymous and let the suite run
+  # without any setup. Set TEST_PROFILE_* locally to exercise realistic values.
+  let(:profile_name) { ENV.fetch("TEST_PROFILE_NAME", "Test User") }
+  let(:profile_email) { ENV.fetch("TEST_PROFILE_EMAIL", "test@example.com") }
+  let(:profile_phone) { ENV.fetch("TEST_PROFILE_PHONE", "555-010-0000") }
+  let(:profile_linkedin) { ENV.fetch("TEST_PROFILE_LINKEDIN", "https://linkedin.com/in/test-user") }
+  let(:profile_portfolio) { ENV.fetch("TEST_PROFILE_PORTFOLIO", "https://example.com") }
+  let(:resume_markdown) { "# #{profile_name}\nDeveloper" }
+
   let(:resume_json) do
     {
       "basics" => {
-        "name" => "Aden Guo",
+        "name" => profile_name,
         "label" => "Software Engineer",
-        "email" => "aden.guowe@gmail.com",
-        "phone" => "587-888-4188",
+        "email" => profile_email,
+        "phone" => profile_phone,
         "summary" => "Full-stack developer.",
         "location" => { "city" => "Calgary", "region" => "AB", "countryCode" => "CA" },
         "profiles" => [
-          { "network" => "LinkedIn", "url" => "https://linkedin.com/in/aden-guo" }
+          { "network" => "LinkedIn", "url" => profile_linkedin }
         ],
-        "url" => "https://aden.dev"
+        "url" => profile_portfolio
       },
       "work" => [ { "name" => "University of Calgary", "position" => "Lead" } ],
       "education" => [ { "institution" => "University of Calgary" } ],
@@ -61,27 +71,27 @@ RSpec.describe "Api profile and resume ingest", type: :request do
       )
 
       post "/api/profile/resume",
-           params: { resume: resume_json.to_json, resume_markdown: "# Aden Guo\nDeveloper", resume_pdf: pdf }
+           params: { resume: resume_json.to_json, resume_markdown: resume_markdown, resume_pdf: pdf }
 
       expect(response).to have_http_status(:created)
       body = JSON.parse(response.body)
       expect(body.dig("resume", "parse_status")).to eq("parsed")
       expect(body.dig("resume", "file_attached")).to be(true)
-      expect(body.dig("profile", "full_name")).to eq("Aden Guo")
+      expect(body.dig("profile", "full_name")).to eq(profile_name)
 
       profile = Profile.sole
-      expect(profile.full_name).to eq("Aden Guo")
+      expect(profile.full_name).to eq(profile_name)
       expect(profile.headline).to eq("Software Engineer")
       expect(profile.location).to eq("Calgary, AB, CA")
-      expect(profile.email).to eq("aden.guowe@gmail.com")
-      expect(profile.linkedin_url).to eq("https://linkedin.com/in/aden-guo")
-      expect(profile.portfolio_url).to eq("https://aden.dev")
+      expect(profile.email).to eq(profile_email)
+      expect(profile.linkedin_url).to eq(profile_linkedin)
+      expect(profile.portfolio_url).to eq(profile_portfolio)
       expect(profile.skills).to eq(resume_json["skills"])
 
       document = profile.resume_documents.sole
       expect(document).to be_primary
       expect(document.parsed_structure).to eq(resume_json)
-      expect(document.raw_text).to eq("# Aden Guo\nDeveloper")
+      expect(document.raw_text).to eq(resume_markdown)
       expect(document.file).to be_attached
     end
 
@@ -93,7 +103,7 @@ RSpec.describe "Api profile and resume ingest", type: :request do
       raw = ActiveRecord::Base.connection.select_one(
         "SELECT email, phone FROM profiles WHERE id = #{profile.id}"
       )
-      expect(raw["phone"]).not_to include("587-888-4188")
+      expect(raw["phone"]).not_to include(profile_phone)
 
       document = profile.resume_documents.sole
       raw_doc = ActiveRecord::Base.connection.select_one(
@@ -144,7 +154,7 @@ RSpec.describe "Api profile and resume ingest", type: :request do
 
       expect(response).to have_http_status(:ok)
       payload = JSON.parse(response.body).fetch("profile")
-      expect(payload["full_name"]).to eq("Aden Guo")
+      expect(payload["full_name"]).to eq(profile_name)
       expect(payload.dig("contact", "email_present")).to be(true)
       expect(payload).not_to have_key("email")
       expect(payload.dig("resume", "parse_status")).to eq("parsed")

@@ -110,6 +110,22 @@ There is no staging environment — only Local dev and Production (Railway).
 | `LINKEDIN_EASY_APPLY_ENABLED` | Optional | Optional |
 | `REDIS_URL` | Optional | Optional |
 
+## Test-only Variables
+
+These are read only by the RSpec suite and never by the running app. They let the profile/resume
+request spec exercise realistic personal data without committing any PII; all default to anonymous
+placeholders so the suite runs with no setup. Leave them unset in normal runs.
+
+| Variable | Default | Used by |
+|---|---|---|
+| `TEST_PROFILE_NAME` | `Test User` | `spec/requests/api/profile_spec.rb` |
+| `TEST_PROFILE_EMAIL` | `test@example.com` | `spec/requests/api/profile_spec.rb` |
+| `TEST_PROFILE_PHONE` | `555-010-0000` | `spec/requests/api/profile_spec.rb` |
+| `TEST_PROFILE_LINKEDIN` | `https://linkedin.com/in/test-user` | `spec/requests/api/profile_spec.rb` |
+| `TEST_PROFILE_PORTFOLIO` | `https://example.com` | `spec/requests/api/profile_spec.rb` |
+
+---
+
 ## Railway Production Provisioning Notes
 
 Production variables are set per Railway service with deploys skipped during provisioning. The
