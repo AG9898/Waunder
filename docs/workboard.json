@@ -1,7 +1,7 @@
 {
   "$schema": "./workboard.schema.json",
   "schema_version": "1.0.0",
-  "last_updated": "2026-06-10",
+  "last_updated": "2026-06-12",
   "tasks": [
     {
       "id": "INFRA-01",
@@ -899,7 +899,8 @@
       "group_id": "WEB",
       "depends_on": [
         "WEB-02",
-        "MANUAL-01"
+        "MANUAL-01",
+        "READ-01"
       ],
       "blocked_by": [],
       "acceptance_criteria": [
@@ -918,6 +919,41 @@
       "commands": [
         "cd web && go test ./...",
         "cd web && go vet ./..."
+      ]
+    },
+    {
+      "id": "READ-01",
+      "title": "JobPost feed/detail and digest read endpoints",
+      "description": "Add session-guarded read endpoints the PWA needs: GET /api/job_posts (scored job feed), GET /api/job_posts/:id (detail with scored fields + resolved ApplicationRoute), and GET /api/digest (latest daily digest of recently scored JobPosts). Read-only; reuse the DailyDigestBuilder for the digest payload and never trigger LLM/scoring on read. Expose only client-safe fields (no sensitive PII). Consistent JSON error shape; 401 without a session. WEB-02 shipped against this contract before it existed (see ARCHITECTURE.md pending-endpoints note).",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "READ",
+      "depends_on": [
+        "AUTH-01",
+        "LLM-02",
+        "PUSH-02"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "GET /api/job_posts returns the scored feed; GET /api/job_posts/:id returns detail with scored fields and the resolved route",
+        "GET /api/digest returns the latest daily digest built from recently scored JobPosts (no LLM call on read)",
+        "Unauthenticated requests return 401; invalid id returns the consistent JSON error shape",
+        "No sensitive PII is exposed in any read payload",
+        "Request specs cover feed, detail, digest, and auth gating"
+      ],
+      "docs": [
+        "docs/PRD.md",
+        "docs/ARCHITECTURE.md"
+      ],
+      "files": [
+        "api/app/controllers/api/job_posts_controller.rb",
+        "api/app/controllers/api/digest_controller.rb",
+        "api/config/routes.rb",
+        "api/spec/requests/api"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
       ]
     }
   ]
