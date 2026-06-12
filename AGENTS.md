@@ -402,3 +402,13 @@ no subscriptions ⇒ `skipped` Result, no raise). Dead endpoints raise `WebPush:
 test double must stub `code`/`message`/`body`. `DailyDigestBuilder` reads only already-scored JobPosts
 (never calls the LLM); the recurring schedule lives under the `production:` key in
 `config/recurring.yml` (`DailyDigestJob`, `every day at 8am`).
+
+### 2026-06-12 — Outreach generation is synchronous (controller), unlike scoring/drafts
+CONTACT-01's `OutreachDraftGenerator` runs inline in `Api::OutreachDraftsController#create` (no
+ActiveJob), because the client wants the draft back in the response. It mirrors
+`ApplicationDraftGenerator`'s OpenRouter seam (`client:` kwarg, `OpenrouterClient::MissingApiKeyError`
+⇒ skip), but the controller maps `skipped`⇒`503 llm_unavailable` and `failed`⇒`502 generation_failed`
+so the caller learns the LLM is unavailable rather than getting a silent no-op. Specs stub
+`OpenrouterClient.new` (not a `client:` injection, since the controller builds it) to a fake
+responding to `complete_json` — never hits the network and never sends the message anywhere. Routes
+are nested: `contact_candidates` under `job_posts`, `outreach_drafts` under `contact_candidates`.

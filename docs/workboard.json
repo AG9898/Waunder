@@ -709,7 +709,7 @@
       "id": "CONTACT-01",
       "title": "Contact candidates and outreach drafts API",
       "description": "Authenticated endpoints to save ContactCandidates linked to a JobPost (with a relevance reason) and to generate OutreachDrafts from a loose template via the OpenRouter client. Outreach drafts are prefilled for manual sending only and are never auto-sent. Session-guarded.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "CONTACT",
       "depends_on": [

@@ -158,7 +158,17 @@ dispatch.
   each record must include the reason the contact is relevant. Outreach text is persisted as
   `OutreachDraft` records linked to a contact candidate, with the loose source template and final
   message retained for manual-send presentation only. Waunder never sends LinkedIn outreach
-  automatically.
+  automatically. Session-guarded endpoints expose this surface:
+  `GET`/`POST /api/job_posts/:job_post_id/contact_candidates`
+  (`Api::ContactCandidatesController` — list/save candidates with a `relevance_reason`) and
+  `POST /api/contact_candidates/:contact_candidate_id/outreach_drafts`
+  (`Api::OutreachDraftsController` — generate a draft from an optional `loose_template`).
+  Outreach generation is isolated in `OutreachDraftGenerator`
+  (`app/services/outreach_draft_generator.rb`): it calls `OpenrouterClient` for a single
+  `message` string, persists an `OutreachDraft`, and **never sends the message anywhere**. When no
+  API key is configured the endpoint returns `503 llm_unavailable` (generator skips, no draft, no
+  raise); on an `OpenrouterClient::Error` it returns `502 generation_failed`. It never logs
+  prompt/completion contents or Profile PII.
 - Resume ingest is deterministic and isolated in `ResumeJsonImporter`
   (`app/services/resume_json_importer.rb`), invoked by `Api::ResumeDocumentsController#create`
   (`POST /api/profile/resume`). The external portfolio project pushes a canonical **JSON Resume**
