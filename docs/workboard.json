@@ -771,7 +771,7 @@
       "id": "WEB-02",
       "title": "Digest, job list, and job detail views with login",
       "description": "go-app screens for the job feed (scored jobs), job detail (summary, match score, relevant/missing requirements, red flags, resolved route), and the daily digest landing. Fetch via the /api proxy carrying the session cookie and render scored fields. Add a login screen that posts the passphrase to POST /api/session. Mock the Rails client in component tests.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "WEB",
       "depends_on": [

@@ -117,6 +117,14 @@ Be honest about the current state — most of the suite is still to be written.
 - **web/** — `components/pwa_test.go`: table-driven `go test` coverage of the PWA install/push
   gating helpers — iOS/iPadOS detection and version parsing (`DetectIOS`), the iOS 16.4+ Web Push
   threshold (`SupportsIOSWebPush`), and the install/permission gate decision (`EvaluatePushGate`).
+- **web/** — `components/jobs_test.go`, `components/login_test.go`, `components/client_test.go`:
+  render tests for the job list, job detail, and daily-digest screens (scored fields, empty,
+  error, and 401 states) plus the login form, driven by a mocked `RailsClient`. Render tests use
+  the go-app `NewTestEngine` (which fires `OnPreRender`, so data screens load in both `OnMount`
+  and `OnPreRender`). The `httpRailsClient` is exercised against an `httptest` server to assert
+  the `/api`-namespaced paths, JSON decode of scored fields/route, session-cookie carry between
+  requests, and 401 → `APIError`/`IsUnauthorized` mapping. Pure helpers (`MatchScoreLabel`,
+  `RouteLabel`, `jobIDFromPath`, `loginErrorStatus`) are table-tested.
 
 ### Planned (from the plan's Testing Plan)
 
@@ -187,6 +195,9 @@ Keep this table up to date — add a row when adding a new test file.
 | `workers/src/worker.test.ts` | Worker orchestration | config loading, bearer-auth task fetch/report calls, clean idle without `API_INTERNAL_URL`, one-cycle poll orchestration, and unsupported-ATS safe failure |
 | `workers/src/ats/handlers.test.ts` | Worker ATS handlers | Playwright fixture coverage for Greenhouse/Lever/Ashby registration, approved field fill/submit, unknown required field pauses, and sensitive-field pauses |
 | `web/components/pwa_test.go` | Web (go-app PWA) | iOS/iPadOS detection + version parsing, iOS 16.4+ Web Push threshold, and the install/notification-permission gate decision |
+| `web/components/jobs_test.go` | Web (go-app PWA) | Job list / job detail / daily-digest render tests (scored fields, empty/error/401 states) via a mocked `RailsClient` and `NewTestEngine`; `MatchScoreLabel`/`RouteLabel`/`jobIDFromPath` helpers |
+| `web/components/login_test.go` | Web (go-app PWA) | Login form render and `loginErrorStatus`/`loginButtonText` status mapping (401 → "Incorrect passphrase") |
+| `web/components/client_test.go` | Web (go-app PWA) | `httpRailsClient` against `httptest`: `/api`-namespaced paths, scored-field/route JSON decode, session-cookie carry, 401 → `APIError` |
 
 ---
 

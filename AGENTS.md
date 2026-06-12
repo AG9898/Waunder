@@ -412,3 +412,16 @@ so the caller learns the LLM is unavailable rather than getting a silent no-op. 
 `OpenrouterClient.new` (not a `client:` injection, since the controller builds it) to a fake
 responding to `complete_json` — never hits the network and never sends the message anywhere. Routes
 are nested: `contact_candidates` under `job_posts`, `outreach_drafts` under `contact_candidates`.
+
+### 2026-06-12 — go-app render tests fire OnPreRender, not OnMount; load data in both
+The go-app `app.NewTestEngine()` harness runs in server mode (`app.IsServer == true`), so it invokes
+`OnPreRender` — NOT `OnMount`. Data screens that fetch on entry must implement BOTH `OnMount` (live
+client/WASM) and `OnPreRender` (SSR + tests) calling the same `load`. `engine.ConsumeAll()` drains the
+`ctx.Async` goroutine and its `ctx.Dispatch`, so async fetches settle before `app.PrintHTML(&sb, c)`
+(`PrintHTML` takes `(w, ui)` and returns nothing; there is no `NewClientTester`). `app.Context` embeds
+`context.Context`, so pass `ctx` itself where a `context.Context` is needed (capture
+`reqCtx := ctx.Context` before `ctx.Async`) — there is no `ctx.Context()` method. Component re-renders
+use `ctx.Update()`, not a `compo.Update()`. WEB-02's screens fetch through a `components.RailsClient`
+interface (mock in tests; `httpRailsClient` over stdlib net/http maps to browser fetch in WASM) and
+target `GET /api/job_posts`, `GET /api/job_posts/:id`, `GET /api/digest` — read endpoints Rails does
+NOT yet expose (only the write/auth surface exists), so those are a pending API-side contract.

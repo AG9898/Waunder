@@ -67,8 +67,22 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   `components/pwa.go` and unit-tested.
 - Reverse-proxies `/api/*` to the Rails `api` service via `API_INTERNAL_URL`. When that var
   is unset, the proxy is disabled and the PWA serves standalone (local dev convenience).
-- Holds **no business logic** — it never reads the database, never calls the LLM, and stores
-  no secrets beyond the proxy target.
+- Renders the client screens (go-app routes in `main.go`): the daily digest landing (`/`,
+  `components.DigestView`), the scored job feed (`/jobs`, `components.JobList`), a single job's
+  scored detail (`/jobs/:id`, `components.JobDetailView` — summary, match score,
+  relevant/missing requirements, red flags, alignment/strategy notes, and the resolved
+  application route), and the passphrase login (`/login`, `components.Login`, which posts to
+  `POST /api/session`). All screens fetch through the same-origin `/api` proxy so the signed,
+  HTTP-only session cookie is carried automatically — no token handling client-side.
+- Talks to Rails only through a small `components.RailsClient` interface (the live
+  implementation, `httpRailsClient`, uses stdlib `net/http`, which maps to browser `fetch` in
+  the WASM build). The interface is the test seam: render/component tests inject a mock and run
+  with no backend. The read shapes the client expects are `GET /api/job_posts` (feed),
+  `GET /api/job_posts/:id` (detail), and `GET /api/digest` (digest); those read endpoints are a
+  Rails-side contract the API must satisfy (Rails currently exposes only the write/auth surface).
+- Holds **no business logic** — it never reads the database, never calls the LLM, never scores
+  or resolves routes (it only renders fields Rails owns), and stores no secrets beyond the
+  proxy target.
 
 ### api (Rails API)
 - Owns **all** business logic: job/company/contact/application records, application and

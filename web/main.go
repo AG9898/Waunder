@@ -22,8 +22,13 @@ import (
 )
 
 func main() {
-	// Client-side routing: which component renders for which path.
-	app.Route("/", func() app.Composer { return &components.Home{} })
+	// Client-side routing: which component renders for which path. The data
+	// screens fetch from the same-origin /api proxy (carrying the session
+	// cookie) and render scored fields owned by Rails.
+	app.Route("/", func() app.Composer { return &components.DigestView{} })
+	app.Route("/login", func() app.Composer { return &components.Login{} })
+	app.Route("/jobs", func() app.Composer { return &components.JobList{} })
+	app.RouteWithRegexp(`^/jobs/\d+$`, func() app.Composer { return &components.JobDetailView{} })
 	app.RunWhenOnBrowser()
 
 	// --- Server-side only below this point ---
