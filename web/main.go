@@ -45,13 +45,34 @@ func main() {
 	}
 
 	// go-app serves the PWA: app shell, app.wasm, generated wasm_exec.js,
-	// service worker, and the web manifest.
-	// Static resources (including app.wasm) are served from the ./web
-	// directory under the /web/ URL prefix (go-app default convention).
+	// service worker, and the web manifest. go-app auto-generates the manifest
+	// (display: standalone) and the offline app-shell service worker; we only
+	// supply the metadata, icon, and PWA chrome here.
+	//
+	// Static resources (including app.wasm and the icon) are served from the
+	// ./web directory under the /web/ URL prefix (go-app default convention).
+	//
+	// VAPID_PUBLIC_KEY is the public web-push key. It is public by design and
+	// is forwarded into the PWA env so the client can subscribe; the private
+	// VAPID secret lives only in Rails. No other business logic crosses here.
 	mux.Handle("/", &app.Handler{
-		Name:        "Waunder",
-		ShortName:   "Waunder",
-		Description: "Personal job application assistant",
+		Name:            "Waunder",
+		ShortName:       "Waunder",
+		Title:           "Waunder",
+		Description:     "Personal job application assistant",
+		Lang:            "en",
+		StartURL:        "/",
+		BackgroundColor: "#2d2c2c",
+		ThemeColor:      "#2d2c2c",
+		Icon: app.Icon{
+			Default:  "/web/icon.svg",
+			Large:    "/web/icon.svg",
+			SVG:      "/web/icon.svg",
+			Maskable: "/web/icon.svg",
+		},
+		Env: map[string]string{
+			"VAPID_PUBLIC_KEY": os.Getenv("VAPID_PUBLIC_KEY"),
+		},
 	})
 
 	port := os.Getenv("PORT")

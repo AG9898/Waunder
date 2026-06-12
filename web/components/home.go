@@ -16,5 +16,6 @@ func (h *Home) Render() app.UI {
 		Body(
 			app.H1().Text("Waunder"),
 			app.P().Text("Personal job application assistant — skeleton."),
+			&InstallGuide{},
 		)
 }

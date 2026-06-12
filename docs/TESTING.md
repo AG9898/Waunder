@@ -114,7 +114,9 @@ Be honest about the current state — most of the suite is still to be written.
 - **workers/** — `src/ats/handlers.test.ts`: Playwright fixture tests for Greenhouse, Lever, and
   Ashby handler registration, approved-answer fill/submit behavior, and required unknown /
   sensitive-field pause behavior.
-- **web/** — **no tests yet.**
+- **web/** — `components/pwa_test.go`: table-driven `go test` coverage of the PWA install/push
+  gating helpers — iOS/iPadOS detection and version parsing (`DetectIOS`), the iOS 16.4+ Web Push
+  threshold (`SupportsIOSWebPush`), and the install/permission gate decision (`EvaluatePushGate`).
 
 ### Planned (from the plan's Testing Plan)
 
@@ -144,7 +146,8 @@ Be honest about the current state — most of the suite is still to be written.
 
 ### Not covered yet
 
-- Any `web/` (Go) tests at all.
+- `web/` component render tests and an API-client/push-subscription abstraction (only the pure
+  install/push gating helpers are covered so far).
 - Rails webhook/job/dispatch specs.
 - The full end-to-end MVP integration scenario (see below).
 
@@ -183,6 +186,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `workers/src/safety.test.ts` | Worker safety | `isSensitiveField` detection + `partitionBySensitivity` splitting of answers |
 | `workers/src/worker.test.ts` | Worker orchestration | config loading, bearer-auth task fetch/report calls, clean idle without `API_INTERNAL_URL`, one-cycle poll orchestration, and unsupported-ATS safe failure |
 | `workers/src/ats/handlers.test.ts` | Worker ATS handlers | Playwright fixture coverage for Greenhouse/Lever/Ashby registration, approved field fill/submit, unknown required field pauses, and sensitive-field pauses |
+| `web/components/pwa_test.go` | Web (go-app PWA) | iOS/iPadOS detection + version parsing, iOS 16.4+ Web Push threshold, and the install/notification-permission gate decision |
 
 ---
 
