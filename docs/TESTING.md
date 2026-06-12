@@ -101,6 +101,11 @@ Be honest about the current state — most of the suite is still to be written.
   routes), Profile data merged into autofill answers, malformed structured-answer dropping, graceful
   skip (no draft, no raise) when no API key is configured, `failed` result on client errors, and
   PII-safe logging — using a mocked OpenRouter client (no live calls).
+- **api/** — `spec/jobs/daily_digest_job_spec.rb`: DailyDigestBuilder + WebPushDispatcher +
+  DailyDigestJob specs covering recently-scored JobPost selection and notification-payload
+  shaping, no-op guards (no VAPID key, no subscriptions, no digest content), expired-subscription
+  pruning, and end-to-end dispatch — using a fake push transport injected via the dispatcher's
+  `transport:` seam so no real Web Push is ever sent.
 - **workers/** — `src/safety.test.ts`: unit tests for sensitive-field detection
   (`isSensitiveField`) and answer partitioning (`partitionBySensitivity`).
 - **workers/** — `src/worker.test.ts`: unit tests for worker config loading, bearer-auth task

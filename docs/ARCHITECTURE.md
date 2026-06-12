@@ -100,7 +100,11 @@ The full topology and the rationale for the `/api` proxy routing decision live i
    `RESEND_WEBHOOK_SECRET`.
 3. Rails enqueues background jobs: parse alert → normalize job → resolve application route →
    LLM score via OpenRouter → generate draft.
-4. A daily web-push digest is eventually sent to subscribed PWA installs.
+4. A daily web-push digest is sent to subscribed PWA installs. `DailyDigestJob` (scheduled
+   via `config/recurring.yml`, `every day at 8am`) builds the payload from recently scored
+   JobPosts with `DailyDigestBuilder` and dispatches it with `WebPushDispatcher`, which signs
+   each message with the VAPID keys. Live sends are guarded behind VAPID key presence: with no
+   key or no stored subscriptions the dispatcher no-ops, so the recurring job is always safe.
 
 **Manual job/link entry**:
 1. The authenticated owner posts a URL and/or pasted posting text to `POST /api/job_posts`

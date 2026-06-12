@@ -517,7 +517,7 @@
       "id": "PUSH-02",
       "title": "Daily digest builder and web-push dispatch job",
       "description": "solid_queue job that builds the daily digest from recently scored JobPosts and dispatches a VAPID-signed Web Push notification to stored subscriptions, configured as a recurring/scheduled job. Guard live sends behind VAPID key presence. In tests, mock the push client and never send a real push.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "PUSH",
       "depends_on": [

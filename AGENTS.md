@@ -391,3 +391,14 @@ Worker ATS handlers import the registry from `workers/src/ats/registry.ts`; `wor
 then imports handler modules for side-effect registration and re-exports registry helpers. Do not
 register handlers by dynamically importing from `index.ts` with top-level await, because Node's test
 runner can exit with an unsettled top-level await cycle.
+
+### 2026-06-12 — Web Push uses the `web-push` gem behind a transport seam
+PUSH-02 added the `web-push` gem (3.1.0; pulls in `jwt`/`openssl`) — the first real push dependency.
+`WebPushDispatcher` wraps `WebPush.payload_send` in a `WebPushTransport` and exposes a `transport:`
+seam (same pattern as `OpenrouterClient`'s `http:`) so specs inject a fake transport and never send a
+real push. Live sends are guarded behind `VAPID_PUBLIC_KEY` + `VAPID_PRIVATE_KEY` presence (no key or
+no subscriptions ⇒ `skipped` Result, no raise). Dead endpoints raise `WebPush::ExpiredSubscription`/
+`InvalidSubscription` and are pruned; that error's `.new(response, host)` reads `response.body`, so a
+test double must stub `code`/`message`/`body`. `DailyDigestBuilder` reads only already-scored JobPosts
+(never calls the LLM); the recurring schedule lives under the `production:` key in
+`config/recurring.yml` (`DailyDigestJob`, `every day at 8am`).
