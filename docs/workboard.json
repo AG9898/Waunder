@@ -894,7 +894,7 @@
       "id": "WEB-06",
       "title": "Manual job entry form",
       "description": "go-app form to add a job by URL/paste, posting to the MANUAL-01 endpoint and surfacing the resulting JobPost in the feed once processed. Mock the client in tests.",
-      "status": "todo",
+      "status": "done",
       "priority": "low",
       "group_id": "WEB",
       "depends_on": [

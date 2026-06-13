@@ -57,6 +57,11 @@ type mockClient struct {
 	gotOutreachID   int
 	gotOutreachTmpl string
 	generateCalls   int
+
+	createResult ManualJobResult
+	createErr    error
+	createInput  ManualJobInput
+	createCalls  int
 }
 
 func (m *mockClient) Login(_ context.Context, passphrase string) error {
@@ -125,6 +130,12 @@ func (m *mockClient) GenerateOutreach(_ context.Context, candidateID int, looseT
 	m.gotOutreachTmpl = looseTemplate
 	m.generateCalls++
 	return m.outreach, m.outreachErr
+}
+
+func (m *mockClient) CreateJobPost(_ context.Context, input ManualJobInput) (ManualJobResult, error) {
+	m.createInput = input
+	m.createCalls++
+	return m.createResult, m.createErr
 }
 
 // renderHTML loads a component in the go-app test engine, runs its full

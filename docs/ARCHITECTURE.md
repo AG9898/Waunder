@@ -68,8 +68,11 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 - Reverse-proxies `/api/*` to the Rails `api` service via `API_INTERNAL_URL`. When that var
   is unset, the proxy is disabled and the PWA serves standalone (local dev convenience).
 - Renders the client screens (go-app routes in `main.go`): the daily digest landing (`/`,
-  `components.DigestView`), the scored job feed (`/jobs`, `components.JobList`), a single job's
-  scored detail (`/jobs/:id`, `components.JobDetailView` — summary, match score,
+  `components.DigestView`), the scored job feed (`/jobs`, `components.JobList`), the manual job
+  entry form (`/jobs/new`, `components.ManualEntry` — a URL and/or pasted posting text plus
+  optional title/company hints, posting to `POST /api/job_posts`; on success it surfaces the
+  created post with a `/jobs/:id` link to follow it into the feed once Rails scores it), a single
+  job's scored detail (`/jobs/:id`, `components.JobDetailView` — summary, match score,
   relevant/missing requirements, red flags, alignment/strategy notes, and the resolved
   application route), the application draft review (`/applications/:id`,
   `components.DraftReview` — resume emphasis, cover letter, structured answers, and a read-only
@@ -122,6 +125,15 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   exposes **no send action**: outreach is prefilled for manual sending only, upholding the
   never-auto-send-LinkedIn-outreach rule. (Outreach drafts are generated on demand; there is no
   list-drafts read endpoint.)
+- The manual job entry screen (WEB-06) writes a new posting with
+  `POST /api/job_posts` (MANUAL-01): the client sends a `job_post` object carrying `url` and/or
+  `text` plus optional `title`/`company` hints, and Rails returns the created post
+  (`{job_post: {id, title, company, posting_url, source, scoring_status, route}}`, HTTP 201) or
+  the standard `{error: {code: "invalid_input", ...}}` shape (HTTP 422). The post is created only
+  on an explicit form submit — never on mount/render — and the client does no validation beyond a
+  "URL or text present" hint (Rails owns normalization, the HTTP(S)-URL check, route resolution,
+  and scoring). On success the screen links to `/jobs/:id` so the new post can be followed into the
+  feed once Rails finishes scoring it (`scoring_status` starts `pending`).
 - Holds **no business logic** — it never reads the database, never calls the LLM, never scores
   or resolves routes (it only renders fields Rails owns), and stores no secrets beyond the
   proxy target.

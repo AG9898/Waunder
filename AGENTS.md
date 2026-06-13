@@ -461,3 +461,14 @@ manual-send-only rule with a 0 `GenerateOutreach` count after a full `renderHTML
 this inert (no real DOM), so render tests exercise the copy handler safely and the WASM build still
 compiles. Per-candidate generate state is held in a `map[int]*outreachGen` keyed by candidate id,
 lazily created via a `genFor(id)` helper so `renderContact` and the handlers share one instance.
+
+### 2026-06-13 — Manual entry form mirrors the existing do*/apply* + trim-only client pattern
+WEB-06's `components.ManualEntry` posts to the existing MANUAL-01 `POST /api/job_posts` via a new
+`RailsClient.CreateJobPost(ctx, ManualJobInput)` (request wrapped as `{job_post: {...}}`, response
+read from `{job_post: {...}}`). The web layer does ONLY a "URL or text present" client hint and
+trims fields before sending — all real validation (HTTP(S)-URL check), normalization, route
+resolution, and scoring stay in Rails. The new `CreateJobPost` mock method goes on the shared
+`mockClient` in `jobs_test.go` (one mock for the whole package), and the click handler body is
+extracted into a context-only `doSubmit` + pure `applyCreateResult` so it is unit-testable without
+the go-app engine. Route `/jobs/new` is added before the `^/jobs/\d+$` regexp route — exact routes
+win over regexps and "new" is not `\d+`, so no collision.

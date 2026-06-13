@@ -150,6 +150,14 @@ Be honest about the current state — most of the suite is still to be written.
   send affordance — only copy/manual-send guidance. Error-mapping (`applyGenerateResult`:
   503 → not-configured, 401 → session-expired, generic) and the `contactRole`/`generateButtonLabel`/
   `contactsJobIDFromPath` helpers are table-tested.
+- **web/** — `components/manual_entry_test.go`: render and unit tests for the manual job entry
+  screen (WEB-06). They assert the form renders (URL/text/title/company inputs, submit, back link),
+  the explicit `doSubmit` path posts the **trimmed** input via the mocked `RailsClient` and then
+  surfaces the created `JobPost` with a `/jobs/:id` link, that an empty form (no URL or text) never
+  reaches the API (`inputPresent` gate), and the `applyCreateResult` error mapping (401 →
+  session-expired, 422 → invalid-input, generic → transient). The `createdMessage` (title/company
+  vs id fallback, pending/empty status → "being scored") and `entryButtonLabel` helpers are
+  table-tested.
 
 ### Planned (from the plan's Testing Plan)
 
@@ -227,6 +235,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `web/components/profile_test.go` | Web (go-app PWA) | Profile/resume render (editable fields, contact presence flags with no PII leak, resume metadata/empty) and `doSave` write path (reseed/error/401) via a mocked `RailsClient` |
 | `web/components/push_test.go` | Web (go-app PWA) | Push toggle subscribe/unsubscribe flow via a mocked `PushSubscriber` (public VAPID key fetched then persisted; browser cancel before Rails), state-mapping helpers, and no-auto-subscribe-on-render |
 | `web/components/contacts_test.go` | Web (go-app PWA) | Contacts/outreach render (candidate fields, empty/error/401), explicit `doGenerate` draft path, no-auto-generate-on-mount and no-send-affordance safety tests, and `applyGenerateResult`/`contactRole`/`generateButtonLabel`/`contactsJobIDFromPath` helpers, via a mocked `RailsClient` |
+| `web/components/manual_entry_test.go` | Web (go-app PWA) | Manual job entry render (URL/text/title/company form), explicit `doSubmit` posting trimmed input via the mocked `RailsClient` and surfacing the created `/jobs/:id` link, empty-form no-API-call gate, `applyCreateResult` error mapping (401/422/transient), and `createdMessage`/`entryButtonLabel` helpers |
 
 ---
 

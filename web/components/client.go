@@ -77,6 +77,38 @@ type RailsClient interface {
 	// Rails drafts the message via the LLM; it NEVER sends anything. The draft
 	// is returned for copy/manual sending only.
 	GenerateOutreach(ctx context.Context, candidateID int, looseTemplate string) (OutreachDraft, error)
+
+	// CreateJobPost submits a manual job entry (a URL and/or pasted posting
+	// text) to POST /api/job_posts. Rails deterministically normalizes it into
+	// a JobPost with source "manual" and runs it through the same route-resolve
+	// and scoring pipeline as email ingestion; the created post then appears in
+	// the feed once scored. All normalization and scoring happen in Rails.
+	CreateJobPost(ctx context.Context, input ManualJobInput) (ManualJobResult, error)
+}
+
+// ManualJobInput is the owner-submitted manual entry: a URL and/or pasted
+// posting text, with optional title/company hints. Rails requires at least one
+// of URL or Text and validates the URL is HTTP(S). The web layer carries no
+// validation logic of its own beyond a "needs URL or text" client hint.
+type ManualJobInput struct {
+	URL     string `json:"url"`
+	Text    string `json:"text"`
+	Title   string `json:"title"`
+	Company string `json:"company"`
+}
+
+// ManualJobResult is the created JobPost as the manual-entry endpoint returns
+// it (HTTP 201). It carries enough to confirm creation and link to the new
+// post in the feed; scoring runs asynchronously, so ScoringStatus starts
+// "pending".
+type ManualJobResult struct {
+	ID            int      `json:"id"`
+	Title         string   `json:"title"`
+	Company       string   `json:"company"`
+	PostingURL    string   `json:"posting_url"`
+	Source        string   `json:"source"`
+	ScoringStatus string   `json:"scoring_status"`
+	Route         JobRoute `json:"route"`
 }
 
 // ContactCandidate is a person worth reaching out to about a job posting, as
@@ -411,6 +443,17 @@ func (c *httpRailsClient) GenerateOutreach(ctx context.Context, candidateID int,
 		return OutreachDraft{}, err
 	}
 	return out.OutreachDraft, nil
+}
+
+func (c *httpRailsClient) CreateJobPost(ctx context.Context, input ManualJobInput) (ManualJobResult, error) {
+	body := map[string]any{"job_post": input}
+	var out struct {
+		JobPost ManualJobResult `json:"job_post"`
+	}
+	if err := c.sendJSON(ctx, http.MethodPost, "/api/job_posts", body, &out); err != nil {
+		return ManualJobResult{}, err
+	}
+	return out.JobPost, nil
 }
 
 // sendJSON marshals body as JSON, sends it with the given method, and decodes
