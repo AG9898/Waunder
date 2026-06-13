@@ -425,3 +425,16 @@ use `ctx.Update()`, not a `compo.Update()`. WEB-02's screens fetch through a `co
 interface (mock in tests; `httpRailsClient` over stdlib net/http maps to browser fetch in WASM) and
 target `GET /api/job_posts`, `GET /api/job_posts/:id`, `GET /api/digest` — read endpoints Rails does
 NOT yet expose (only the write/auth surface exists), so those are a pending API-side contract.
+
+### 2026-06-13 — go-app OnClick handlers aren't directly testable; split the body out
+The public `app.TestEngine` (from `app.NewTestEngine()`) exposes only `Load`/`ConsumeNext`/
+`ConsumeAll` — there is NO way to obtain an `app.Context` to invoke an `OnClick(handler)` from a
+test, and `app.PrintHTML` spins up its own engine that re-runs `OnPreRender` (resetting any
+post-action state, e.g. it flips a data screen back to `loadLoading` and hides content gated on
+`loadDone`). To test an explicit user action (WEB-03's approve+submit), extract the action body
+into a plain method that takes a `context.Context` (`doSubmit(ctx)`) plus a pure state-applier
+(`applySubmitResult(res, err)`); the `OnClick` handler stays a thin `ctx.Async`/`ctx.Dispatch`
+wrapper around them. Tests then call the plain method directly and assert on component state and
+the label helpers, and render submit-state chrome via `PrintHTML(r.renderSubmit())` (a sub-UI,
+not the whole component, to dodge the OnPreRender reset). The "never submit on mount" safety rule
+is covered by asserting the mock's submit-call count is 0 after a full `renderHTML` lifecycle.

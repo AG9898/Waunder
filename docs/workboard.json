@@ -802,7 +802,7 @@
       "id": "WEB-03",
       "title": "Application draft review and approve/submit UI",
       "description": "go-app screen to review a generated ApplicationDraft (resume emphasis, cover letter, structured answers, autofill preview) and explicitly approve and submit via POST /api/applications/:id/submit. Approval is an explicit user action; surface the submit status and audit result. Mock the client in tests.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "WEB",
       "depends_on": [

@@ -29,6 +29,7 @@ func main() {
 	app.Route("/login", func() app.Composer { return &components.Login{} })
 	app.Route("/jobs", func() app.Composer { return &components.JobList{} })
 	app.RouteWithRegexp(`^/jobs/\d+$`, func() app.Composer { return &components.JobDetailView{} })
+	app.RouteWithRegexp(`^/applications/\d+$`, func() app.Composer { return &components.DraftReview{} })
 	app.RunWhenOnBrowser()
 
 	// --- Server-side only below this point ---

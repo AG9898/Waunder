@@ -26,6 +26,15 @@ type mockClient struct {
 
 	digest    Digest
 	digestErr error
+
+	draft      ApplicationDraft
+	draftErr   error
+	gotDraftID int
+
+	submitResult SubmitResult
+	submitErr    error
+	gotSubmitID  int
+	submitCalls  int
 }
 
 func (m *mockClient) Login(_ context.Context, passphrase string) error {
@@ -44,6 +53,17 @@ func (m *mockClient) Job(_ context.Context, id int) (JobDetail, error) {
 
 func (m *mockClient) Digest(context.Context) (Digest, error) {
 	return m.digest, m.digestErr
+}
+
+func (m *mockClient) ApplicationDraft(_ context.Context, id int) (ApplicationDraft, error) {
+	m.gotDraftID = id
+	return m.draft, m.draftErr
+}
+
+func (m *mockClient) SubmitApplication(_ context.Context, id int) (SubmitResult, error) {
+	m.gotSubmitID = id
+	m.submitCalls++
+	return m.submitResult, m.submitErr
 }
 
 // renderHTML loads a component in the go-app test engine, runs its full

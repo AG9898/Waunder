@@ -71,7 +71,10 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   `components.DigestView`), the scored job feed (`/jobs`, `components.JobList`), a single job's
   scored detail (`/jobs/:id`, `components.JobDetailView` — summary, match score,
   relevant/missing requirements, red flags, alignment/strategy notes, and the resolved
-  application route), and the passphrase login (`/login`, `components.Login`, which posts to
+  application route), the application draft review (`/applications/:id`,
+  `components.DraftReview` — resume emphasis, cover letter, structured answers, and a read-only
+  worker autofill preview, plus an explicit approve+submit control), and the passphrase login
+  (`/login`, `components.Login`, which posts to
   `POST /api/session`). All screens fetch through the same-origin `/api` proxy so the signed,
   HTTP-only session cookie is carried automatically — no token handling client-side.
 - Talks to Rails only through a small `components.RailsClient` interface (the live
@@ -86,7 +89,14 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   `application_strategy`) plus the resolved `route` (`route_type`, `recommended_route`,
   `application_url`); the digest reuses `DailyDigestBuilder#posts` for the recently scored,
   top-ranked set. None of these reads ever trigger scoring or the LLM, and an unknown id returns
-  the standard `{error: {code: "not_found", ...}}` shape.
+  the standard `{error: {code: "not_found", ...}}` shape. The draft review screen additionally
+  expects `GET /api/applications/:id` (the generated `ApplicationDraft`: `resume_emphasis_notes`,
+  `cover_letter`, `structured_answers`, worker-shaped `autofill_payload`) and submits via
+  `POST /api/applications/:id/submit` (already served; returns `{status: "dispatched", ...}` or
+  an error). The submit is fired only on an explicit user click — never on mount/render — which
+  upholds the per-application approval rule; the dispatched ATS from the submit response is
+  surfaced as the audit result. (The `GET /api/applications/:id` read endpoint is a pending
+  Rails-side contract; the screen renders against a mocked client in tests.)
 - Holds **no business logic** — it never reads the database, never calls the LLM, never scores
   or resolves routes (it only renders fields Rails owns), and stores no secrets beyond the
   proxy target.
