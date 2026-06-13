@@ -26,6 +26,13 @@ class DailyDigestBuilder
     }
   end
 
+  # Returns the same recently scored, top-ranked JobPosts the push digest is
+  # built from, for read endpoints that render the digest in the PWA. Read-only
+  # and never triggers scoring or the LLM. May be empty.
+  def posts
+    recent_scored_posts
+  end
+
   private
 
   attr_reader :window, :now

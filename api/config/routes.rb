@@ -16,7 +16,8 @@ Rails.application.routes.draw do
     post "profile/resume", to: "resume_documents#create"
     get "push/vapid_public_key", to: "push_subscriptions#public_key"
     resource :push_subscription, only: %i[create destroy]
-    resources :job_posts, only: %i[create] do
+    get "digest", to: "digest#show"
+    resources :job_posts, only: %i[index show create] do
       resources :contact_candidates, only: %i[index create]
     end
     resources :contact_candidates, only: [] do

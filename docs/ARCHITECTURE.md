@@ -78,8 +78,15 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   implementation, `httpRailsClient`, uses stdlib `net/http`, which maps to browser `fetch` in
   the WASM build). The interface is the test seam: render/component tests inject a mock and run
   with no backend. The read shapes the client expects are `GET /api/job_posts` (feed),
-  `GET /api/job_posts/:id` (detail), and `GET /api/digest` (digest); those read endpoints are a
-  Rails-side contract the API must satisfy (Rails currently exposes only the write/auth surface).
+  `GET /api/job_posts/:id` (detail), and `GET /api/digest` (digest). Rails now serves all three
+  (READ-01): session-guarded, read-only, exposing only client-safe fields. The feed returns
+  compact rows (`id`, `title`, `company`, `match_score`, `scoring_status`, `summary`) ranked by
+  `match_score DESC NULLS LAST` then recency; detail adds the scored arrays/notes
+  (`relevant_requirements`, `missing_requirements`, `red_flags`, `resume_alignment_notes`,
+  `application_strategy`) plus the resolved `route` (`route_type`, `recommended_route`,
+  `application_url`); the digest reuses `DailyDigestBuilder#posts` for the recently scored,
+  top-ranked set. None of these reads ever trigger scoring or the LLM, and an unknown id returns
+  the standard `{error: {code: "not_found", ...}}` shape.
 - Holds **no business logic** — it never reads the database, never calls the LLM, never scores
   or resolves routes (it only renders fields Rails owns), and stores no secrets beyond the
   proxy target.

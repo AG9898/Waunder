@@ -102,4 +102,96 @@ RSpec.describe "Api job posts", type: :request do
       expect(enqueued_jobs).to be_empty
     end
   end
+
+  describe "GET /api/job_posts" do
+    it "returns the scored feed ranked by match score" do
+      sign_in!
+      company = Company.create!(name: "Acme")
+      JobPost.create!(company: company, title: "Lower", match_score: 40,
+        scoring_status: "scored", summary: "lower match")
+      JobPost.create!(company: company, title: "Higher", match_score: 90,
+        scoring_status: "scored", summary: "higher match")
+
+      get "/api/job_posts"
+
+      expect(response).to have_http_status(:ok)
+      body = JSON.parse(response.body)
+      titles = body["job_posts"].map { |jp| jp["title"] }
+      expect(titles).to eq(%w[Higher Lower])
+      first = body["job_posts"].first
+      expect(first).to include(
+        "title" => "Higher",
+        "company" => "Acme",
+        "match_score" => 90,
+        "scoring_status" => "scored",
+        "summary" => "higher match"
+      )
+    end
+
+    it "requires authentication" do
+      get "/api/job_posts"
+
+      expect(response).to have_http_status(:unauthorized)
+      expect(JSON.parse(response.body)).to eq(
+        "error" => { "code" => "unauthorized", "message" => "Unauthorized" }
+      )
+    end
+  end
+
+  describe "GET /api/job_posts/:id" do
+    it "returns the scored detail with the resolved route" do
+      sign_in!
+      company = Company.create!(name: "Acme")
+      job_post = JobPost.create!(
+        company: company, title: "Staff Engineer", posting_url: "https://example.com/job",
+        match_score: 88, scoring_status: "scored", summary: "great fit",
+        relevant_requirements: [ "Go" ], missing_requirements: [ "K8s" ],
+        red_flags: [ "on-call" ], resume_alignment_notes: "strong overlap",
+        application_strategy: "apply direct"
+      )
+      ApplicationRoute.create!(job_post: job_post, route_type: "greenhouse",
+        recommended_route: "direct_ats", application_url: "https://boards.greenhouse.io/acme")
+
+      get "/api/job_posts/#{job_post.id}"
+
+      expect(response).to have_http_status(:ok)
+      detail = JSON.parse(response.body)["job_post"]
+      expect(detail).to include(
+        "id" => job_post.id,
+        "title" => "Staff Engineer",
+        "company" => "Acme",
+        "posting_url" => "https://example.com/job",
+        "match_score" => 88,
+        "scoring_status" => "scored",
+        "summary" => "great fit",
+        "relevant_requirements" => [ "Go" ],
+        "missing_requirements" => [ "K8s" ],
+        "red_flags" => [ "on-call" ],
+        "resume_alignment_notes" => "strong overlap",
+        "application_strategy" => "apply direct"
+      )
+      expect(detail["route"]).to eq(
+        "route_type" => "greenhouse",
+        "recommended_route" => "direct_ats",
+        "application_url" => "https://boards.greenhouse.io/acme"
+      )
+    end
+
+    it "returns the consistent JSON error shape for an unknown id" do
+      sign_in!
+
+      get "/api/job_posts/999999"
+
+      expect(response).to have_http_status(:not_found)
+      expect(JSON.parse(response.body)).to eq(
+        "error" => { "code" => "not_found", "message" => "JobPost not found" }
+      )
+    end
+
+    it "requires authentication" do
+      get "/api/job_posts/1"
+
+      expect(response).to have_http_status(:unauthorized)
+    end
+  end
 end
