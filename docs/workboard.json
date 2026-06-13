@@ -833,7 +833,7 @@
       "id": "WEB-04",
       "title": "Profile/resume upload and push subscription UI",
       "description": "go-app screens for resume upload and structured profile editing (via PROFILE-01) and a push-subscription toggle that subscribes using the public VAPID key (via PUSH-01). Stays same-origin through the /api proxy. Mock the client and browser Push API in tests.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "WEB",
       "depends_on": [

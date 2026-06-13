@@ -1,6 +1,7 @@
 package components
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -43,6 +44,88 @@ type RailsClient interface {
 	// (POST /api/applications/:id/submit). This is only called on an explicit
 	// user action; Rails dispatches the trusted submit task to the worker.
 	SubmitApplication(ctx context.Context, id int) (SubmitResult, error)
+
+	// Profile fetches the single-user structured profile (GET /api/profile).
+	// Sensitive contact details come back as presence flags only; Rails never
+	// serializes the raw encrypted PII.
+	Profile(ctx context.Context) (Profile, error)
+
+	// UpdateProfile writes the editable structured profile fields
+	// (PATCH /api/profile) and returns the refreshed profile.
+	UpdateProfile(ctx context.Context, edit ProfileEdit) (Profile, error)
+
+	// VAPIDPublicKey fetches the public web-push key
+	// (GET /api/push/vapid_public_key). The value is public by design; the
+	// private VAPID secret never leaves Rails.
+	VAPIDPublicKey(ctx context.Context) (string, error)
+
+	// Subscribe stores a browser Web Push subscription
+	// (POST /api/push_subscription) for the daily digest dispatch.
+	Subscribe(ctx context.Context, sub PushSubscription) error
+
+	// Unsubscribe removes the stored subscription for an endpoint
+	// (DELETE /api/push_subscription).
+	Unsubscribe(ctx context.Context, endpoint string) error
+}
+
+// Profile is the single-user structured profile as Rails serializes it. The
+// editable text/array fields are echoed back in full; sensitive contact
+// details (email, phone, address) are exposed only as presence flags so raw
+// encrypted PII never reaches the client.
+type Profile struct {
+	FullName     string         `json:"full_name"`
+	Headline     string         `json:"headline"`
+	Summary      string         `json:"summary"`
+	Location     string         `json:"location"`
+	LinkedInURL  string         `json:"linkedin_url"`
+	GitHubURL    string         `json:"github_url"`
+	PortfolioURL string         `json:"portfolio_url"`
+	Contact      ProfileContact `json:"contact"`
+	Resume       *ResumeSummary `json:"resume"`
+}
+
+// ProfileContact carries presence flags only for the encrypted contact fields.
+type ProfileContact struct {
+	EmailPresent         bool `json:"email_present"`
+	PhonePresent         bool `json:"phone_present"`
+	StreetAddressPresent bool `json:"street_address_present"`
+}
+
+// ResumeSummary is the metadata for the current primary resume document. It is
+// nil when no resume has been ingested yet.
+type ResumeSummary struct {
+	Title        string `json:"title"`
+	ParseStatus  string `json:"parse_status"`
+	FileAttached bool   `json:"file_attached"`
+	Filename     string `json:"filename"`
+}
+
+// ProfileEdit is the set of editable profile fields the form writes back. Only
+// the non-sensitive text/URL fields are editable here; sensitive contact
+// details and the structured resume arrays are sourced from the resume ingest.
+type ProfileEdit struct {
+	FullName     string `json:"full_name"`
+	Headline     string `json:"headline"`
+	Summary      string `json:"summary"`
+	Location     string `json:"location"`
+	LinkedInURL  string `json:"linkedin_url"`
+	GitHubURL    string `json:"github_url"`
+	PortfolioURL string `json:"portfolio_url"`
+}
+
+// PushSubscription is the browser Web Push subscription posted to Rails. It
+// mirrors the PushSubscriptionJSON the browser hands back, so the worker/digest
+// dispatch can send to the endpoint with the stored keys.
+type PushSubscription struct {
+	Endpoint string               `json:"endpoint"`
+	Keys     PushSubscriptionKeys `json:"keys"`
+}
+
+// PushSubscriptionKeys are the browser-supplied encryption keys for a push
+// subscription.
+type PushSubscriptionKeys struct {
+	P256dh string `json:"p256dh"`
+	Auth   string `json:"auth"`
 }
 
 // JobSummary is the compact job-feed row: enough to render the list and link
@@ -229,6 +312,64 @@ func (c *httpRailsClient) SubmitApplication(ctx context.Context, id int) (Submit
 		return SubmitResult{}, err
 	}
 	return out, nil
+}
+
+func (c *httpRailsClient) Profile(ctx context.Context) (Profile, error) {
+	var out struct {
+		Profile Profile `json:"profile"`
+	}
+	if err := c.get(ctx, "/api/profile", &out); err != nil {
+		return Profile{}, err
+	}
+	return out.Profile, nil
+}
+
+func (c *httpRailsClient) UpdateProfile(ctx context.Context, edit ProfileEdit) (Profile, error) {
+	body := map[string]any{"profile": edit}
+	var out struct {
+		Profile Profile `json:"profile"`
+	}
+	if err := c.sendJSON(ctx, http.MethodPatch, "/api/profile", body, &out); err != nil {
+		return Profile{}, err
+	}
+	return out.Profile, nil
+}
+
+func (c *httpRailsClient) VAPIDPublicKey(ctx context.Context) (string, error) {
+	var out struct {
+		VAPIDPublicKey string `json:"vapid_public_key"`
+	}
+	if err := c.get(ctx, "/api/push/vapid_public_key", &out); err != nil {
+		return "", err
+	}
+	return out.VAPIDPublicKey, nil
+}
+
+func (c *httpRailsClient) Subscribe(ctx context.Context, sub PushSubscription) error {
+	body := map[string]any{"subscription": sub}
+	return c.sendJSON(ctx, http.MethodPost, "/api/push_subscription", body, nil)
+}
+
+func (c *httpRailsClient) Unsubscribe(ctx context.Context, endpoint string) error {
+	body := map[string]any{"subscription": map[string]string{"endpoint": endpoint}}
+	return c.sendJSON(ctx, http.MethodDelete, "/api/push_subscription", body, nil)
+}
+
+// sendJSON marshals body as JSON, sends it with the given method, and decodes
+// the response into dst when dst is non-nil. The same-origin session cookie is
+// carried automatically by the browser fetch stack.
+func (c *httpRailsClient) sendJSON(ctx context.Context, method, path string, body, dst any) error {
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, method, c.base+path, bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	return c.do(req, dst)
 }
 
 func (c *httpRailsClient) get(ctx context.Context, path string, dst any) error {

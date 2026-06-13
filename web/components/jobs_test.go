@@ -35,6 +35,18 @@ type mockClient struct {
 	submitErr    error
 	gotSubmitID  int
 	submitCalls  int
+
+	profile       Profile
+	profileErr    error
+	updated       ProfileEdit
+	updateErr     error
+	updateCalls   int
+	vapidKey      string
+	vapidErr      error
+	subscribed    PushSubscription
+	subscribeErr  error
+	unsubEndpoint string
+	unsubErr      error
 }
 
 func (m *mockClient) Login(_ context.Context, passphrase string) error {
@@ -64,6 +76,33 @@ func (m *mockClient) SubmitApplication(_ context.Context, id int) (SubmitResult,
 	m.gotSubmitID = id
 	m.submitCalls++
 	return m.submitResult, m.submitErr
+}
+
+func (m *mockClient) Profile(context.Context) (Profile, error) {
+	return m.profile, m.profileErr
+}
+
+func (m *mockClient) UpdateProfile(_ context.Context, edit ProfileEdit) (Profile, error) {
+	m.updated = edit
+	m.updateCalls++
+	if m.updateErr != nil {
+		return Profile{}, m.updateErr
+	}
+	return m.profile, nil
+}
+
+func (m *mockClient) VAPIDPublicKey(context.Context) (string, error) {
+	return m.vapidKey, m.vapidErr
+}
+
+func (m *mockClient) Subscribe(_ context.Context, sub PushSubscription) error {
+	m.subscribed = sub
+	return m.subscribeErr
+}
+
+func (m *mockClient) Unsubscribe(_ context.Context, endpoint string) error {
+	m.unsubEndpoint = endpoint
+	return m.unsubErr
 }
 
 // renderHTML loads a component in the go-app test engine, runs its full

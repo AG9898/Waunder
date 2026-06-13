@@ -73,7 +73,10 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   relevant/missing requirements, red flags, alignment/strategy notes, and the resolved
   application route), the application draft review (`/applications/:id`,
   `components.DraftReview` — resume emphasis, cover letter, structured answers, and a read-only
-  worker autofill preview, plus an explicit approve+submit control), and the passphrase login
+  worker autofill preview, plus an explicit approve+submit control), the profile/resume screen
+  (`/profile`, `components.ProfileView` — editable non-sensitive text/URL fields, encrypted
+  contact details shown as presence flags only, read-only resume ingest metadata, and an embedded
+  `components.PushToggle`), and the passphrase login
   (`/login`, `components.Login`, which posts to
   `POST /api/session`). All screens fetch through the same-origin `/api` proxy so the signed,
   HTTP-only session cookie is carried automatically — no token handling client-side.
@@ -96,7 +99,17 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   an error). The submit is fired only on an explicit user click — never on mount/render — which
   upholds the per-application approval rule; the dispatched ATS from the submit response is
   surfaced as the audit result. (The `GET /api/applications/:id` read endpoint is a pending
-  Rails-side contract; the screen renders against a mocked client in tests.)
+  Rails-side contract; the screen renders against a mocked client in tests.) The profile screen
+  reads/writes `GET /api/profile` and `PATCH /api/profile` (WEB-04, both served by PROFILE-01):
+  the read exposes the editable text/URL fields plus contact `*_present` presence flags and a
+  `resume` summary (`title`, `parse_status`, `file_attached`, `filename`); the write only sends
+  the non-sensitive `profile` text/URL fields. The push toggle fetches the public web-push key
+  from `GET /api/push/vapid_public_key` (PUSH-01) — the private VAPID secret never leaves Rails —
+  subscribes via the browser Push API behind the `components.PushSubscriber` abstraction (mocked
+  in tests), then persists/removes the subscription with `POST`/`DELETE /api/push_subscription`.
+  Subscribe and unsubscribe fire only on an explicit user click — never on mount/render — so the
+  toggle never auto-subscribes; on the server/SSR build the Push API is unsupported and the toggle
+  renders a guidance state.
 - Holds **no business logic** — it never reads the database, never calls the LLM, never scores
   or resolves routes (it only renders fields Rails owns), and stores no secrets beyond the
   proxy target.

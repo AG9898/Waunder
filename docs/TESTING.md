@@ -131,6 +131,16 @@ Be honest about the current state — most of the suite is still to be written.
   the `/api`-namespaced paths, JSON decode of scored fields/route, session-cookie carry between
   requests, and 401 → `APIError`/`IsUnauthorized` mapping. Pure helpers (`MatchScoreLabel`,
   `RouteLabel`, `jobIDFromPath`, `loginErrorStatus`) are table-tested.
+- **web/** — `components/profile_test.go`, `components/push_test.go`: render and unit tests for the
+  profile/resume screen and the embedded push toggle (WEB-04). Profile tests assert the editable
+  fields render, contact details show only as presence flags (never leaking PII), the resume
+  metadata/empty state, and the save path (`doSave`) writes via the mocked `RailsClient` with
+  reseed/error/401 handling. Push tests use a `mockPusher` standing in for the browser Push API
+  (`PushSubscriber`): they verify `doSubscribe` reads the public VAPID key, subscribes, and only
+  then persists to Rails; `doUnsubscribe` cancels the browser subscription before calling Rails;
+  the `applySubscribe`/`applyUnsubscribe`/`initialPushState`/`pushErrorMessage` state mappings; and
+  that rendering/mount never auto-subscribes (unsupported build renders guidance, supported build
+  renders the enable control without any VAPID fetch or persist).
 
 ### Planned (from the plan's Testing Plan)
 
@@ -205,6 +215,8 @@ Keep this table up to date — add a row when adding a new test file.
 | `web/components/jobs_test.go` | Web (go-app PWA) | Job list / job detail / daily-digest render tests (scored fields, empty/error/401 states) via a mocked `RailsClient` and `NewTestEngine`; `MatchScoreLabel`/`RouteLabel`/`jobIDFromPath` helpers |
 | `web/components/login_test.go` | Web (go-app PWA) | Login form render and `loginErrorStatus`/`loginButtonText` status mapping (401 → "Incorrect passphrase") |
 | `web/components/client_test.go` | Web (go-app PWA) | `httpRailsClient` against `httptest`: `/api`-namespaced paths, scored-field/route JSON decode, session-cookie carry, 401 → `APIError` |
+| `web/components/profile_test.go` | Web (go-app PWA) | Profile/resume render (editable fields, contact presence flags with no PII leak, resume metadata/empty) and `doSave` write path (reseed/error/401) via a mocked `RailsClient` |
+| `web/components/push_test.go` | Web (go-app PWA) | Push toggle subscribe/unsubscribe flow via a mocked `PushSubscriber` (public VAPID key fetched then persisted; browser cancel before Rails), state-mapping helpers, and no-auto-subscribe-on-render |
 
 ---
 

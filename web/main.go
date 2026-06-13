@@ -28,6 +28,7 @@ func main() {
 	app.Route("/", func() app.Composer { return &components.DigestView{} })
 	app.Route("/login", func() app.Composer { return &components.Login{} })
 	app.Route("/jobs", func() app.Composer { return &components.JobList{} })
+	app.Route("/profile", func() app.Composer { return &components.ProfileView{} })
 	app.RouteWithRegexp(`^/jobs/\d+$`, func() app.Composer { return &components.JobDetailView{} })
 	app.RouteWithRegexp(`^/applications/\d+$`, func() app.Composer { return &components.DraftReview{} })
 	app.RunWhenOnBrowser()
