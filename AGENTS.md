@@ -438,3 +438,26 @@ wrapper around them. Tests then call the plain method directly and assert on com
 the label helpers, and render submit-state chrome via `PrintHTML(r.renderSubmit())` (a sub-UI,
 not the whole component, to dodge the OnPreRender reset). The "never submit on mount" safety rule
 is covered by asserting the mock's submit-call count is 0 after a full `renderHTML` lifecycle.
+
+### 2026-06-13 — go-app render assertions must match HTML-escaped text; share Push mock
+WEB-04's `PushToggle` reuses the WEB-03 pattern (`OnClick` → thin `ctx.Async`/`ctx.Dispatch` over a
+plain `doSubscribe(ctx)`/`doUnsubscribe(ctx)` + pure `applySubscribe`/`applyUnsubscribe` appliers),
+so the subscribe/unsubscribe flows are unit-tested with no engine and the "never auto-subscribe on
+render" rule is asserted by a 0 subscribe/persist count after a full `renderHTML` lifecycle. Two
+gotchas: (1) `app.PrintHTML` HTML-escapes apostrophes (`aren't` → `aren&#39;t`), so render-substring
+assertions must avoid raw apostrophes or match an escape-free fragment. (2) The browser Push API
+mock (`mockPusher`, implementing `PushSubscriber`) lives in `push_test.go` but is also used by
+`profile_test.go` (ProfileView embeds a PushToggle) — keep one shared mock in the package, not one
+per file, to avoid duplicate-type redefinition.
+
+### 2026-06-13 — go-app Textarea has no Value(); clipboard via app.Window() JS shim
+WEB-05's `ContactsView` reuses the action-handler split (`OnClick` → thin `ctx.Async`/`ctx.Dispatch`
+over a plain `doGenerate(ctx, idStr, tmpl)` + pure `applyGenerateResult`), and asserts the
+manual-send-only rule with a 0 `GenerateOutreach` count after a full `renderHTML` lifecycle plus a
+"no send affordance in the rendered HTML" test. Two go-app gotchas: (1) `app.HTMLTextarea` has NO
+`.Value()` method (unlike `app.HTMLInput`) — set its content with `.Text(...)` or the build fails.
+(2) For browser clipboard copy use `app.Window().Get("navigator").Get("clipboard")` guarded by
+`.Truthy()` then `.Call("writeText", text)`; on the server/SSR + test build go-app's JS shim makes
+this inert (no real DOM), so render tests exercise the copy handler safely and the WASM build still
+compiles. Per-candidate generate state is held in a `map[int]*outreachGen` keyed by candidate id,
+lazily created via a `genFor(id)` helper so `renderContact` and the handlers share one instance.

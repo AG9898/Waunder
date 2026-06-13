@@ -47,6 +47,16 @@ type mockClient struct {
 	subscribeErr  error
 	unsubEndpoint string
 	unsubErr      error
+
+	contacts      []ContactCandidate
+	contactsErr   error
+	gotContactsID int
+
+	outreach        OutreachDraft
+	outreachErr     error
+	gotOutreachID   int
+	gotOutreachTmpl string
+	generateCalls   int
 }
 
 func (m *mockClient) Login(_ context.Context, passphrase string) error {
@@ -103,6 +113,18 @@ func (m *mockClient) Subscribe(_ context.Context, sub PushSubscription) error {
 func (m *mockClient) Unsubscribe(_ context.Context, endpoint string) error {
 	m.unsubEndpoint = endpoint
 	return m.unsubErr
+}
+
+func (m *mockClient) Contacts(_ context.Context, jobID int) ([]ContactCandidate, error) {
+	m.gotContactsID = jobID
+	return m.contacts, m.contactsErr
+}
+
+func (m *mockClient) GenerateOutreach(_ context.Context, candidateID int, looseTemplate string) (OutreachDraft, error) {
+	m.gotOutreachID = candidateID
+	m.gotOutreachTmpl = looseTemplate
+	m.generateCalls++
+	return m.outreach, m.outreachErr
 }
 
 // renderHTML loads a component in the go-app test engine, runs its full

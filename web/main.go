@@ -30,6 +30,7 @@ func main() {
 	app.Route("/jobs", func() app.Composer { return &components.JobList{} })
 	app.Route("/profile", func() app.Composer { return &components.ProfileView{} })
 	app.RouteWithRegexp(`^/jobs/\d+$`, func() app.Composer { return &components.JobDetailView{} })
+	app.RouteWithRegexp(`^/jobs/\d+/contacts$`, func() app.Composer { return &components.ContactsView{} })
 	app.RouteWithRegexp(`^/applications/\d+$`, func() app.Composer { return &components.DraftReview{} })
 	app.RunWhenOnBrowser()
 

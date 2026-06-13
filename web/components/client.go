@@ -66,6 +66,40 @@ type RailsClient interface {
 	// Unsubscribe removes the stored subscription for an endpoint
 	// (DELETE /api/push_subscription).
 	Unsubscribe(ctx context.Context, endpoint string) error
+
+	// Contacts fetches the saved ContactCandidates for a job
+	// (GET /api/job_posts/:id/contact_candidates): people worth reaching out
+	// to about the posting, with a relevance reason. Read-only.
+	Contacts(ctx context.Context, jobID int) ([]ContactCandidate, error)
+
+	// GenerateOutreach generates an outreach draft for a contact candidate
+	// (POST /api/contact_candidates/:id/outreach_drafts) from a loose template.
+	// Rails drafts the message via the LLM; it NEVER sends anything. The draft
+	// is returned for copy/manual sending only.
+	GenerateOutreach(ctx context.Context, candidateID int, looseTemplate string) (OutreachDraft, error)
+}
+
+// ContactCandidate is a person worth reaching out to about a job posting, as
+// Rails serializes it. It carries no send action; outreach is drafted on
+// demand and sent manually by the user.
+type ContactCandidate struct {
+	ID              int    `json:"id"`
+	JobPostID       int    `json:"job_post_id"`
+	Name            string `json:"name"`
+	Title           string `json:"title"`
+	CompanyName     string `json:"company_name"`
+	LinkedInURL     string `json:"linkedin_url"`
+	RelevanceReason string `json:"relevance_reason"`
+}
+
+// OutreachDraft is a generated outreach message for a contact candidate. It is
+// PREFILLED FOR MANUAL SENDING ONLY: Rails never sends it and this client never
+// triggers a send. The user copies the message and sends it themselves.
+type OutreachDraft struct {
+	ID                 int    `json:"id"`
+	ContactCandidateID int    `json:"contact_candidate_id"`
+	Message            string `json:"message"`
+	LooseTemplate      string `json:"loose_template"`
 }
 
 // Profile is the single-user structured profile as Rails serializes it. The
@@ -353,6 +387,30 @@ func (c *httpRailsClient) Subscribe(ctx context.Context, sub PushSubscription) e
 func (c *httpRailsClient) Unsubscribe(ctx context.Context, endpoint string) error {
 	body := map[string]any{"subscription": map[string]string{"endpoint": endpoint}}
 	return c.sendJSON(ctx, http.MethodDelete, "/api/push_subscription", body, nil)
+}
+
+func (c *httpRailsClient) Contacts(ctx context.Context, jobID int) ([]ContactCandidate, error) {
+	var out struct {
+		ContactCandidates []ContactCandidate `json:"contact_candidates"`
+	}
+	if err := c.get(ctx, fmt.Sprintf("/api/job_posts/%d/contact_candidates", jobID), &out); err != nil {
+		return nil, err
+	}
+	return out.ContactCandidates, nil
+}
+
+func (c *httpRailsClient) GenerateOutreach(ctx context.Context, candidateID int, looseTemplate string) (OutreachDraft, error) {
+	body := map[string]any{
+		"outreach_draft": map[string]string{"loose_template": looseTemplate},
+	}
+	var out struct {
+		OutreachDraft OutreachDraft `json:"outreach_draft"`
+	}
+	path := fmt.Sprintf("/api/contact_candidates/%d/outreach_drafts", candidateID)
+	if err := c.sendJSON(ctx, http.MethodPost, path, body, &out); err != nil {
+		return OutreachDraft{}, err
+	}
+	return out.OutreachDraft, nil
 }
 
 // sendJSON marshals body as JSON, sends it with the given method, and decodes

@@ -864,7 +864,7 @@
       "id": "WEB-05",
       "title": "Contacts and outreach UI (manual send/copy only)",
       "description": "go-app screen to view ContactCandidates for a job and view/copy generated OutreachDrafts for manual sending. The UI never triggers any send action; outreach is copy/prefill only. Mock the client in tests.",
-      "status": "todo",
+      "status": "done",
       "priority": "low",
       "group_id": "WEB",
       "depends_on": [

@@ -153,6 +153,10 @@ func (d *JobDetailView) Render() app.UI {
 					return app.P().Class("job-strategy").Text(job.ApplicationStrategy)
 				}),
 				renderRoute(job.Route),
+				app.A().
+					Class("job-contacts-link").
+					Href("/jobs/"+strconv.Itoa(job.ID)+"/contacts").
+					Text("View contacts and outreach"),
 			)
 		}),
 	)

@@ -141,6 +141,15 @@ Be honest about the current state — most of the suite is still to be written.
   the `applySubscribe`/`applyUnsubscribe`/`initialPushState`/`pushErrorMessage` state mappings; and
   that rendering/mount never auto-subscribes (unsupported build renders guidance, supported build
   renders the enable control without any VAPID fetch or persist).
+- **web/** — `components/contacts_test.go`: render and unit tests for the contacts/outreach screen
+  (WEB-05). They assert the saved candidates render (name, role line, relevance reason, LinkedIn
+  link), the empty/error/401 load states, and the explicit per-candidate `doGenerate` path (drafts
+  via the mocked `RailsClient` with the typed loose template, recording the message for manual
+  copy). Two safety tests lock in the product constraint: a full render lifecycle makes **zero**
+  `GenerateOutreach` calls (no auto-generate/send on mount), and the rendered screen exposes no
+  send affordance — only copy/manual-send guidance. Error-mapping (`applyGenerateResult`:
+  503 → not-configured, 401 → session-expired, generic) and the `contactRole`/`generateButtonLabel`/
+  `contactsJobIDFromPath` helpers are table-tested.
 
 ### Planned (from the plan's Testing Plan)
 
@@ -217,6 +226,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `web/components/client_test.go` | Web (go-app PWA) | `httpRailsClient` against `httptest`: `/api`-namespaced paths, scored-field/route JSON decode, session-cookie carry, 401 → `APIError` |
 | `web/components/profile_test.go` | Web (go-app PWA) | Profile/resume render (editable fields, contact presence flags with no PII leak, resume metadata/empty) and `doSave` write path (reseed/error/401) via a mocked `RailsClient` |
 | `web/components/push_test.go` | Web (go-app PWA) | Push toggle subscribe/unsubscribe flow via a mocked `PushSubscriber` (public VAPID key fetched then persisted; browser cancel before Rails), state-mapping helpers, and no-auto-subscribe-on-render |
+| `web/components/contacts_test.go` | Web (go-app PWA) | Contacts/outreach render (candidate fields, empty/error/401), explicit `doGenerate` draft path, no-auto-generate-on-mount and no-send-affordance safety tests, and `applyGenerateResult`/`contactRole`/`generateButtonLabel`/`contactsJobIDFromPath` helpers, via a mocked `RailsClient` |
 
 ---
 

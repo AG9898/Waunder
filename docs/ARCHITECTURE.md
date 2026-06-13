@@ -73,7 +73,9 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   relevant/missing requirements, red flags, alignment/strategy notes, and the resolved
   application route), the application draft review (`/applications/:id`,
   `components.DraftReview` — resume emphasis, cover letter, structured answers, and a read-only
-  worker autofill preview, plus an explicit approve+submit control), the profile/resume screen
+  worker autofill preview, plus an explicit approve+submit control), the contacts/outreach screen
+  (`/jobs/:id/contacts`, `components.ContactsView` — saved contact candidates for a job plus
+  per-candidate, copy/manual-send-only outreach drafting), the profile/resume screen
   (`/profile`, `components.ProfileView` — editable non-sensitive text/URL fields, encrypted
   contact details shown as presence flags only, read-only resume ingest metadata, and an embedded
   `components.PushToggle`), and the passphrase login
@@ -110,6 +112,16 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   Subscribe and unsubscribe fire only on an explicit user click — never on mount/render — so the
   toggle never auto-subscribes; on the server/SSR build the Push API is unsupported and the toggle
   renders a guidance state.
+- The contacts/outreach screen (WEB-05) reads the saved candidates with
+  `GET /api/job_posts/:id/contact_candidates` (CONTACT-01 `index`: `id`, `name`, `title`,
+  `company_name`, `linkedin_url`, `relevance_reason`) and generates an outreach draft on demand
+  with `POST /api/contact_candidates/:id/outreach_drafts` (returns `{outreach_draft: {message,
+  loose_template, ...}}`, or `503 llm_unavailable` / `502 generation_failed`). Generation fires
+  only on an explicit per-candidate user click — never on mount/render — and the drafted message
+  is shown read-only with a clipboard-copy affordance and explicit manual-send guidance. The UI
+  exposes **no send action**: outreach is prefilled for manual sending only, upholding the
+  never-auto-send-LinkedIn-outreach rule. (Outreach drafts are generated on demand; there is no
+  list-drafts read endpoint.)
 - Holds **no business logic** — it never reads the database, never calls the LLM, never scores
   or resolves routes (it only renders fields Rails owns), and stores no secrets beyond the
   proxy target.
