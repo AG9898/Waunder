@@ -103,8 +103,13 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   `POST /api/applications/:id/submit` (already served; returns `{status: "dispatched", ...}` or
   an error). The submit is fired only on an explicit user click — never on mount/render — which
   upholds the per-application approval rule; the dispatched ATS from the submit response is
-  surfaced as the audit result. (The `GET /api/applications/:id` read endpoint is a pending
-  Rails-side contract; the screen renders against a mocked client in tests.) The profile screen
+  surfaced as the audit result. Rails now serves `GET /api/applications/:id`:
+  session-guarded, read-only, returning `{application: {application_id, job_title, company,
+  status, resume_emphasis_notes, cover_letter, structured_answers, autofill_payload}}` where
+  `autofill_payload` is the worker-shaped preview (`ats`, `apply_url`, `answers`, `resume_ref`) the
+  draft generator already built (it omits sensitive questions by construction). The read never
+  generates a draft, calls the LLM, or submits, and an unknown id returns the standard
+  `{error: {code: "not_found", ...}}` shape. The profile screen
   reads/writes `GET /api/profile` and `PATCH /api/profile` (WEB-04, both served by PROFILE-01):
   the read exposes the editable text/URL fields plus contact `*_present` presence flags and a
   `resume` summary (`title`, `parse_status`, `file_attached`, `filename`); the write only sends

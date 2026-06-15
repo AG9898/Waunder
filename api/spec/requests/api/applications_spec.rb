@@ -130,4 +130,69 @@ RSpec.describe "Api applications", type: :request do
       expect(enqueued_jobs).to be_empty
     end
   end
+
+  describe "GET /api/applications/:id" do
+    it "returns the draft, job context, and worker-shaped autofill preview" do
+      sign_in!
+      app = build_application(status: "draft", approved_at: nil)
+      app.application_draft.update!(
+        cover_letter: "Dear Acme team, ...",
+        resume_emphasis_notes: "Emphasize backend platform work.",
+        structured_answers: [ { "field" => "years_experience", "value" => "7" } ]
+      )
+
+      get "/api/applications/#{app.id}"
+
+      expect(response).to have_http_status(:ok)
+      body = JSON.parse(response.body).fetch("application")
+      expect(body).to include(
+        "application_id" => app.id,
+        "job_title" => "Senior Backend Engineer",
+        "company" => "Acme Corp",
+        "status" => "draft",
+        "cover_letter" => "Dear Acme team, ...",
+        "resume_emphasis_notes" => "Emphasize backend platform work."
+      )
+      expect(body["structured_answers"]).to eq(
+        [ { "field" => "years_experience", "value" => "7" } ]
+      )
+      expect(body["autofill_payload"]).to include(
+        "ats" => "greenhouse",
+        "apply_url" => "https://boards.greenhouse.io/acme/jobs/1",
+        "resume_ref" => "resume-doc-1"
+      )
+      expect(body["autofill_payload"]["answers"]).to eq(
+        [ { "field" => "full_name", "value" => "Jane Doe" } ]
+      )
+    end
+
+    it "is read-only: it does not submit or enqueue worker dispatch" do
+      sign_in!
+      app = build_application
+
+      expect do
+        get "/api/applications/#{app.id}"
+      end.not_to change(AuditEvent, :count)
+
+      expect(response).to have_http_status(:ok)
+      expect(enqueued_jobs).to be_empty
+    end
+
+    it "returns 404 for an unknown application" do
+      sign_in!
+
+      get "/api/applications/0"
+
+      expect(response).to have_http_status(:not_found)
+      expect(JSON.parse(response.body).dig("error", "code")).to eq("not_found")
+    end
+
+    it "requires authentication" do
+      app = build_application
+
+      get "/api/applications/#{app.id}"
+
+      expect(response).to have_http_status(:unauthorized)
+    end
+  end
 end

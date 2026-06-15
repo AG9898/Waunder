@@ -23,7 +23,7 @@ Rails.application.routes.draw do
     resources :contact_candidates, only: [] do
       resources :outreach_drafts, only: %i[create]
     end
-    resources :applications, only: [] do
+    resources :applications, only: %i[show] do
       post :submit, on: :member
     end
     resources :worker_tasks, only: %i[index] do

@@ -52,7 +52,9 @@ Be honest about the current state — most of the suite is still to be written.
 - **api/** — `spec/requests/api/applications_spec.rb`: request specs for `POST
   /api/applications/:id/submit`, covering the approved clean-payload dispatch path, audit-event
   recording, approval-required refusal, unsupported ATS refusal, unsafe-payload refusal, and 401
-  auth gating with no enqueue on refused paths.
+  auth gating with no enqueue on refused paths; plus the read endpoint `GET /api/applications/:id`,
+  covering the draft + job context + worker-shaped autofill preview, read-only behavior
+  (no audit/enqueue), unknown-id not-found JSON shape, and auth gating.
 - **api/** — `spec/requests/api/job_posts_spec.rb`: request specs for authenticated manual
   `POST /api/job_posts`, covering deterministic JobPost creation, route resolution, scoring-job
   enqueueing, unauthenticated refusal, and invalid-input JSON errors; plus the read endpoints
@@ -211,7 +213,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `api/spec/models/profile_spec.rb` | API (Rails) | profile name/JSON-shape validation, encrypted-at-rest ciphertext check for email/phone/address, deterministic-email queryability |
 | `api/spec/models/resume_document_spec.rb` | API (Rails) | resume document profile/title validation, parsed_structure default, encrypted-at-rest ciphertext check for raw_text/parsed_structure |
 | `api/spec/requests/api/auth_spec.rb` | API (Rails) | shared-secret session success/failure, protected endpoint gating, health bypass, worker bearer guard |
-| `api/spec/requests/api/applications_spec.rb` | API (Rails) | `POST /api/applications/:id/submit` approved clean-payload dispatch, audit event recording, approval-required/unsupported/unsafe refusal paths, and 401 auth gating with no enqueue on refusal |
+| `api/spec/requests/api/applications_spec.rb` | API (Rails) | `POST /api/applications/:id/submit` approved clean-payload dispatch, audit event recording, approval-required/unsupported/unsafe refusal paths, and 401 auth gating with no enqueue on refusal; `GET /api/applications/:id` draft + job context + worker-shaped autofill preview, read-only (no audit/enqueue), not-found JSON shape, and auth gating |
 | `api/spec/requests/api/job_posts_spec.rb` | API (Rails) | `POST /api/job_posts` authenticated manual URL/text ingestion, route resolution, scoring enqueue, 401 auth gating, and invalid-input JSON error shape; `GET /api/job_posts` scored feed ranking + auth; `GET /api/job_posts/:id` scored detail with resolved route, not-found JSON shape, and auth |
 | `api/spec/requests/api/digest_spec.rb` | API (Rails) | `GET /api/digest` latest digest of recently scored JobPosts (no scoring/LLM on read), empty-jobs case, and 401 auth gating |
 | `api/spec/requests/api/push_subscriptions_spec.rb` | API (Rails) | `GET /api/push/vapid_public_key` public VAPID key read; `POST`/`DELETE /api/push_subscription` authenticated subscribe/unsubscribe, idempotent endpoint update, and 401 auth gating |
