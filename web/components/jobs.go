@@ -16,6 +16,8 @@ const (
 	loadError
 )
 
+const sessionExpiredMessage = "Your session expired. Please sign in again."
+
 // JobList renders the scored job feed (GET /api/job_posts). Each row links to
 // the job detail screen. Scored fields are owned by Rails; this screen only
 // renders them.
@@ -237,7 +239,7 @@ func applyResult(ctx app.Context, state *loadState, errMsg *string, err error, s
 	if err != nil {
 		*state = loadError
 		if IsUnauthorized(err) {
-			*errMsg = "Your session expired. Please sign in again."
+			*errMsg = sessionExpiredMessage
 		} else {
 			*errMsg = "Could not load data. Please try again."
 		}
@@ -255,10 +257,19 @@ func renderLoad(state loadState, errMsg string, content func() app.UI) app.UI {
 	case loadLoading, loadIdle:
 		return app.P().Class("loading").Text("Loading…")
 	case loadError:
-		return app.P().Class("load-error").Text(errMsg)
+		return renderLoadError(errMsg)
 	default:
 		return content()
 	}
+}
+
+func renderLoadError(errMsg string) app.UI {
+	return app.Div().Class("load-error").Body(
+		app.P().Text(errMsg),
+		app.If(errMsg == sessionExpiredMessage, func() app.UI {
+			return app.A().Class("sign-in-link").Href("/login").Text("Sign in")
+		}),
+	)
 }
 
 func requirementList(heading, class string, items []string) app.UI {

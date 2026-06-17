@@ -255,6 +255,11 @@ func TestJobListUnauthorized(t *testing.T) {
 	if !strings.Contains(html, "session expired") {
 		t.Errorf("expected session-expired message, got:\n%s", html)
 	}
+	for _, want := range []string{"Sign in", `href="/login"`} {
+		if !strings.Contains(html, want) {
+			t.Errorf("expected unauthorized state to include %q, got:\n%s", want, html)
+		}
+	}
 }
 
 func TestJobDetailRendersScoredFields(t *testing.T) {
@@ -326,5 +331,15 @@ func TestDigestEmpty(t *testing.T) {
 	html := renderHTML(t, c)
 	if !strings.Contains(html, "No new jobs today.") {
 		t.Errorf("expected empty digest state, got:\n%s", html)
+	}
+}
+
+func TestDigestUnauthorizedLinksToLogin(t *testing.T) {
+	c := &DigestView{Client: &mockClient{digestErr: &APIError{Status: http.StatusUnauthorized}}}
+	html := renderHTML(t, c)
+	for _, want := range []string{"session expired", "Sign in", `href="/login"`} {
+		if !strings.Contains(html, want) {
+			t.Errorf("expected unauthorized digest state to include %q, got:\n%s", want, html)
+		}
 	}
 }
