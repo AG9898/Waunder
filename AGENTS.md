@@ -472,3 +472,14 @@ resolution, and scoring stay in Rails. The new `CreateJobPost` mock method goes 
 extracted into a context-only `doSubmit` + pure `applyCreateResult` so it is unit-testable without
 the go-app engine. Route `/jobs/new` is added before the `^/jobs/\d+$` regexp route — exact routes
 win over regexps and "new" is not `\d+`, so no collision.
+
+### 2026-06-17 — Resend webhook reaches Rails through the web proxy
+Rails remains private in production, so the public Resend webhook URL must use the `web` service
+domain at `/webhooks/resend/inbound`. `web/main.go` proxies that exact path to `API_INTERNAL_URL`
+alongside `/api/*`; do not add a public Railway domain directly to `api` just for Resend.
+
+### 2026-06-17 — Production multi-db config must explicitly use DATABASE_URL
+The Rails production `database.yml` has primary/cache/queue/cable entries, so Railway's
+`DATABASE_URL` was not being applied implicitly at boot and Rails tried a local Postgres socket
+during `db:prepare`. Keep `url: <%= ENV["DATABASE_URL"] %>` on the shared production base config
+unless the app is deliberately split across separate managed databases.

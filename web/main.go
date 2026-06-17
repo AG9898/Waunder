@@ -39,18 +39,18 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	// Proxy /api/* to the Rails backend over Railway's private network so the
-	// browser stays same-origin (no CORS) and Rails needs no public domain.
+	// Proxy client API traffic and the Resend inbound webhook to the Rails
+	// backend over Railway's private network so Rails needs no public domain.
 	// Skipped when unset so the PWA still serves standalone in local dev.
 	if api := os.Getenv("API_INTERNAL_URL"); api != "" {
 		proxy, err := newAPIProxy(api)
 		if err != nil {
 			log.Fatalf("invalid API_INTERNAL_URL %q: %v", api, err)
 		}
-		mux.Handle("/api/", proxy)
-		log.Printf("proxying /api/ -> %s", api)
+		registerAPIProxyRoutes(mux, proxy)
+		log.Printf("proxying /api/ and /webhooks/resend/inbound -> %s", api)
 	} else {
-		log.Print("API_INTERNAL_URL not set; /api proxy disabled")
+		log.Print("API_INTERNAL_URL not set; API and webhook proxy disabled")
 	}
 
 	// go-app serves the PWA: app shell, app.wasm, generated wasm_exec.js,
@@ -102,4 +102,9 @@ func newAPIProxy(target string) (http.Handler, error) {
 		return nil, err
 	}
 	return httputil.NewSingleHostReverseProxy(u), nil
+}
+
+func registerAPIProxyRoutes(mux *http.ServeMux, proxy http.Handler) {
+	mux.Handle("/api/", proxy)
+	mux.Handle("/webhooks/resend/inbound", proxy)
 }

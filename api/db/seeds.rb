@@ -34,12 +34,12 @@ ActiveRecord::Base.transaction do
     github_url: "https://github.com/example",
     portfolio_url: "https://example.dev",
     summary: "Full-stack engineer with a focus on Rails APIs, Go services, and applied ML.",
-    skills: ["Ruby on Rails", "Go", "TypeScript", "PostgreSQL", "Playwright", "LLM orchestration"],
+    skills: [ "Ruby on Rails", "Go", "TypeScript", "PostgreSQL", "Playwright", "LLM orchestration" ],
     work_history: [
       { "company" => "Acme Corp", "title" => "Software Engineer", "start" => "2023", "end" => "Present",
-        "highlights" => ["Built API platform", "Led migration to Rails 8"] },
+        "highlights" => [ "Built API platform", "Led migration to Rails 8" ] },
       { "company" => "Startup Inc", "title" => "Junior Developer", "start" => "2021", "end" => "2023",
-        "highlights" => ["Shipped customer dashboard"] }
+        "highlights" => [ "Shipped customer dashboard" ] }
     ],
     education: [
       { "school" => "University of British Columbia", "degree" => "BSc Computer Science", "year" => "2021" }
@@ -55,7 +55,7 @@ ActiveRecord::Base.transaction do
     parse_status: "parsed",
     parsed_at: Time.current,
     raw_text: "Aden Guo — Software Engineer. Rails, Go, TypeScript...",
-    parsed_structure: { "basics" => { "name" => "Aden Guo" }, "skills" => ["Rails", "Go"] }
+    parsed_structure: { "basics" => { "name" => "Aden Guo" }, "skills" => [ "Rails", "Go" ] }
   )
 
   # --- Companies + scored JobPosts ---
@@ -65,8 +65,8 @@ ActiveRecord::Base.transaction do
       title: "Senior Backend Engineer", location: "Remote (US/CA)", remote_status: "remote",
       employment_type: "Full-time", compensation: "$180k–$220k",
       match_score: 92, summary: "Strong fit: Ruby/Rails platform team building payments APIs.",
-      relevant: ["7+ yrs backend", "Ruby on Rails", "Distributed systems"],
-      missing: ["Payments domain experience"],
+      relevant: [ "7+ yrs backend", "Ruby on Rails", "Distributed systems" ],
+      missing: [ "Payments domain experience" ],
       red_flags: [],
       alignment: "Your Rails 8 migration work maps directly to their platform modernization.",
       strategy: "Apply via Greenhouse; reference the API platform work in your summary.",
@@ -79,9 +79,9 @@ ActiveRecord::Base.transaction do
       title: "Staff Software Engineer, Platform", location: "Remote (Canada)", remote_status: "remote",
       employment_type: "Full-time", compensation: "$200k+",
       match_score: 85, summary: "Good fit: Rails monolith at scale, strong infra culture.",
-      relevant: ["Ruby on Rails", "Large-scale systems", "Mentorship"],
-      missing: ["Staff-level leadership scope", "GraphQL at scale"],
-      red_flags: ["Role may require more people-leadership than IC work"],
+      relevant: [ "Ruby on Rails", "Large-scale systems", "Mentorship" ],
+      missing: [ "Staff-level leadership scope", "GraphQL at scale" ],
+      red_flags: [ "Role may require more people-leadership than IC work" ],
       alignment: "Your migration leadership is relevant but role leans staff-scope.",
       strategy: "Apply via Lever; emphasize cross-team migration leadership.",
       route_type: "lever", recommended: "direct_ats",
@@ -93,8 +93,8 @@ ActiveRecord::Base.transaction do
       title: "Full-stack Engineer", location: "Remote", remote_status: "remote",
       employment_type: "Full-time", compensation: "Competitive + equity",
       match_score: 78, summary: "Solid fit: TypeScript product engineering, small team.",
-      relevant: ["TypeScript", "Product sense", "Full-stack"],
-      missing: ["React deep expertise"],
+      relevant: [ "TypeScript", "Product sense", "Full-stack" ],
+      missing: [ "React deep expertise" ],
       red_flags: [],
       alignment: "Strong on full-stack, lighter on their React-heavy frontend.",
       strategy: "Apply via Ashby; lead with shipped product features.",
@@ -107,9 +107,9 @@ ActiveRecord::Base.transaction do
       title: "Backend Engineer", location: "Hybrid (SF)", remote_status: "hybrid",
       employment_type: "Full-time", compensation: "$170k–$200k",
       match_score: 64, summary: "Partial fit: hybrid SF role, strong backend but location mismatch.",
-      relevant: ["Backend systems", "PostgreSQL"],
-      missing: ["On-site availability in SF", "Go experience"],
-      red_flags: ["Hybrid on-site requirement conflicts with remote preference"],
+      relevant: [ "Backend systems", "PostgreSQL" ],
+      missing: [ "On-site availability in SF", "Go experience" ],
+      red_flags: [ "Hybrid on-site requirement conflicts with remote preference" ],
       alignment: "Technical fit good; location is the main blocker.",
       strategy: "Manual application; clarify remote flexibility before applying.",
       route_type: "unknown", recommended: "manual",

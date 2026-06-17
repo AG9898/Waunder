@@ -9,9 +9,10 @@
 
 Waunder is a single-user, mobile-first personal job-application assistant deployed as a
 three-service monorepo on Railway. A Go + go-app WebAssembly PWA (`web`) serves the
-installable app shell and proxies `/api/*` to a Ruby on Rails API (`api`), which is the
-single source of truth for all data, LLM orchestration, notification dispatch, and
-worker dispatch. A Node + Playwright automation worker (`worker`) executes only
+installable app shell and proxies `/api/*` plus the Resend inbound webhook path to a
+Ruby on Rails API (`api`), which is the single source of truth for all data, LLM
+orchestration, notification dispatch, and worker dispatch. A Node + Playwright
+automation worker (`worker`) executes only
 pre-approved, structured submit tasks against supported ATS forms. Managed PostgreSQL
 backs the Rails app, including its database-backed jobs, cache, and cable.
 
@@ -26,17 +27,18 @@ only if Sidekiq later replaces solid_queue.
 - **web** (Railway — Go 1.26 + go-app v10 WebAssembly PWA + small native Go HTTP server;
   Go module `github.com/ag9898/waunder/web`): serves the compiled `app.wasm`, go-app's
   generated `wasm_exec.js`, the auto-generated PWA manifest and service worker, and the
-  app shell. Reverse-proxies `/api/*` to the Rails `api` service over the private network.
-  Built from an explicit two-target Dockerfile (`GOOS=js GOARCH=wasm go build -o web/app.wasm .`
-  for the frontend, then a native server binary). Listens on `$PORT` (default `8000`).
+  app shell. Reverse-proxies `/api/*` and `/webhooks/resend/inbound` to the Rails `api`
+  service over the private network. Built from an explicit two-target Dockerfile
+  (`GOOS=js GOARCH=wasm go build -o web/app.wasm .` for the frontend, then a native
+  server binary). Listens on `$PORT` (default `8000`).
 - **api** (Railway — Rails 8.1.3 API-only, Ruby 3.2.3, Puma): owns all data, LLM
   orchestration via OpenRouter, notification dispatch, Resend inbound webhook handling,
   background jobs, and worker dispatch. Jobs run on `solid_queue`, cache on `solid_cache`,
   cable on `solid_cable` — all database-backed, so no Redis is required initially.
   Client-facing endpoints live under `/api` and include health, session, profile/resume,
   manual job entry, application submit, and worker task handoff/status APIs. Rails also
-  exposes the `/up` boot check. It has **no public domain** — reachable only through `web`'s
-  proxy on the private network.
+  exposes the `/up` boot check and the Resend webhook endpoint. It has **no public domain**
+  — reachable only through `web`'s proxy on the private network.
 - **worker** (Railway — Node 22 + TypeScript ESM + Playwright): polls Rails for approved
   application tasks, fills supported ATS forms (`greenhouse`, `lever`, `ashby`,
   `linkedin_easy_apply`), captures screenshots and logs, and reports status back to Rails.
@@ -65,8 +67,9 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   client can subscribe via go-app's notification service; the resulting subscription is posted to
   Rails through the same-origin `/api` proxy. The detection/gating logic is pure Go in
   `components/pwa.go` and unit-tested.
-- Reverse-proxies `/api/*` to the Rails `api` service via `API_INTERNAL_URL`. When that var
-  is unset, the proxy is disabled and the PWA serves standalone (local dev convenience).
+- Reverse-proxies `/api/*` and `/webhooks/resend/inbound` to the Rails `api` service via
+  `API_INTERNAL_URL`. When that var is unset, the proxy is disabled and the PWA serves
+  standalone (local dev convenience).
 - Renders the client screens (go-app routes in `main.go`): the daily digest landing (`/`,
   `components.DigestView`), the scored job feed (`/jobs`, `components.JobList`), the manual job
   entry form (`/jobs/new`, `components.ManualEntry` — a URL and/or pasted posting text plus
@@ -178,9 +181,10 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 
 **Inbound email ingestion**:
 1. A forwarded job-alert email hits the Resend-verified receiving domain (`RESEND_INBOUND_DOMAIN`).
-2. Resend parses it and POSTs an `email.received` event to `/webhooks/resend/inbound` on Rails;
-   the Svix signature (`svix-id`/`svix-timestamp`/`svix-signature`) is validated against
-   `RESEND_WEBHOOK_SECRET`.
+2. Resend parses it and POSTs an `email.received` event to `/webhooks/resend/inbound` on the
+   public `web` service domain; `web` forwards that exact path to Rails over the private
+   `API_INTERNAL_URL` proxy. The Svix signature (`svix-id`/`svix-timestamp`/`svix-signature`)
+   is validated against `RESEND_WEBHOOK_SECRET`.
 3. Rails enqueues background jobs: parse alert → normalize job → resolve application route →
    LLM score via OpenRouter → generate draft.
 4. A daily web-push digest is sent to subscribed PWA installs. `DailyDigestJob` (scheduled
@@ -285,7 +289,8 @@ See [`ENV_VARS.md`](ENV_VARS.md) for the canonical variable and secret matrix pe
 ## Constraints
 
 - The browser only ever talks to the `web` origin — never directly to Rails.
-- All `/api` traffic goes through the Go proxy; the Rails `api` service has no public domain.
+- All `/api` traffic and the Resend inbound webhook go through the Go proxy; the Rails `api`
+  service has no public domain.
 - Rails is the single source of truth — **no business logic in the Go server or the worker**.
 - Schema changes go through Rails migrations only — never `ALTER TABLE` or `DROP COLUMN` directly.
 - Secrets are read from environment variables only — no hardcoded values anywhere.

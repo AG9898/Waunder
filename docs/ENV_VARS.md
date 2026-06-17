@@ -19,7 +19,7 @@ If any other doc mentions a variable, it should link here rather than restate it
 
 | Variable | Required | Default | Description | Where set |
 |---|---|---|---|---|
-| `API_INTERNAL_URL` | Conditional (Required in prod) | none | Base URL of the Rails `api` service. The `web` server proxies `/api/*` here and the `worker` polls it. When unset, `web` disables the `/api` proxy and serves standalone, and the worker idles/exits. | `web` + `worker` runtime env (Railway private-network URL) |
+| `API_INTERNAL_URL` | Conditional (Required in prod) | none | Base URL of the Rails `api` service. The `web` server proxies `/api/*` and `/webhooks/resend/inbound` here, and the `worker` polls it. When unset, `web` disables the Rails proxy and serves standalone, and the worker idles/exits. | `web` + `worker` runtime env (Railway private-network URL) |
 | `PORT` | No | `8000` | Port the Go `web` server listens on. | `web` runtime (Railway sets this automatically) |
 | `DATABASE_URL` | Yes | none | PostgreSQL connection string. | `api` runtime (`api/.env`, Railway) |
 | `RAILS_MASTER_KEY` | Yes (prod) | none | Decrypts Rails encrypted credentials. | `api` runtime (Railway secret; locally `api/config/master.key`) |
@@ -68,7 +68,8 @@ variables. Copy the relevant template to `.env` for local development; never com
 1. Create `web/.env` from `web/.env.example`.
 2. Build and run with `make run` (defaults to `localhost:8000`).
 3. Set `API_INTERNAL_URL` to your local Rails URL (e.g. `http://localhost:3000`) so the
-   `/api` proxy is active. If unset, the proxy is disabled and the PWA serves standalone.
+   `/api` and Resend webhook proxy routes are active. If unset, the proxy is disabled and
+   the PWA serves standalone.
 
 **worker (Node + Playwright):**
 1. Create `workers/.env` from `workers/.env.example`.
