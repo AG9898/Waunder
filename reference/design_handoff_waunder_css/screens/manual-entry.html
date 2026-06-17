@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Waunder — Add a job</title>
+<!-- This file is a DESIGN REFERENCE. The production artifact is app.css applied
+     to the go-app component classes. This wrapper only frames the markup for review. -->
+<link rel="stylesheet" href="../app.css">
+<style>
+  body { background:#e8e2d7; margin:0; padding:32px; display:flex; justify-content:center; font-family:'Hanken Grotesk',system-ui,sans-serif; }
+  .frame { width:390px; background:#f4efe8; border-radius:28px; overflow:hidden; box-shadow:0 18px 50px -12px rgba(45,44,44,.28);  }
+</style>
+</head>
+<body>
+<div class="frame">
+<div class="manual-entry">
+  <a class="manual-entry-back" href="/jobs">← Jobs</a>
+  <h1>Add a job</h1>
+  <p class="manual-entry-note">Paste a job link and/or the posting text. It is scored and added to your feed.</p>
+  <form class="manual-entry-form" onsubmit="return false">
+    <label class="manual-entry-label"><span>Job URL</span><input class="manual-entry-url" type="url" placeholder="https://…" value="https://maple.co/careers/senior-product-designer"></label>
+    <label class="manual-entry-label"><span>Posting text</span><textarea class="manual-entry-text" placeholder="Paste the job description…"></textarea></label>
+    <label class="manual-entry-label"><span>Title (optional)</span><input class="manual-entry-title" type="text" value=""></label>
+    <label class="manual-entry-label"><span>Company (optional)</span><input class="manual-entry-company" type="text" value=""></label>
+    <button class="manual-entry-submit" type="submit">Add job</button>
+  </form>
+  <div class="manual-entry-result">
+    <p class="manual-entry-result-msg">Added Senior Product Designer — Maple &amp; Co. It is being scored and will appear in your feed.</p>
+    <a class="manual-entry-result-link" href="/jobs/1">View job</a>
+  </div>
+</div>
+</div>
+</body>
+</html>

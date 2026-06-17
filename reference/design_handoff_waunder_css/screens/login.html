@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Waunder — Login</title>
+<!-- This file is a DESIGN REFERENCE. The production artifact is app.css applied
+     to the go-app component classes. This wrapper only frames the markup for review. -->
+<link rel="stylesheet" href="../app.css">
+<style>
+  body { background:#e8e2d7; margin:0; padding:32px; display:flex; justify-content:center; font-family:'Hanken Grotesk',system-ui,sans-serif; }
+  .frame { width:390px; background:#f4efe8; border-radius:28px; overflow:hidden; box-shadow:0 18px 50px -12px rgba(45,44,44,.28);  }
+</style>
+</head>
+<body>
+<div class="frame">
+<div class="login-screen" style="min-height:680px;">
+  <h1>Waunder</h1>
+  <form class="login-form" onsubmit="return false">
+    <input class="login-passphrase" type="password" placeholder="Passphrase" value="••••••••••">
+    <button class="login-submit" type="submit">Sign in</button>
+  </form>
+  <p class="login-status">Incorrect passphrase.</p>
+</div>
+</div>
+</body>
+</html>

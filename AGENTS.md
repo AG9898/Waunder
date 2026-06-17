@@ -484,3 +484,9 @@ The Rails production `database.yml` has primary/cache/queue/cable entries, so Ra
 `DATABASE_URL` was not being applied implicitly at boot and Rails tried a local Postgres socket
 during `db:prepare`. Keep `url: <%= ENV["DATABASE_URL"] %>` on the shared production base config
 unless the app is deliberately split across separate managed databases.
+
+### 2026-06-17 — UI handoff is reference-only except CSS/assets
+The frontend design handoff lives at `reference/design_handoff_waunder_css/` and targets the
+existing go-app class names. Do not copy the static wrapper HTML into the app; ship styling through
+`web/web/app.css` loaded by `app.Handler.Styles`, and self-host fonts or use system fallbacks for
+the offline-tolerant PWA shell.

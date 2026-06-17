@@ -85,6 +85,17 @@ package compiles both to WebAssembly for the browser and to a native server bina
 - PWA manifest, icon, theme/background colors, and `display: standalone` are configured via the
   `app.Handler` struct in `main.go` — go-app generates the manifest and service worker from it.
   Do not hand-write a manifest or service worker.
+- PWA styling is plain CSS loaded through `app.Handler.Styles` from static assets under
+  `web/web/` (currently `web/web/app.css`). Do not introduce React, Tailwind, MUI, or another
+  frontend framework for styling. The canonical visual system is [`STYLE_GUIDE.md`](STYLE_GUIDE.md);
+  the handoff under `reference/design_handoff_waunder_css/` is reference-only except for reusable
+  CSS/assets. Never copy its wrapper HTML into go-app components.
+- Keep the go-app components as the source of truth for markup, state, and behavior. Styling
+  tasks may make narrow class/markup compatibility fixes, but must not add business logic,
+  bypass session/auth behavior, or change explicit-action safety gates.
+- Fonts for the installable PWA should be self-hosted under `web/web/` or use the documented
+  system fallback. Avoid live third-party font dependencies in the final stylesheet because the
+  app shell is offline-tolerant.
 - Browser-dependent component logic (user-agent / standalone / Push-API detection) must isolate
   the **pure decision** into testable plain-Go helpers (see `components/pwa.go`'s `DetectIOS`,
   `SupportsIOSWebPush`, `EvaluatePushGate`); the component only reads JS facts via `app.Window()`

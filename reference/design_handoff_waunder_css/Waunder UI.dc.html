@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="web/web/app.css">
+  <style>
+    body { margin: 0; }
+    .wndr-canvas code { font: 600 13px/1 ui-monospace, SFMono-Regular, Menlo, monospace; background:#ece5da; padding:2px 6px; border-radius:6px; color:#3a5446; }
+  </style>
+</helmet>
+<div class="wndr-canvas" style="min-height:100vh; background:#e8e2d7; padding:48px; box-sizing:border-box; font-family:'Hanken Grotesk', ui-sans-serif, system-ui, sans-serif;">
+  <div style="max-width:1360px; margin:0 auto;">
+
+    <div style="font:700 30px/1.1 'Hanken Grotesk', sans-serif; color:#2d2c2c; letter-spacing:-0.02em;">Waunder — visual direction &amp; mobile mockups</div>
+    <div style="margin:10px 0 36px; font:400 15px/1.55 'Hanken Grotesk', sans-serif; color:#5d584f; max-width:680px;">Warm paper, sage accent, soft rounding. Quiet and utilitarian — built for daily, repeated use, not a landing page. Each phone below renders the <em>exact</em> HTML your go-app components emit, styled live by <code>web/web/app.css</code>.</div>
+
+    <!-- ============ DIRECTION PANEL ============ -->
+    <div style="background:#fbf8f3; border:1px solid #e4dccd; border-radius:22px; padding:30px 32px; box-shadow:0 2px 6px rgba(45,44,44,.05), 0 10px 28px rgba(45,44,44,.06); margin-bottom:48px;">
+      <div style="font:700 13px/1 'Hanken Grotesk', sans-serif; letter-spacing:.07em; text-transform:uppercase; color:#8c8579; margin-bottom:24px;">The system</div>
+      <div style="display:flex; flex-wrap:wrap; gap:40px;">
+
+        <!-- Colors -->
+        <div style="flex:1 1 280px; min-width:260px;">
+          <div style="font:600 13px/1 'Hanken Grotesk', sans-serif; color:#2d2c2c; margin-bottom:14px;">Palette</div>
+          <div style="display:flex; flex-wrap:wrap; gap:14px;">
+            <div style="text-align:center;"><div style="width:46px; height:46px; border-radius:12px; background:#f4efe8; border:1px solid #e4dccd;"></div><div style="font:500 10px/1.4 'Hanken Grotesk'; color:#8c8579; margin-top:6px;">paper</div></div>
+            <div style="text-align:center;"><div style="width:46px; height:46px; border-radius:12px; background:#fbf8f3; border:1px solid #e4dccd;"></div><div style="font:500 10px/1.4 'Hanken Grotesk'; color:#8c8579; margin-top:6px;">surface</div></div>
+            <div style="text-align:center;"><div style="width:46px; height:46px; border-radius:12px; background:#2d2c2c;"></div><div style="font:500 10px/1.4 'Hanken Grotesk'; color:#8c8579; margin-top:6px;">ink</div></div>
+            <div style="text-align:center;"><div style="width:46px; height:46px; border-radius:12px; background:#5d584f;"></div><div style="font:500 10px/1.4 'Hanken Grotesk'; color:#8c8579; margin-top:6px;">ink-soft</div></div>
+            <div style="text-align:center;"><div style="width:46px; height:46px; border-radius:12px; background:#5e7d6a;"></div><div style="font:500 10px/1.4 'Hanken Grotesk'; color:#8c8579; margin-top:6px;">sage</div></div>
+            <div style="text-align:center;"><div style="width:46px; height:46px; border-radius:12px; background:#e7ede7; border:1px solid #d6e0d8;"></div><div style="font:500 10px/1.4 'Hanken Grotesk'; color:#8c8579; margin-top:6px;">sage-soft</div></div>
+            <div style="text-align:center;"><div style="width:46px; height:46px; border-radius:12px; background:#a8533f;"></div><div style="font:500 10px/1.4 'Hanken Grotesk'; color:#8c8579; margin-top:6px;">danger</div></div>
+          </div>
+        </div>
+
+        <!-- Type -->
+        <div style="flex:1 1 240px; min-width:220px;">
+          <div style="font:600 13px/1 'Hanken Grotesk', sans-serif; color:#2d2c2c; margin-bottom:14px;">Type — Hanken Grotesk</div>
+          <div style="font:700 22px/1.2 'Hanken Grotesk'; color:#2d2c2c; letter-spacing:-0.01em;">Screen title</div>
+          <div style="font:600 12px/1 'Hanken Grotesk'; letter-spacing:.07em; text-transform:uppercase; color:#8c8579; margin:12px 0 8px;">Section label</div>
+          <div style="font:400 15px/1.55 'Hanken Grotesk'; color:#2d2c2c;">Body copy is set at 15px with comfortable line height for quiet, repeated reading.</div>
+          <div style="font:500 13px/1.4 'Hanken Grotesk'; color:#5d584f; margin-top:8px;">Meta &amp; secondary · 13px</div>
+        </div>
+
+        <!-- Shape -->
+        <div style="flex:1 1 200px; min-width:200px;">
+          <div style="font:600 13px/1 'Hanken Grotesk', sans-serif; color:#2d2c2c; margin-bottom:14px;">Shape &amp; elevation</div>
+          <div style="display:flex; align-items:flex-end; gap:12px; margin-bottom:16px;">
+            <div style="text-align:center;"><div style="width:40px; height:40px; background:#ece5da; border-radius:8px;"></div><div style="font:500 10px/1.4 'Hanken Grotesk'; color:#8c8579; margin-top:6px;">8</div></div>
+            <div style="text-align:center;"><div style="width:44px; height:44px; background:#ece5da; border-radius:12px;"></div><div style="font:500 10px/1.4 'Hanken Grotesk'; color:#8c8579; margin-top:6px;">12</div></div>
+            <div style="text-align:center;"><div style="width:48px; height:48px; background:#ece5da; border-radius:16px;"></div><div style="font:500 10px/1.4 'Hanken Grotesk'; color:#8c8579; margin-top:6px;">16</div></div>
+            <div style="text-align:center;"><div style="width:52px; height:52px; background:#ece5da; border-radius:22px;"></div><div style="font:500 10px/1.4 'Hanken Grotesk'; color:#8c8579; margin-top:6px;">22</div></div>
+          </div>
+          <div style="width:120px; height:44px; background:#fbf8f3; border:1px solid #e4dccd; border-radius:16px; box-shadow:0 2px 6px rgba(45,44,44,.05), 0 10px 28px rgba(45,44,44,.06);"></div>
+          <div style="font:500 10px/1.4 'Hanken Grotesk'; color:#8c8579; margin-top:6px;">soft elevation</div>
+        </div>
+
+        <!-- Components / states (live, via app.css) -->
+        <div style="flex:1 1 280px; min-width:260px;">
+          <div style="font:600 13px/1 'Hanken Grotesk', sans-serif; color:#2d2c2c; margin-bottom:14px;">Components &amp; states</div>
+          <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+            <button class="profile-save" type="button">Primary</button>
+            <button class="push-toggle-disable" type="button">Secondary</button>
+            <button class="profile-save" type="button" disabled>Saving…</button>
+            <span style="display:inline-flex; padding:5px 11px; border-radius:999px; background:#e7ede7; color:#3a5446; font:600 12px 'Hanken Grotesk'; font-variant-numeric:tabular-nums;">88%</span>
+          </div>
+          <div style="margin-top:12px; max-width:300px;">
+            <input class="profile-input" type="text" value="Sage on warm paper">
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:12px;">
+            <span class="manual-entry-error" style="margin:0;">Incorrect passphrase.</span>
+            <span class="profile-save-ok" style="margin:0;">Profile saved.</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ============ MOBILE MOCKUPS ============ -->
+    <div style="display:flex; flex-wrap:wrap; gap:48px 40px; align-items:flex-start;">
+
+      <!-- 1. DIGEST -->
+      <div style="flex:none; width:392px; display:flex; flex-direction:column; gap:13px;">
+        <div style="font:600 11px/1 'Hanken Grotesk'; letter-spacing:.08em; text-transform:uppercase; color:#8c8579; padding-left:6px;">Daily digest · /</div>
+        <div style="background:#2d2c2c; border-radius:48px; padding:11px; box-shadow:0 22px 55px -12px rgba(45,44,44,.30);">
+          <div style="background:#f4efe8; border-radius:37px; overflow:hidden;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:13px 26px 4px; font:600 13px 'Hanken Grotesk'; color:#2d2c2c;"><span>9:41</span><span style="display:flex; align-items:center; gap:7px;"><span style="font-size:11px;">5G</span><span style="display:inline-block; width:17px; height:11px; border:1.4px solid #2d2c2c; border-radius:3px; position:relative;"><span style="position:absolute; left:1.4px; top:1.4px; bottom:1.4px; width:64%; background:#2d2c2c; border-radius:1px;"></span></span></span></div>
+            <div style="height:752px; overflow:auto;">
+              <div class="digest">
+                <h1>Daily digest</h1>
+                <div class="digest-body">
+                  <p class="digest-date">Tuesday · June 17</p>
+                  <ul class="digest-items">
+                    <li class="digest-item"><a class="digest-link" href="#"><span class="job-title">Senior Product Designer</span><span class="job-company">Maple &amp; Co</span><span class="job-score">88%</span></a></li>
+                    <li class="digest-item"><a class="digest-link" href="#"><span class="job-title">Design Systems Lead</span><span class="job-company">Northwind Labs</span><span class="job-score">81%</span></a></li>
+                    <li class="digest-item"><a class="digest-link" href="#"><span class="job-title">UX Engineer</span><span class="job-company">Lumen</span><span class="job-score">74%</span></a></li>
+                    <li class="digest-item"><a class="digest-link" href="#"><span class="job-title">Frontend Designer</span><span class="job-company">Tidepool</span><span class="job-score">Scoring…</span></a></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. JOBS FEED -->
+      <div style="flex:none; width:392px; display:flex; flex-direction:column; gap:13px;">
+        <div style="font:600 11px/1 'Hanken Grotesk'; letter-spacing:.08em; text-transform:uppercase; color:#8c8579; padding-left:6px;">Jobs feed · /jobs</div>
+        <div style="background:#2d2c2c; border-radius:48px; padding:11px; box-shadow:0 22px 55px -12px rgba(45,44,44,.30);">
+          <div style="background:#f4efe8; border-radius:37px; overflow:hidden;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:13px 26px 4px; font:600 13px 'Hanken Grotesk'; color:#2d2c2c;"><span>9:41</span><span style="display:flex; align-items:center; gap:7px;"><span style="font-size:11px;">5G</span><span style="display:inline-block; width:17px; height:11px; border:1.4px solid #2d2c2c; border-radius:3px; position:relative;"><span style="position:absolute; left:1.4px; top:1.4px; bottom:1.4px; width:64%; background:#2d2c2c; border-radius:1px;"></span></span></span></div>
+            <div style="height:752px; overflow:auto;">
+              <div class="job-list">
+                <h1>Jobs</h1>
+                <ul class="job-list-items">
+                  <li class="job-list-item"><a class="job-list-link" href="#"><span class="job-title">Senior Product Designer</span><span class="job-company">Maple &amp; Co</span><span class="job-score">88%</span></a></li>
+                  <li class="job-list-item"><a class="job-list-link" href="#"><span class="job-title">Design Systems Lead</span><span class="job-company">Northwind Labs</span><span class="job-score">81%</span></a></li>
+                  <li class="job-list-item"><a class="job-list-link" href="#"><span class="job-title">Staff Interaction Designer</span><span class="job-company">Cedar &amp; Vale</span><span class="job-score">79%</span></a></li>
+                  <li class="job-list-item"><a class="job-list-link" href="#"><span class="job-title">UX Engineer</span><span class="job-company">Lumen</span><span class="job-score">74%</span></a></li>
+                  <li class="job-list-item"><a class="job-list-link" href="#"><span class="job-title">Frontend Designer</span><span class="job-company">Tidepool</span><span class="job-score">Scoring…</span></a></li>
+                  <li class="job-list-item"><a class="job-list-link" href="#"><span class="job-title">Product Design Contractor</span><span class="job-company">Harbor</span><span class="job-score">Not scored</span></a></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. JOB DETAIL -->
+      <div style="flex:none; width:392px; display:flex; flex-direction:column; gap:13px;">
+        <div style="font:600 11px/1 'Hanken Grotesk'; letter-spacing:.08em; text-transform:uppercase; color:#8c8579; padding-left:6px;">Job detail · /jobs/:id</div>
+        <div style="background:#2d2c2c; border-radius:48px; padding:11px; box-shadow:0 22px 55px -12px rgba(45,44,44,.30);">
+          <div style="background:#f4efe8; border-radius:37px; overflow:hidden;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:13px 26px 4px; font:600 13px 'Hanken Grotesk'; color:#2d2c2c;"><span>9:41</span><span style="display:flex; align-items:center; gap:7px;"><span style="font-size:11px;">5G</span><span style="display:inline-block; width:17px; height:11px; border:1.4px solid #2d2c2c; border-radius:3px; position:relative;"><span style="position:absolute; left:1.4px; top:1.4px; bottom:1.4px; width:64%; background:#2d2c2c; border-radius:1px;"></span></span></span></div>
+            <div style="height:752px; overflow:auto;">
+              <div class="job-detail">
+                <a class="job-detail-back" href="#">← Jobs</a>
+                <div class="job-detail-body">
+                  <h1 class="job-title">Senior Product Designer</h1>
+                  <p class="job-company">Maple &amp; Co</p>
+                  <p class="job-score">Match: 88%</p>
+                  <p class="job-summary">A small, design-led team shipping financial tooling. The role owns end-to-end product design with a strong systems and prototyping bent.</p>
+                  <div class="job-relevant">
+                    <h2>Relevant requirements</h2>
+                    <ul><li>6+ years product design</li><li>Design systems ownership</li><li>Prototyping in code</li></ul>
+                  </div>
+                  <div class="job-missing">
+                    <h2>Missing requirements</h2>
+                    <ul><li>Fintech domain experience</li><li>People management</li></ul>
+                  </div>
+                  <div class="job-red-flags">
+                    <h2>Red flags</h2>
+                    <ul><li>“Wear many hats” — possible scope creep</li></ul>
+                  </div>
+                  <p class="job-alignment">Your systems work at scale and code-prototyping background map directly to the core of this role.</p>
+                  <p class="job-strategy">Lead with the design-system case study; address the fintech gap with your tooling work.</p>
+                  <div class="job-route">
+                    <h2>How to apply</h2>
+                    <p class="job-route-type">Apply on company site</p>
+                    <a class="job-route-link" href="#" target="_blank">Open application</a>
+                  </div>
+                  <a class="job-contacts-link" href="#">View contacts and outreach</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. DRAFT REVIEW -->
+      <div style="flex:none; width:392px; display:flex; flex-direction:column; gap:13px;">
+        <div style="font:600 11px/1 'Hanken Grotesk'; letter-spacing:.08em; text-transform:uppercase; color:#8c8579; padding-left:6px;">Draft review · /applications/:id</div>
+        <div style="background:#2d2c2c; border-radius:48px; padding:11px; box-shadow:0 22px 55px -12px rgba(45,44,44,.30);">
+          <div style="background:#f4efe8; border-radius:37px; overflow:hidden;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:13px 26px 4px; font:600 13px 'Hanken Grotesk'; color:#2d2c2c;"><span>9:41</span><span style="display:flex; align-items:center; gap:7px;"><span style="font-size:11px;">5G</span><span style="display:inline-block; width:17px; height:11px; border:1.4px solid #2d2c2c; border-radius:3px; position:relative;"><span style="position:absolute; left:1.4px; top:1.4px; bottom:1.4px; width:64%; background:#2d2c2c; border-radius:1px;"></span></span></span></div>
+            <div style="height:752px; overflow:auto;">
+              <div class="draft-review">
+                <a class="draft-back" href="#">← Jobs</a>
+                <div class="draft-body">
+                  <h1 class="draft-title">Senior Product Designer — Maple &amp; Co</h1>
+                  <p class="draft-status">Status: draft</p>
+                  <div class="draft-resume-emphasis">
+                    <h2>Resume emphasis</h2>
+                    <p>Foreground the design-systems leadership and the in-code prototyping work; trim the early agency roles.</p>
+                  </div>
+                  <div class="draft-cover-letter">
+                    <h2>Cover letter</h2>
+                    <p>I’ve spent the last six years making design systems that teams actually use — and I prototype in the browser so decisions are grounded in real interaction…</p>
+                  </div>
+                  <div class="draft-answers">
+                    <h2>Application answers</h2>
+                    <ul>
+                      <li class="draft-answer"><span class="draft-answer-field">Why this company</span><span class="draft-answer-value">Design-led, small team, tools I’d use myself.</span></li>
+                      <li class="draft-answer"><span class="draft-answer-field">Notice period</span><span class="draft-answer-value">Four weeks</span></li>
+                    </ul>
+                  </div>
+                  <div class="draft-autofill">
+                    <h2>Autofill preview</h2>
+                    <p class="draft-autofill-ats">ATS: greenhouse</p>
+                    <a class="draft-autofill-url" href="#" target="_blank">boards.greenhouse.io/mapleco/jobs/4821</a>
+                    <div class="draft-autofill-answers">
+                      <h2>Fields the worker will fill</h2>
+                      <ul>
+                        <li class="draft-answer"><span class="draft-answer-field">Full name</span><span class="draft-answer-value">Aden Guo</span></li>
+                        <li class="draft-answer"><span class="draft-answer-field">Resume</span><span class="draft-answer-value">aden-guo-resume.pdf</span></li>
+                      </ul>
+                    </div>
+                  </div>
+                  <div class="draft-submit">
+                    <h2>Approve and submit</h2>
+                    <p class="draft-submit-note">Submitting dispatches a trusted automated submission. This is your explicit approval.</p>
+                    <button class="draft-submit-button" type="button">Approve and submit</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. PROFILE -->
+      <div style="flex:none; width:392px; display:flex; flex-direction:column; gap:13px;">
+        <div style="font:600 11px/1 'Hanken Grotesk'; letter-spacing:.08em; text-transform:uppercase; color:#8c8579; padding-left:6px;">Profile · /profile</div>
+        <div style="background:#2d2c2c; border-radius:48px; padding:11px; box-shadow:0 22px 55px -12px rgba(45,44,44,.30);">
+          <div style="background:#f4efe8; border-radius:37px; overflow:hidden;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:13px 26px 4px; font:600 13px 'Hanken Grotesk'; color:#2d2c2c;"><span>9:41</span><span style="display:flex; align-items:center; gap:7px;"><span style="font-size:11px;">5G</span><span style="display:inline-block; width:17px; height:11px; border:1.4px solid #2d2c2c; border-radius:3px; position:relative;"><span style="position:absolute; left:1.4px; top:1.4px; bottom:1.4px; width:64%; background:#2d2c2c; border-radius:1px;"></span></span></span></div>
+            <div style="height:752px; overflow:auto;">
+              <div class="profile">
+                <h1>Profile</h1>
+                <div class="profile-body">
+                  <form class="profile-form" onsubmit="return false">
+                    <label class="profile-field"><span class="profile-field-label">Full name</span><input class="profile-full-name" type="text" value="Aden Guo"></label>
+                    <label class="profile-field"><span class="profile-field-label">Headline</span><input class="profile-headline" type="text" value="Product Designer · systems &amp; prototyping"></label>
+                    <label class="profile-field"><span class="profile-field-label">Location</span><input class="profile-location" type="text" value="Vancouver, BC"></label>
+                    <label class="profile-field"><span class="profile-field-label">LinkedIn URL</span><input class="profile-linkedin" type="text" value="linkedin.com/in/adenguo"></label>
+                    <button class="profile-save" type="submit">Save profile</button>
+                    <p class="profile-save-ok">Profile saved.</p>
+                  </form>
+                  <div class="profile-contact">
+                    <h2>Contact details</h2>
+                    <p class="profile-contact-note">Contact details are encrypted at rest and shown only as set / not set.</p>
+                    <ul>
+                      <li class="profile-contact-row">Email: set</li>
+                      <li class="profile-contact-row">Phone: set</li>
+                      <li class="profile-contact-row">Street address: not set</li>
+                    </ul>
+                  </div>
+                  <div class="profile-resume">
+                    <h2>Resume</h2>
+                    <ul class="profile-resume-meta">
+                      <li class="profile-resume-title">Title: Aden Guo — Product Designer</li>
+                      <li class="profile-resume-status">Parse status: parsed</li>
+                      <li class="profile-resume-file">File: aden-guo-resume.pdf</li>
+                    </ul>
+                  </div>
+                  <div class="push-toggle">
+                    <h2>Push notifications</h2>
+                    <p class="push-toggle-note">Get the daily job digest as a push notification on this device.</p>
+                    <button class="push-toggle-enable" type="button">Turn on notifications</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6. MANUAL ENTRY -->
+      <div style="flex:none; width:392px; display:flex; flex-direction:column; gap:13px;">
+        <div style="font:600 11px/1 'Hanken Grotesk'; letter-spacing:.08em; text-transform:uppercase; color:#8c8579; padding-left:6px;">Add a job · /jobs/new</div>
+        <div style="background:#2d2c2c; border-radius:48px; padding:11px; box-shadow:0 22px 55px -12px rgba(45,44,44,.30);">
+          <div style="background:#f4efe8; border-radius:37px; overflow:hidden;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:13px 26px 4px; font:600 13px 'Hanken Grotesk'; color:#2d2c2c;"><span>9:41</span><span style="display:flex; align-items:center; gap:7px;"><span style="font-size:11px;">5G</span><span style="display:inline-block; width:17px; height:11px; border:1.4px solid #2d2c2c; border-radius:3px; position:relative;"><span style="position:absolute; left:1.4px; top:1.4px; bottom:1.4px; width:64%; background:#2d2c2c; border-radius:1px;"></span></span></span></div>
+            <div style="height:752px; overflow:auto;">
+              <div class="manual-entry">
+                <a class="manual-entry-back" href="#">← Jobs</a>
+                <h1>Add a job</h1>
+                <p class="manual-entry-note">Paste a job link and/or the posting text. It is scored and added to your feed.</p>
+                <form class="manual-entry-form" onsubmit="return false">
+                  <label class="manual-entry-label"><span>Job URL</span><input class="manual-entry-url" type="url" placeholder="https://…" value="https://maple.co/careers/senior-product-designer"></label>
+                  <label class="manual-entry-label"><span>Posting text</span><textarea class="manual-entry-text" placeholder="Paste the job description…"></textarea></label>
+                  <label class="manual-entry-label"><span>Title (optional)</span><input class="manual-entry-title" type="text" value=""></label>
+                  <label class="manual-entry-label"><span>Company (optional)</span><input class="manual-entry-company" type="text" value=""></label>
+                  <button class="manual-entry-submit" type="submit">Add job</button>
+                </form>
+                <div class="manual-entry-result">
+                  <p class="manual-entry-result-msg">Added Senior Product Designer — Maple &amp; Co. It is being scored and will appear in your feed.</p>
+                  <a class="manual-entry-result-link" href="#">View job</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 7. CONTACTS -->
+      <div style="flex:none; width:392px; display:flex; flex-direction:column; gap:13px;">
+        <div style="font:600 11px/1 'Hanken Grotesk'; letter-spacing:.08em; text-transform:uppercase; color:#8c8579; padding-left:6px;">Contacts &amp; outreach · /jobs/:id/contacts</div>
+        <div style="background:#2d2c2c; border-radius:48px; padding:11px; box-shadow:0 22px 55px -12px rgba(45,44,44,.30);">
+          <div style="background:#f4efe8; border-radius:37px; overflow:hidden;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:13px 26px 4px; font:600 13px 'Hanken Grotesk'; color:#2d2c2c;"><span>9:41</span><span style="display:flex; align-items:center; gap:7px;"><span style="font-size:11px;">5G</span><span style="display:inline-block; width:17px; height:11px; border:1.4px solid #2d2c2c; border-radius:3px; position:relative;"><span style="position:absolute; left:1.4px; top:1.4px; bottom:1.4px; width:64%; background:#2d2c2c; border-radius:1px;"></span></span></span></div>
+            <div style="height:752px; overflow:auto;">
+              <div class="contacts-view">
+                <a class="contacts-back" href="#">← Job</a>
+                <h1 class="contacts-title">Contacts</h1>
+                <p class="contacts-note">Outreach drafts are prefilled for manual sending only. Copy a draft and send it yourself — Waunder never sends messages for you.</p>
+                <ul class="contacts-list">
+                  <li class="contact">
+                    <p class="contact-name">Dana Whitfield</p>
+                    <p class="contact-role">Head of Design at Maple &amp; Co</p>
+                    <p class="contact-relevance">Owns the design org you’d join; warm intro via a shared former colleague.</p>
+                    <a class="contact-linkedin" href="#" target="_blank">LinkedIn profile</a>
+                    <div class="contact-outreach">
+                      <textarea class="contact-outreach-template" placeholder="Optional: notes or a loose template for the draft"></textarea>
+                      <button class="contact-outreach-generate" type="button">Generate draft</button>
+                    </div>
+                  </li>
+                  <li class="contact">
+                    <p class="contact-name">Marcus Reyes</p>
+                    <p class="contact-role">Senior Recruiter at Maple &amp; Co</p>
+                    <p class="contact-relevance">Likely owns this requisition.</p>
+                    <a class="contact-linkedin" href="#" target="_blank">LinkedIn profile</a>
+                    <div class="contact-outreach">
+                      <textarea class="contact-outreach-template">Friendly, brief, mention the systems work.</textarea>
+                      <button class="contact-outreach-generate" type="button">Regenerate draft</button>
+                      <div class="contact-outreach-draft">
+                        <p class="contact-outreach-manual">Copy this draft and send it manually. Waunder does not send it.</p>
+                        <textarea class="contact-outreach-message" readonly>Hi Marcus — I just applied for the Senior Product Designer role. I’ve spent the last six years building design systems teams actually adopt, and Maple’s tooling focus is exactly the kind of work I want to do next. Happy to share a short case study if useful.</textarea>
+                        <button class="contact-outreach-copy" type="button">Copy draft</button>
+                      </div>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 8. LOGIN -->
+      <div style="flex:none; width:392px; display:flex; flex-direction:column; gap:13px;">
+        <div style="font:600 11px/1 'Hanken Grotesk'; letter-spacing:.08em; text-transform:uppercase; color:#8c8579; padding-left:6px;">Login · /login</div>
+        <div style="background:#2d2c2c; border-radius:48px; padding:11px; box-shadow:0 22px 55px -12px rgba(45,44,44,.30);">
+          <div style="background:#f4efe8; border-radius:37px; overflow:hidden;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:13px 26px 4px; font:600 13px 'Hanken Grotesk'; color:#2d2c2c;"><span>9:41</span><span style="display:flex; align-items:center; gap:7px;"><span style="font-size:11px;">5G</span><span style="display:inline-block; width:17px; height:11px; border:1.4px solid #2d2c2c; border-radius:3px; position:relative;"><span style="position:absolute; left:1.4px; top:1.4px; bottom:1.4px; width:64%; background:#2d2c2c; border-radius:1px;"></span></span></span></div>
+            <div style="height:752px; overflow:auto;">
+              <div class="login-screen" style="min-height:710px;">
+                <h1>Waunder</h1>
+                <form class="login-form" onsubmit="return false">
+                  <input class="login-passphrase" type="password" placeholder="Passphrase" value="••••••••••">
+                  <button class="login-submit" type="submit">Sign in</button>
+                </form>
+                <p class="login-status">Incorrect passphrase.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

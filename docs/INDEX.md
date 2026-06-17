@@ -18,6 +18,7 @@ moving any file under `docs/`, update this file in the same commit.
 | [`docs/DECISIONS.md`](DECISIONS.md) | Architectural decision log (open and resolved) |
 | [`docs/ENV_VARS.md`](ENV_VARS.md) | Canonical environment variable and secret matrix |
 | [`docs/PRODUCTION_SETUP.md`](PRODUCTION_SETUP.md) | Production setup runbook and non-secret live integration facts |
+| [`docs/STYLE_GUIDE.md`](STYLE_GUIDE.md) | UI style system, visual direction, and frontend styling integration rules |
 | [`docs/TESTING.md`](TESTING.md) | Test strategy, how to run, file inventory, and writing new tests |
 | [`docs/workboard.json`](workboard.json) | Active task queue (canonical board) |
 | [`docs/workboard.schema.json`](workboard.schema.json) | JSON Schema contract for workboard structure and required task fields |
@@ -26,7 +27,6 @@ moving any file under `docs/`, update this file in the same commit.
 <!-- TODO: Add project-specific docs below as needed. Examples:
 | [`docs/SCHEMA.md`](SCHEMA.md) | Database schema and migration history |
 | [`docs/API.md`](API.md) | API endpoint contracts |
-| [`docs/STYLE_GUIDE.md`](STYLE_GUIDE.md) | UI style system and design direction |
 | [`docs/DEPLOYMENT.md`](DEPLOYMENT.md) | Deployment runbook |
 -->
 

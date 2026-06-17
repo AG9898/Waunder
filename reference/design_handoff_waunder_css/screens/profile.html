@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Waunder — Profile</title>
+<!-- This file is a DESIGN REFERENCE. The production artifact is app.css applied
+     to the go-app component classes. This wrapper only frames the markup for review. -->
+<link rel="stylesheet" href="../app.css">
+<style>
+  body { background:#e8e2d7; margin:0; padding:32px; display:flex; justify-content:center; font-family:'Hanken Grotesk',system-ui,sans-serif; }
+  .frame { width:390px; background:#f4efe8; border-radius:28px; overflow:hidden; box-shadow:0 18px 50px -12px rgba(45,44,44,.28);  }
+</style>
+</head>
+<body>
+<div class="frame">
+<div class="profile">
+  <h1>Profile</h1>
+  <div class="profile-body">
+    <form class="profile-form" onsubmit="return false">
+      <label class="profile-field"><span class="profile-field-label">Full name</span><input class="profile-full-name" type="text" value="Aden Guo"></label>
+      <label class="profile-field"><span class="profile-field-label">Headline</span><input class="profile-headline" type="text" value="Product Designer · systems &amp; prototyping"></label>
+      <label class="profile-field"><span class="profile-field-label">Location</span><input class="profile-location" type="text" value="Vancouver, BC"></label>
+      <label class="profile-field"><span class="profile-field-label">LinkedIn URL</span><input class="profile-linkedin" type="text" value="linkedin.com/in/adenguo"></label>
+      <button class="profile-save" type="submit">Save profile</button>
+      <p class="profile-save-ok">Profile saved.</p>
+    </form>
+    <div class="profile-contact">
+      <h2>Contact details</h2>
+      <p class="profile-contact-note">Contact details are encrypted at rest and shown only as set / not set.</p>
+      <ul>
+        <li class="profile-contact-row">Email: set</li>
+        <li class="profile-contact-row">Phone: set</li>
+        <li class="profile-contact-row">Street address: not set</li>
+      </ul>
+    </div>
+    <div class="profile-resume">
+      <h2>Resume</h2>
+      <ul class="profile-resume-meta">
+        <li class="profile-resume-title">Title: Aden Guo — Product Designer</li>
+        <li class="profile-resume-status">Parse status: parsed</li>
+        <li class="profile-resume-file">File: aden-guo-resume.pdf</li>
+      </ul>
+    </div>
+    <div class="push-toggle">
+      <h2>Push notifications</h2>
+      <p class="push-toggle-note">Get the daily job digest as a push notification on this device.</p>
+      <button class="push-toggle-enable" type="button">Turn on notifications</button>
+    </div>
+  </div>
+</div>
+</div>
+</body>
+</html>

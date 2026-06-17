@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Waunder — Contacts & outreach</title>
+<!-- This file is a DESIGN REFERENCE. The production artifact is app.css applied
+     to the go-app component classes. This wrapper only frames the markup for review. -->
+<link rel="stylesheet" href="../app.css">
+<style>
+  body { background:#e8e2d7; margin:0; padding:32px; display:flex; justify-content:center; font-family:'Hanken Grotesk',system-ui,sans-serif; }
+  .frame { width:390px; background:#f4efe8; border-radius:28px; overflow:hidden; box-shadow:0 18px 50px -12px rgba(45,44,44,.28);  }
+</style>
+</head>
+<body>
+<div class="frame">
+<div class="contacts-view">
+  <a class="contacts-back" href="/jobs/1">← Job</a>
+  <h1 class="contacts-title">Contacts</h1>
+  <p class="contacts-note">Outreach drafts are prefilled for manual sending only. Copy a draft and send it yourself — Waunder never sends messages for you.</p>
+  <ul class="contacts-list">
+    <li class="contact">
+      <p class="contact-name">Dana Whitfield</p>
+      <p class="contact-role">Head of Design at Maple &amp; Co</p>
+      <p class="contact-relevance">Owns the design org you’d join; warm intro via a shared former colleague.</p>
+      <a class="contact-linkedin" href="#" target="_blank">LinkedIn profile</a>
+      <div class="contact-outreach">
+        <textarea class="contact-outreach-template" placeholder="Optional: notes or a loose template for the draft"></textarea>
+        <button class="contact-outreach-generate" type="button">Generate draft</button>
+      </div>
+    </li>
+    <li class="contact">
+      <p class="contact-name">Marcus Reyes</p>
+      <p class="contact-role">Senior Recruiter at Maple &amp; Co</p>
+      <p class="contact-relevance">Likely owns this requisition.</p>
+      <a class="contact-linkedin" href="#" target="_blank">LinkedIn profile</a>
+      <div class="contact-outreach">
+        <textarea class="contact-outreach-template">Friendly, brief, mention the systems work.</textarea>
+        <button class="contact-outreach-generate" type="button">Regenerate draft</button>
+        <div class="contact-outreach-draft">
+          <p class="contact-outreach-manual">Copy this draft and send it manually. Waunder does not send it.</p>
+          <textarea class="contact-outreach-message" readonly>Hi Marcus — I just applied for the Senior Product Designer role. I’ve spent the last six years building design systems teams actually adopt, and Maple’s tooling focus is exactly the kind of work I want to do next. Happy to share a short case study if useful.</textarea>
+          <button class="contact-outreach-copy" type="button">Copy draft</button>
+        </div>
+      </div>
+    </li>
+  </ul>
+</div>
+</div>
+</body>
+</html>

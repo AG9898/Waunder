@@ -1,7 +1,7 @@
 {
   "$schema": "./workboard.schema.json",
   "schema_version": "1.0.0",
-  "last_updated": "2026-06-12",
+  "last_updated": "2026-06-17",
   "tasks": [
     {
       "id": "INFRA-01",
@@ -954,6 +954,280 @@
       "commands": [
         "cd api && bundle exec rspec",
         "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "WEB-07",
+      "title": "Integrate reference stylesheet into PWA shell",
+      "description": "Copy the delivered stylesheet from reference/design_handoff_waunder_css/app.css to web/web/app.css and load it through go-app app.Handler Styles as /web/app.css. Keep the existing go-app components as the markup and behavior source of truth; do not copy static reference HTML or change product behavior. Add or adjust a small server/handler test if needed to prove the stylesheet is registered.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "WEB",
+      "depends_on": [
+        "WEB-01",
+        "WEB-02",
+        "WEB-03",
+        "WEB-04",
+        "WEB-05",
+        "WEB-06"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "web/web/app.css exists and is based on the reference stylesheet",
+        "go-app Handler loads /web/app.css via Styles",
+        "No static reference HTML is copied into web/components",
+        "Existing frontend behavior and explicit-action safety gates remain unchanged",
+        "web tests and go vet pass"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md",
+        "docs/CONVENTIONS.md",
+        "web/README.md"
+      ],
+      "files": [
+        "reference/design_handoff_waunder_css/app.css",
+        "web/web/app.css",
+        "web/main.go",
+        "web/main_test.go"
+      ],
+      "commands": [
+        "cd web && go test ./...",
+        "cd web && go vet ./..."
+      ]
+    },
+    {
+      "id": "WEB-08",
+      "title": "Make PWA font loading offline-safe",
+      "description": "Remove the live Google Fonts dependency from web/web/app.css by either self-hosting Hanken Grotesk WOFF2 assets under web/web/fonts or intentionally using the documented system-font fallback. Preserve the Hanken Grotesk family name when self-hosting, keep the visual tokens intact, and update docs only if the final font strategy differs from STYLE_GUIDE.md.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "WEB",
+      "depends_on": [
+        "WEB-07"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "web/web/app.css has no @import or fonts.googleapis.com reference",
+        "Font loading is either local under /web/ assets or explicitly falls back to the documented system stack",
+        "The stylesheet still uses the canonical typography tokens from STYLE_GUIDE.md",
+        "web tests and go vet pass"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md",
+        "web/README.md"
+      ],
+      "files": [
+        "web/web/app.css",
+        "web/web/fonts",
+        "web/README.md",
+        "docs/STYLE_GUIDE.md"
+      ],
+      "commands": [
+        "cd web && go test ./...",
+        "cd web && go vet ./..."
+      ]
+    },
+    {
+      "id": "WEB-09",
+      "title": "Style current non-reference UI states",
+      "description": "Audit the actual go-app classes and states that are not shown in the reference screenshots, including empty feed/digest/contact states, loading, load errors, profile resume metadata, push unsupported/busy/error states, and any still-reachable install-guide UI. Add CSS or narrow class compatibility fixes so those states fit the same warm utilitarian system without changing API calls or mount/render side effects.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "WEB",
+      "depends_on": [
+        "WEB-08"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Every class emitted by current web/components screens has an intentional styled treatment or inherits one from the style system",
+        "Empty, loading, error, disabled, and push states are visually consistent with STYLE_GUIDE.md",
+        "No write action is triggered on mount/render",
+        "Relevant render assertions are updated only where markup/classes intentionally changed",
+        "web tests and go vet pass"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "web/web/app.css",
+        "web/components",
+        "web/components/*_test.go"
+      ],
+      "commands": [
+        "cd web && go test ./...",
+        "cd web && go vet ./..."
+      ]
+    },
+    {
+      "id": "WEB-10",
+      "title": "Polish digest, jobs feed, and login visuals",
+      "description": "Compare the routed /, /jobs, and /login screens against the reference digest/jobs/login screenshots at mobile width and a desktop width. Make only CSS or minimal class fixes needed for spacing, row cards, score pills, empty/loading/auth-error states, focus states, and text fit. Do not introduce persistent navigation or new business behavior.",
+      "status": "todo",
+      "priority": "low",
+      "group_id": "WEB",
+      "depends_on": [
+        "WEB-09"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Digest and jobs rows match the reference card rhythm, score-pill treatment, and mobile spacing",
+        "Login screen is centered and usable on mobile and desktop widths",
+        "Empty, loading, and unauthenticated states on these screens remain readable and non-overlapping",
+        "No frontend API contract changes are introduced",
+        "web tests and go vet pass"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "web/web/app.css",
+        "web/components/jobs.go",
+        "web/components/login.go",
+        "web/components/*_test.go"
+      ],
+      "commands": [
+        "cd web && go test ./...",
+        "cd web && go vet ./..."
+      ]
+    },
+    {
+      "id": "WEB-11",
+      "title": "Polish job detail and draft review visuals",
+      "description": "Compare /jobs/:id and /applications/:id against the reference job-detail and draft-review screenshots at mobile and desktop widths. Focus on hairline section rhythm, match/status pills, requirement bullets, route/action links, structured answer cards, autofill preview, and approve-submit status states while preserving explicit submit-only-on-click behavior.",
+      "status": "todo",
+      "priority": "low",
+      "group_id": "WEB",
+      "depends_on": [
+        "WEB-09"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Job detail sections use the reference hairline spacing, bullets, route link, and score treatment",
+        "Draft review sections, answer cards, autofill preview, and approve panel match the style guide",
+        "Approve/submit is still only reachable through explicit user action",
+        "Long URLs and generated text wrap without overlapping at mobile width",
+        "web tests and go vet pass"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "web/web/app.css",
+        "web/components/jobs.go",
+        "web/components/draft.go",
+        "web/components/*_test.go"
+      ],
+      "commands": [
+        "cd web && go test ./...",
+        "cd web && go vet ./..."
+      ]
+    },
+    {
+      "id": "WEB-12",
+      "title": "Polish profile and push-toggle visuals",
+      "description": "Compare /profile against the reference profile screenshot and the style guide, including the real resume metadata and push-toggle states that are not fully represented in the static handoff. Keep sensitive contact details as presence flags only and keep push subscribe/unsubscribe behind explicit user clicks.",
+      "status": "todo",
+      "priority": "low",
+      "group_id": "WEB",
+      "depends_on": [
+        "WEB-09"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Profile form fields, labels, save states, contact presence rows, and resume metadata match the visual system",
+        "Push enable, disable, busy, unsupported, and error states are styled consistently",
+        "No raw encrypted contact details are rendered",
+        "Push subscribe/unsubscribe still require explicit user action",
+        "web tests and go vet pass"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "web/web/app.css",
+        "web/components/profile.go",
+        "web/components/push.go",
+        "web/components/*_test.go"
+      ],
+      "commands": [
+        "cd web && go test ./...",
+        "cd web && go vet ./..."
+      ]
+    },
+    {
+      "id": "WEB-13",
+      "title": "Polish manual entry and contacts visuals",
+      "description": "Compare /jobs/new and /jobs/:id/contacts against the reference manual-entry and contacts screenshots at mobile and desktop widths. Focus on input sizing, textarea behavior, success/error panels, contact cards, outreach draft wells, copy controls, and manual-send-only messaging without adding any send action.",
+      "status": "todo",
+      "priority": "low",
+      "group_id": "WEB",
+      "depends_on": [
+        "WEB-09"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Manual entry form, result panel, and validation/error states match the style guide",
+        "Contact cards, outreach generation controls, draft textarea, and copy control match the reference direction",
+        "Outreach remains copy/manual-send only with no send affordance",
+        "Long pasted text and generated outreach messages remain usable on mobile",
+        "web tests and go vet pass"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "web/web/app.css",
+        "web/components/manual_entry.go",
+        "web/components/contacts.go",
+        "web/components/*_test.go"
+      ],
+      "commands": [
+        "cd web && go test ./...",
+        "cd web && go vet ./..."
+      ]
+    },
+    {
+      "id": "WEB-14",
+      "title": "Run cross-viewport PWA visual smoke",
+      "description": "After the focused visual passes, run the PWA locally and perform a final cross-viewport smoke check across all routed screens using representative mocked or local data. Verify mobile 390px and desktop widths, app.css asset loading, no text overlap, no blank screens, and no regressions to explicit-action safety constraints. Update TESTING.md only if a repeatable visual-smoke procedure or new test file is added.",
+      "status": "todo",
+      "priority": "low",
+      "group_id": "WEB",
+      "depends_on": [
+        "WEB-10",
+        "WEB-11",
+        "WEB-12",
+        "WEB-13"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "All routed screens render with app.css at mobile and desktop widths without overlap or clipped controls",
+        "The PWA shell serves /web/app.css and existing static assets correctly",
+        "Explicit-action constraints for submit, profile save, push subscribe, manual job create, and outreach generation are spot-checked or covered by tests",
+        "Any repeatable visual-smoke instructions added during the task are documented",
+        "web tests and go vet pass"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md",
+        "docs/TESTING.md",
+        "web/README.md"
+      ],
+      "files": [
+        "web/web/app.css",
+        "web/main.go",
+        "web/components",
+        "docs/TESTING.md",
+        "web/README.md"
+      ],
+      "commands": [
+        "cd web && go test ./...",
+        "cd web && go vet ./...",
+        "cd web && make wasm"
       ]
     }
   ]

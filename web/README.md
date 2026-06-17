@@ -9,7 +9,7 @@ serves the app shell and proxies `/api` to the Rails backend.
 web/
   main.go            # routing + server (app.Handler) + /api reverse proxy
   components/        # go-app UI components
-  web/               # static resources, served under /web/ (app.wasm built here)
+  web/               # static resources, served under /web/ (app.wasm + app.css live here)
   Dockerfile         # two-target build: WASM frontend + native server
   Makefile           # wasm / server / run helpers
 ```
@@ -30,6 +30,11 @@ Then open http://localhost:8000.
 
 go-app's `Handler` auto-serves the generated `wasm_exec.js`, `app.js`, service
 worker, and web manifest — only `app.wasm` is a build artifact.
+
+Visual styling is plain CSS loaded by `app.Handler.Styles` from `/web/app.css`.
+The canonical frontend style rules live in `../docs/STYLE_GUIDE.md`; the design
+handoff under `../reference/design_handoff_waunder_css/` is reference material,
+not app markup.
 
 ## Environment
 
