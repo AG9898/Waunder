@@ -92,6 +92,7 @@ docs/          Project docs and task queue
   CONVENTIONS.md  Coding standards and patterns
   DECISIONS.md    Architectural decision log
   ENV_VARS.md     Environment variable matrix
+  PRODUCTION_SETUP.md Production setup runbook and non-secret live integration facts
   TESTING.md      Test strategy and inventory
   workboard.json  Canonical task queue
   workboard.schema.json JSON Schema for task queue

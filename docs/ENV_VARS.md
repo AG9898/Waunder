@@ -138,3 +138,6 @@ domain), and `WORKER_SERVICE_TOKEN` must match exactly on `api` and `worker`.
 Blank optional values from local `.env` files are left unset because the Railway CLI refuses empty
 stdin values. Add conditional secrets such as `OPENROUTER_API_KEY` or `RESEND_WEBHOOK_SECRET` only
 when those integrations are being enabled.
+
+See [`PRODUCTION_SETUP.md`](PRODUCTION_SETUP.md) for the non-secret live URL, Resend webhook,
+job-alert ingestion address, and smoke-check runbook.
