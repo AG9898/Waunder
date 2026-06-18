@@ -14,10 +14,10 @@ tracks contacts, and performs trusted application submission only after explicit
 approval. It is a monorepo of three services deployed on Railway — `api/` (Rails 8.1 API,
 the single source of truth for all data, LLM orchestration, jobs, and worker dispatch),
 `web/` (a Go + go-app WebAssembly PWA shell plus a small server that reverse-proxies `/api/*`
-to Rails — no business logic), and `workers/` (a Node + Playwright worker that executes only
-pre-approved structured submit tasks). Agents implement workboard tasks: features, fixes,
-schema migrations, and infra changes. The canonical task queue is `docs/workboard.json`, and
-skills are available at `.claude/skills/` (synced from ag.dev).
+and the Resend inbound webhook path to Rails — no business logic), and `workers/` (a Node +
+Playwright worker that executes only pre-approved structured submit tasks). Agents implement
+workboard tasks: features, fixes, schema migrations, and infra changes. The canonical task queue
+is `docs/workboard.json`, and skills are available at `.claude/skills/` (synced from ag.dev).
 
 ---
 
@@ -69,7 +69,7 @@ a fast check. Skip slow checks only when the task says so.
 
 ```
 web/           Go + go-app WebAssembly PWA (frontend) + small Go server
-  main.go         App routing + HTTP server that reverse-proxies /api/* to Rails
+  main.go         App routing + HTTP server that reverse-proxies /api/* + Resend webhook to Rails
   components/     go-app UI components (compiled to WASM)
   Makefile        wasm / server / run build targets
   Dockerfile      Two-target (WASM + native server) build for Railway
@@ -110,8 +110,8 @@ Docs navigation: [`docs/INDEX.md`](docs/INDEX.md)
 ## Architecture
 
 - Rails (`api/`) is the single source of truth: it owns all data, LLM orchestration (OpenRouter), background jobs, Resend inbound webhooks, web-push dispatch, and worker dispatch.
-- The Go web server (`web/`) is app-shell + `/api` reverse proxy only. It holds no business logic and no database access.
-- The browser only ever talks to the `web` origin. `/api/*` is proxied server-side to Rails over Railway's private network — no CORS, and Rails has no public domain.
+- The Go web server (`web/`) is app-shell + `/api` and Resend webhook reverse proxy only. It holds no business logic and no database access.
+- The browser only ever talks to the `web` origin. `/api/*` and the Resend inbound webhook path are proxied server-side to Rails over Railway's private network — no CORS, and Rails has no public domain.
 - Database schema changes happen exclusively through Rails migrations. Never alter tables directly.
 - Sensitive resume/profile fields are encrypted at rest with Active Record Encryption.
 - Configuration is read from environment variables only. No hardcoded URLs, keys, or model names.
@@ -226,7 +226,7 @@ Stop and report (do not continue) when:
 ## Debugging & Gotchas
 
 - The `web/` service is one Go package compiled twice: to WebAssembly (`GOOS=js GOARCH=wasm`) for the frontend, and to a native binary for the server. On the client `app.RunWhenOnBrowser()` takes over and the server code never runs; on the server it is a no-op and HTTP starts.
-- The Go server reads `API_INTERNAL_URL` to proxy `/api/*`. When unset, the proxy is disabled and the PWA still serves standalone in local dev — so a missing API_INTERNAL_URL is not a crash, just no backend.
+- The Go server reads `API_INTERNAL_URL` to proxy `/api/*` and `/webhooks/resend/inbound`. When unset, the proxy is disabled and the PWA still serves standalone in local dev — so a missing API_INTERNAL_URL is not a crash, just no backend.
 - The Go server listens on `$PORT` (default 8000).
 - There is no staging environment: only Production (Railway) and local dev.
 

@@ -2,7 +2,7 @@
 
 A mobile-first, single-user personal job application assistant — installable as a PWA on your iPhone home screen.
 
-> **Status:** early skeleton. Nothing is shipped end-to-end yet — all three services are scaffolds. See [`docs/PRD.md`](docs/PRD.md) for scope and [`docs/workboard.json`](docs/workboard.json) for the task queue.
+> **Status:** active MVP build with production wiring on Railway. See [`docs/PRD.md`](docs/PRD.md) for scope, [`docs/PRODUCTION_SETUP.md`](docs/PRODUCTION_SETUP.md) for live setup facts, and [`docs/workboard.json`](docs/workboard.json) for the task queue.
 
 ## What is Waunder?
 
@@ -25,11 +25,11 @@ Waunder/
 
 | Service | Stack |
 |---------|-------|
-| `web/`     | Go + go-app, compiled to WebAssembly; small Go HTTP server serves the WASM bundle, manifest, and service worker, and proxies `/api` to Rails |
-| `api/`     | Rails 8.1 API-only, Ruby 3.2.3, PostgreSQL, RSpec; OpenRouter for LLM, Mailgun inbound for email, Web Push (VAPID) for notifications |
+| `web/`     | Go + go-app, compiled to WebAssembly; small Go HTTP server serves the WASM bundle, manifest, and service worker, and proxies `/api/*` plus the Resend inbound webhook path to Rails |
+| `api/`     | Rails 8.1 API-only, Ruby 3.2.3, PostgreSQL, RSpec; OpenRouter for LLM, Resend inbound for email, Web Push (VAPID) for notifications |
 | `workers/` | Node 22 + TypeScript + Playwright; fills supported ATS forms from approved, structured payloads |
 
-External services: Railway (hosting), managed PostgreSQL, Mailgun (inbound email), OpenRouter (LLM gateway).
+External services: Railway (hosting), managed PostgreSQL, Resend (inbound email), OpenRouter (LLM gateway).
 
 ## Quick start
 
@@ -66,12 +66,13 @@ npm test           # node --test
 
 ## Deployment
 
-Waunder deploys to **Railway** as three containerized services in one project — `web`, `api`, and `worker` — plus managed PostgreSQL. Services communicate over Railway's private network. The browser only ever talks to the `web` origin: the Go server proxies requests under `/api/*` server-side to the Rails `api` service (base URL supplied via an environment variable such as `API_INTERNAL_URL`). This keeps the frontend same-origin (no CORS), keeps the service worker scope and push registration clean, and means the Rails API needs no public domain.
+Waunder deploys to **Railway** as three containerized services in one project — `web`, `api`, and `worker` — plus managed PostgreSQL. Services communicate over Railway's private network. The browser only ever talks to the `web` origin: the Go server proxies requests under `/api/*` and `/webhooks/resend/inbound` server-side to the Rails `api` service via `API_INTERNAL_URL`. This keeps the frontend same-origin (no CORS), keeps the service worker scope and push registration clean, and means the Rails API needs no public domain.
 
-The `web` service uses an explicit Dockerfile because go-app is a two-target build (WASM frontend + server binary). `api` and `worker` can use Railway auto-build or their own Dockerfiles.
+GitHub push-triggered Railway deploys use the repository root as Docker context, so production app services point `RAILWAY_DOCKERFILE_PATH` at the root-context Dockerfiles under `deploy/`: `deploy/railway-web.Dockerfile`, `deploy/railway-api.Dockerfile`, and `deploy/railway-worker.Dockerfile`. See [`docs/PRODUCTION_SETUP.md`](docs/PRODUCTION_SETUP.md) for live URLs, env placement, smoke checks, and non-secret production setup facts.
 
 ## Documentation
 
 - Docs navigation: [`docs/INDEX.md`](docs/INDEX.md)
 - Product requirements: [`docs/PRD.md`](docs/PRD.md)
+- Production setup: [`docs/PRODUCTION_SETUP.md`](docs/PRODUCTION_SETUP.md)
 - Agent working guide: [`CLAUDE.md`](CLAUDE.md) / [`AGENTS.md`](AGENTS.md)
