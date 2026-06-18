@@ -1195,7 +1195,7 @@
       "id": "WEB-14",
       "title": "Run cross-viewport PWA visual smoke",
       "description": "After the focused visual passes, run the PWA locally and perform a final cross-viewport smoke check across all routed screens using representative mocked or local data. Verify mobile 390px and desktop widths, app.css asset loading, no text overlap, no blank screens, and no regressions to explicit-action safety constraints. Update TESTING.md only if a repeatable visual-smoke procedure or new test file is added.",
-      "status": "todo",
+      "status": "done",
       "priority": "low",
       "group_id": "WEB",
       "depends_on": [
