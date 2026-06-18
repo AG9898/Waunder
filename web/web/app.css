@@ -618,6 +618,29 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
   color: var(--color-ink-faint);
 }
 
+/* resume parse status — a quiet pill, same idiom as the match-score pill */
+.profile-resume-status-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.profile-resume-status {
+  display: inline-flex;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: capitalize;
+}
+.profile-resume-status-parsed {
+  background: var(--color-success-soft);
+  color: var(--color-success-ink);
+}
+.profile-resume-status-pending {
+  background: var(--color-surface-sunken);
+  color: var(--color-ink-faint);
+}
+
 /* manual-entry success result */
 .manual-entry-result {
   margin-top: var(--space-5);
@@ -836,6 +859,26 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
   margin: var(--space-2) 0 0;
   font-size: var(--text-sm);
   color: var(--color-ink-faint);
+}
+
+/* push "on" state — quiet status pill beside the disable button, same idiom
+   as the resume parse-status pill, so "subscribed" is legible without color
+   coding the whole control. */
+.push-toggle-control {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.push-toggle-status {
+  display: inline-flex;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.push-toggle-status-on {
+  background: var(--color-success-soft);
+  color: var(--color-success-ink);
 }
 
 /* --------------------------------------------------------------------------

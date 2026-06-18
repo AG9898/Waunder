@@ -252,10 +252,13 @@ func renderPushControl(t *PushToggle) app.UI {
 		return app.P().Class("push-toggle-unsupported").
 			Text("Push notifications aren't available in this browser. Install the app to your home screen on iOS 16.4+.")
 	case pushOn:
-		return app.Button().
-			Class("push-toggle-disable").
-			OnClick(t.disable).
-			Text("Turn off notifications")
+		return app.Div().Class("push-toggle-control").Body(
+			app.Span().Class("push-toggle-status push-toggle-status-on").Text("On"),
+			app.Button().
+				Class("push-toggle-disable").
+				OnClick(t.disable).
+				Text("Turn off notifications"),
+		)
 	case pushBusy:
 		return app.Button().Class("push-toggle-busy").Disabled(true).Text("Working…")
 	default: // pushOff, pushUnknown, pushFailed

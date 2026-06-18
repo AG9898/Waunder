@@ -104,6 +104,10 @@ figures where possible.
   otherwise overflow a narrow card. The base reset applies `overflow-wrap: break-word` to
   `p`/`li`/`h1`/`h2`/`span` as a safe no-op default; raw-URL link text (`.draft-autofill-url`)
   additionally uses `word-break: break-all` since the text itself is the link.
+- The profile screen's resume parse status (`.profile-resume-status`) and the push toggle's
+  subscribed indicator (`.push-toggle-status-on`) reuse the same quiet pill idiom as the
+  match-score pill, but tinted success-soft/sunken rather than sage, so "resume parsed" and
+  "notifications on" read as calm status facts rather than another action button.
 
 If a new screen is added, extend the same system: one centered column, a compact title,
 hairline sections, one primary action where possible, and no decorative background imagery.

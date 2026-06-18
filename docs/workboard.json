@@ -1129,7 +1129,7 @@
       "id": "WEB-12",
       "title": "Polish profile and push-toggle visuals",
       "description": "Compare /profile against the reference profile screenshot and the style guide, including the real resume metadata and push-toggle states that are not fully represented in the static handoff. Keep sensitive contact details as presence flags only and keep push subscribe/unsubscribe behind explicit user clicks.",
-      "status": "todo",
+      "status": "done",
       "priority": "low",
       "group_id": "WEB",
       "depends_on": [

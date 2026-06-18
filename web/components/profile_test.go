@@ -39,7 +39,8 @@ func TestProfileRendersFieldsAndPresenceFlags(t *testing.T) {
 		"Ada Lovelace", "Platform Engineer", "Builds reliable systems.",
 		"London", "https://linkedin.com/in/ada", "https://github.com/ada", "https://ada.dev",
 		"Email: set", "Phone: not set", "Street address: set",
-		"Ada Lovelace — Resume", "Parse status: parsed", "cv.pdf",
+		"Ada Lovelace — Resume", "Parse status:", "cv.pdf",
+		`class="profile-resume-status profile-resume-status-parsed">parsed`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("profile HTML missing %q\n%s", want, html)
@@ -48,6 +49,15 @@ func TestProfileRendersFieldsAndPresenceFlags(t *testing.T) {
 	// Encrypted contact values must never be rendered, only presence flags.
 	if strings.Contains(html, "@") {
 		t.Errorf("profile HTML leaked an email-shaped value:\n%s", html)
+	}
+}
+
+func TestResumeStatusClass(t *testing.T) {
+	if got := resumeStatusClass("parsed"); got != "profile-resume-status-parsed" {
+		t.Errorf("resumeStatusClass(parsed) = %q, want profile-resume-status-parsed", got)
+	}
+	if got := resumeStatusClass("pending"); got != "profile-resume-status-pending" {
+		t.Errorf("resumeStatusClass(pending) = %q, want profile-resume-status-pending", got)
 	}
 }
 

@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/maxence-charriere/go-app/v10/pkg/app"
 )
 
 // mockPusher is a test double for the browser Push API abstraction. It records
@@ -213,5 +215,22 @@ func TestPushToggleSupportedRendersEnableAndDoesNotSubscribe(t *testing.T) {
 	// Rendering/mount must never auto-subscribe: no VAPID fetch, no persist.
 	if c.subscribed.Endpoint != "" {
 		t.Errorf("push toggle auto-subscribed on render: %+v", c.subscribed)
+	}
+}
+
+func TestPushToggleOnStateShowsStatusAndDisable(t *testing.T) {
+	// PushToggle.start()/refresh() runs on OnMount/OnPreRender and would
+	// overwrite a hand-set "on" state via the mock pusher's CurrentEndpoint,
+	// so drive the pure renderer directly to assert the "on" status markup.
+	toggle := &PushToggle{state: pushOn, endpoint: "https://push.example/abc"}
+	ui := renderPushControl(toggle)
+	var sb strings.Builder
+	app.PrintHTML(&sb, ui)
+	html := sb.String()
+	if !strings.Contains(html, `class="push-toggle-status push-toggle-status-on">On`) {
+		t.Errorf("expected on-status pill, got:\n%s", html)
+	}
+	if !strings.Contains(html, "Turn off notifications") {
+		t.Errorf("expected disable control alongside status, got:\n%s", html)
 	}
 }

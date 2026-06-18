@@ -221,7 +221,11 @@ func renderResume(resume *ResumeSummary) app.UI {
 		}).Else(func() app.UI {
 			return app.Ul().Class("profile-resume-meta").Body(
 				app.Li().Class("profile-resume-title").Text("Title: "+resume.Title),
-				app.Li().Class("profile-resume-status").Text("Parse status: "+resume.ParseStatus),
+				app.Li().Class("profile-resume-status-row").Body(
+					app.Span().Text("Parse status: "),
+					app.Span().Class("profile-resume-status "+resumeStatusClass(resume.ParseStatus)).
+						Text(resume.ParseStatus),
+				),
 				app.Li().Class("profile-resume-file").Text("File: "+resumeFileLabel(resume)),
 			)
 		}),
@@ -236,6 +240,17 @@ func resumeFileLabel(resume *ResumeSummary) string {
 		return "attached"
 	}
 	return "not attached"
+}
+
+// resumeStatusClass maps a resume's parse_status to a quiet status-pill
+// modifier class. "parsed" reads as success; anything else (the "pending"
+// default, or any future value) stays in the neutral/faint treatment rather
+// than reading as an error, since ResumeJsonImporter has no failure path.
+func resumeStatusClass(parseStatus string) string {
+	if parseStatus == "parsed" {
+		return "profile-resume-status-parsed"
+	}
+	return "profile-resume-status-pending"
 }
 
 func saveButtonLabel(s saveState) string {

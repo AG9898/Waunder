@@ -565,3 +565,17 @@ no wrap protection and overflowed the card horizontally at mobile width — fixe
 *static* button/link text (`.job-route-link`, `.job-contacts-link`) with a fake long URL was a
 red herring: those components render fixed labels ("Open application"), never the raw URL, so
 only `.draft-autofill-url` (which renders the URL itself as link text) needed `word-break`.
+
+### 2026-06-18 — PushToggle's OnMount/OnPreRender clobbers a hand-set test state via the mock pusher
+For WEB-12, a render test that constructs `&PushToggle{state: pushOn, ...}` and calls the shared
+`renderHTML` helper does NOT show the "on" markup: `start()` (wired to both `OnMount` and
+`OnPreRender`) unconditionally calls `refresh()`, which re-derives state from
+`t.Pusher.CurrentEndpoint()` — with a zero-value `mockPusher{}` that's `supported: false`, so it
+overwrites the hand-set state to `pushUnsupported` before `Render()` ever runs. To unit-test a
+specific render branch of a component whose `OnMount`/`OnPreRender` re-fetches state, call the
+pure render helper (`renderPushControl(toggle)`) directly and pipe it through `app.PrintHTML`,
+bypassing the engine/lifecycle entirely (mirrors the WEB-03/WEB-04 "render a sub-UI, not the
+whole component" pattern for dodging the OnPreRender reset). Also added a shared quiet
+status-pill idiom (success-soft tint, `--radius-pill`, `--text-xs`) for "fact" indicators next to
+an action control — `.profile-resume-status-{parsed,pending}` and `.push-toggle-status-on` —
+distinct from the existing score/route pill (sage-soft) and error/success message pills.
