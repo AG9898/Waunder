@@ -592,3 +592,12 @@ which never reaches `<textarea>` — so `.manual-entry-text` (pasted posting tex
 same rule applied directly to stay wrap-safe on mobile for an unbroken long token (e.g. a pasted
 URL). When a styling task's CSS/markup diff against the reference comes back empty, check
 non-`p/li/h1/h2/span` text containers (textareas, inputs) before concluding there is nothing to do.
+
+### 2026-06-18 — Railway GitHub auto-deploy needs root-context Dockerfiles
+Connecting the monorepo services to GitHub via `railway service source connect --repo AG9898/Waunder
+--branch main` enables push-triggered deployments, but Railway's GitHub builds used the repo root
+as Docker context even after service `rootDirectory` was set. Do not point GitHub deploys at
+`api/Dockerfile`, `web/Dockerfile`, or `workers/Dockerfile` directly because those Dockerfiles
+assume their service directory is the build context; instead use the root-context files under
+`deploy/` and set each service's `RAILWAY_DOCKERFILE_PATH` to the matching
+`deploy/railway-*.Dockerfile`.

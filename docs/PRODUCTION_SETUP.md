@@ -30,6 +30,17 @@ Production runs in one Railway project with these services:
 | `worker` | Private Playwright worker for approved submit tasks |
 | `Postgres` | Managed PostgreSQL backing Rails data, jobs, cache, and cable |
 
+App services (`api`, `web`, and `worker`) are connected to GitHub source
+`AG9898/Waunder`, branch `main`, with auto-deploy enabled on push. Railway's
+GitHub builder uses the repository root as Docker context for this project, so
+each app service points `RAILWAY_DOCKERFILE_PATH` at a root-context Dockerfile:
+
+| Service | Railway Dockerfile path |
+|---|---|
+| `api` | `deploy/railway-api.Dockerfile` |
+| `web` | `deploy/railway-web.Dockerfile` |
+| `worker` | `deploy/railway-worker.Dockerfile` |
+
 Required production env is documented in [`ENV_VARS.md`](ENV_VARS.md). Key placement:
 
 | Variable | Railway service |
