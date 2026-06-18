@@ -1096,7 +1096,7 @@
       "id": "WEB-11",
       "title": "Polish job detail and draft review visuals",
       "description": "Compare /jobs/:id and /applications/:id against the reference job-detail and draft-review screenshots at mobile and desktop widths. Focus on hairline section rhythm, match/status pills, requirement bullets, route/action links, structured answer cards, autofill preview, and approve-submit status states while preserving explicit submit-only-on-click behavior.",
-      "status": "todo",
+      "status": "done",
       "priority": "low",
       "group_id": "WEB",
       "depends_on": [

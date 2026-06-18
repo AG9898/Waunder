@@ -99,6 +99,11 @@ figures where possible.
   same sunken-well treatment as empty states, with a sage filled `.enable-notifications` button
   matching the primary-button system and a faint `.install-status` line for the post-action
   result.
+- LLM-generated free text (job summaries, alignment/strategy notes, cover letters, structured
+  answer values) can contain long unbroken tokens (e.g. a pasted URL with no spaces) that would
+  otherwise overflow a narrow card. The base reset applies `overflow-wrap: break-word` to
+  `p`/`li`/`h1`/`h2`/`span` as a safe no-op default; raw-URL link text (`.draft-autofill-url`)
+  additionally uses `word-break: break-all` since the text itself is the link.
 
 If a new screen is added, extend the same system: one centered column, a compact title,
 hairline sections, one primary action where possible, and no decorative background imagery.

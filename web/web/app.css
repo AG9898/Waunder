@@ -115,6 +115,14 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* LLM-generated copy (job summaries, alignment/strategy notes, cover letters,
+   structured answer values) is free text and may contain long unbroken tokens
+   (e.g. a pasted URL with no spaces). Apply overflow-wrap everywhere as a safe
+   no-op default so that copy wraps inside its container at mobile widths
+   instead of overflowing the page — explicit raw-URL fields additionally use
+   word-break: break-all where the text itself is the link. */
+p, li, h1, h2, span { overflow-wrap: break-word; }
+
 a { color: var(--color-accent); text-decoration: none; }
 a:hover { color: var(--color-accent-strong); }
 

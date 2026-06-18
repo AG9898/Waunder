@@ -550,3 +550,18 @@ explicit static route registration needed for new files dropped under `web/web/`
 `main.go` changes. `--font-sans` now lists `"Hanken Grotesk"` first with the system stack retained
 as the fallback for the brief load window / asset-unavailable case, satisfying STYLE_GUIDE.md's
 "self-hosted WOFF2 ... or documented system-font fallback" guidance with both layered together.
+
+### 2026-06-18 — job-detail/draft-review markup already matched reference; CSS had one real gap
+For WEB-11, rendering the reference `screens/job-detail.html`/`draft-review.html` fixtures
+through the *production* `web/web/app.css` (via a local static server + a cached Playwright
+Chromium binary, since the `mcp__playwright__browser_*` tools require a Chrome extension not
+installed in this sandbox — point `chromium.launch({ executablePath, args: ['--no-sandbox'] })`
+at `~/.cache/ms-playwright/chromium-<rev>/chrome-linux64/chrome` directly instead) showed pixel
+parity with the reference screenshots already, since WEB-09/WEB-10 had carried this CSS over
+essentially verbatim. The one real gap found by stress-testing long LLM-generated text (an
+unbroken token with no spaces, e.g. a bare URL) was that `.job-summary`/`.job-alignment` etc. had
+no wrap protection and overflowed the card horizontally at mobile width — fixed with a base-reset
+`overflow-wrap: break-word` on `p,li,h1,h2,span` (see STYLE_GUIDE.md). Stress-testing the literal
+*static* button/link text (`.job-route-link`, `.job-contacts-link`) with a fake long URL was a
+red herring: those components render fixed labels ("Open application"), never the raw URL, so
+only `.draft-autofill-url` (which renders the URL itself as link text) needed `word-break`.
