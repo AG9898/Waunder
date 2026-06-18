@@ -1063,7 +1063,7 @@
       "id": "WEB-10",
       "title": "Polish digest, jobs feed, and login visuals",
       "description": "Compare the routed /, /jobs, and /login screens against the reference digest/jobs/login screenshots at mobile width and a desktop width. Make only CSS or minimal class fixes needed for spacing, row cards, score pills, empty/loading/auth-error states, focus states, and text fit. Do not introduce persistent navigation or new business behavior.",
-      "status": "todo",
+      "status": "done",
       "priority": "low",
       "group_id": "WEB",
       "depends_on": [

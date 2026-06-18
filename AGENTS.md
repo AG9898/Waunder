@@ -520,6 +520,22 @@ items (`.profile-resume-title/-status/-file`) and `.contact-outreach-error` look
 exact-class grep but already inherit from a parent/group selector (`.profile-resume-meta li`,
 the shared error-message selector list) — verify inheritance before adding a redundant rule.
 
+### 2026-06-18 — Digest/jobs/login screens already matched the reference; one real focus-ring gap
+WEB-10's comparison pass found the digest/jobs/login markup and CSS already byte-identical to the
+reference handoff for row rhythm, score pills, mobile/desktop spacing, and the auth-error/empty
+states (verified by proxying the live PWA through a throwaway local mock JSON server via
+`API_INTERNAL_URL` and screenshotting with the `playwright` package already vendored in
+`workers/node_modules`, since the MCP Playwright tool requires a browser extension not present in
+this environment). The one real, reproducible gap: the global `:focus-visible { box-shadow:
+var(--focus-ring); }` rule renders the sage-tinted ring almost invisible against the sage-filled
+primary buttons (e.g. `.login-submit`) because ring and fill share the same hue/lightness family —
+confirm with `getComputedStyle` + a `page.keyboard.press('Tab')` walk, not a same-frame screenshot
+right after `.focus()`, since the box-shadow has a 140ms transition and an immediate screenshot
+under-reports it. Fixed narrowly for `.login-submit:focus-visible` with a two-layer ring (light
+inset + darker sage outer) rather than touching the shared button selector group, since the other
+primary buttons it's grouped with (manual entry, draft submit, profile save, outreach generate,
+push enable) belong to WEB-11/12/13's scope, not WEB-10's files list.
+
 ### 2026-06-18 — Hanken Grotesk self-hosted as one variable-font WOFF2
 WEB-08 self-hosted Hanken Grotesk at `web/web/fonts/hanken-grotesk.woff2` (latin subset) and
 added a single `@font-face { font-weight: 400 700; }` in `web/web/app.css`, because Google Fonts

@@ -923,6 +923,14 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
 }
 .login-status { text-align: center; }
 
+/* The shared sage-soft :focus-visible ring is too low-contrast against the
+   sage-filled primary button itself (.login-submit) to read as a focus
+   indicator. Layer a light inset ring under the sage outer ring so keyboard
+   focus stays visible on this screen's only interactive button. */
+.login-submit:focus-visible {
+  box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-accent-strong);
+}
+
 /* --------------------------------------------------------------------------
    14. Responsive — desktop refinements (mobile-first base above)
    -------------------------------------------------------------------------- */
