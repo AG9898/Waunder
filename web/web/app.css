@@ -12,10 +12,19 @@
      stacked inside cards. No hero sections, no gradient decoration.
    ========================================================================== */
 
-/* No live Google Fonts @import: the PWA app shell is offline-tolerant, so we
-   rely on the documented system-font fallback below instead of a live
-   third-party font dependency. Revisit if Hanken Grotesk is self-hosted as a
-   WOFF2 asset under web/web/ (see docs/STYLE_GUIDE.md, docs/CONVENTIONS.md). */
+/* No live Google Fonts @import: the PWA app shell is offline-tolerant, so
+   Hanken Grotesk is self-hosted as a single variable-font WOFF2 asset under
+   web/web/fonts/ (latin subset, weights 400-700) instead of a live
+   third-party dependency (see docs/STYLE_GUIDE.md, docs/CONVENTIONS.md). The
+   system-sans stack below remains the fallback while the asset loads or if
+   it is unavailable. */
+@font-face {
+  font-family: "Hanken Grotesk";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/web/fonts/hanken-grotesk.woff2") format("woff2");
+}
 
 /* --------------------------------------------------------------------------
    1. Tokens
@@ -46,11 +55,12 @@
   --color-success-ink:   #36513f;
 
   /* Typography
-     "Hanken Grotesk" is the target typeface (docs/STYLE_GUIDE.md), but is not
-     loaded via a live Google Fonts dependency here (offline-tolerant PWA
-     shell). The stack below is the documented system-font fallback; add a
-     self-hosted WOFF2 under web/web/ to enable Hanken Grotesk later. */
-  --font-sans: ui-sans-serif, system-ui, -apple-system,
+     "Hanken Grotesk" is the target typeface (docs/STYLE_GUIDE.md), self-hosted
+     as a WOFF2 under web/web/fonts/ (see @font-face above) rather than loaded
+     via a live Google Fonts dependency (offline-tolerant PWA shell). The
+     remaining stack is the documented system-font fallback for the brief
+     window before the asset loads, or if it is unavailable. */
+  --font-sans: "Hanken Grotesk", ui-sans-serif, system-ui, -apple-system,
                "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --text-xs:   0.75rem;   /* 12 — meta */
   --text-sm:   0.8125rem; /* 13 — labels */

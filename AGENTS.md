@@ -504,3 +504,18 @@ normally happens in `main()` before `RunWhenOnBrowser()`, so a server test that 
 directly (e.g. `httptest.NewServer(newAppHandler())`) must also call `app.Route("/", ...)` itself
 (it's a process-global, idempotent for an already-registered path) before hitting `GET /`, or every
 request 404s and the rendered `<link rel="stylesheet">` markup never appears in the body.
+
+### 2026-06-18 — Hanken Grotesk self-hosted as one variable-font WOFF2
+WEB-08 self-hosted Hanken Grotesk at `web/web/fonts/hanken-grotesk.woff2` (latin subset) and
+added a single `@font-face { font-weight: 400 700; }` in `web/web/app.css`, because Google Fonts
+serves Hanken Grotesk as a **variable font**: requesting the `css2` family endpoint for distinct
+static weights (400/500/600/700) returns the *same* underlying woff2 URL for the latin subset
+for every weight — the file itself encodes the full weight axis, so one file covers all four
+tokens correctly (confirmed via `file` reporting a valid WOFF2/TrueType blob, not a per-weight
+duplicate-name bug). No `Gemfile`/`go.mod`/`package.json` change was needed: go-app's `app.Handler`
+already serves the whole `./web` directory tree under `/web/` by default (no embed directive, no
+explicit static route registration needed for new files dropped under `web/web/`), so
+`web/web/fonts/hanken-grotesk.woff2` is reachable at `/web/fonts/hanken-grotesk.woff2` with zero
+`main.go` changes. `--font-sans` now lists `"Hanken Grotesk"` first with the system stack retained
+as the fallback for the brief load window / asset-unavailable case, satisfying STYLE_GUIDE.md's
+"self-hosted WOFF2 ... or documented system-font fallback" guidance with both layered together.

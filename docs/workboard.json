@@ -999,7 +999,7 @@
       "id": "WEB-08",
       "title": "Make PWA font loading offline-safe",
       "description": "Remove the live Google Fonts dependency from web/web/app.css by either self-hosting Hanken Grotesk WOFF2 assets under web/web/fonts or intentionally using the documented system-font fallback. Preserve the Hanken Grotesk family name when self-hosting, keep the visual tokens intact, and update docs only if the final font strategy differs from STYLE_GUIDE.md.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "WEB",
       "depends_on": [

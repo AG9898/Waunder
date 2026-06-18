@@ -9,7 +9,7 @@ serves the app shell and proxies `/api` to the Rails backend.
 web/
   main.go            # routing + server (app.Handler) + /api reverse proxy
   components/        # go-app UI components
-  web/               # static resources, served under /web/ (app.wasm + app.css live here)
+  web/               # static resources, served under /web/ (app.wasm, app.css, fonts/ live here)
   Dockerfile         # two-target build: WASM frontend + native server
   Makefile           # wasm / server / run helpers
 ```
@@ -35,6 +35,12 @@ Visual styling is plain CSS loaded by `app.Handler.Styles` from `/web/app.css`.
 The canonical frontend style rules live in `../docs/STYLE_GUIDE.md`; the design
 handoff under `../reference/design_handoff_waunder_css/` is reference material,
 not app markup.
+
+Hanken Grotesk is self-hosted as a single variable-font WOFF2 asset at
+`web/fonts/hanken-grotesk.woff2` (latin subset, weights 400-700), referenced
+from `app.css` via `@font-face` and served by go-app's default `/web/` static
+file convention — no live Google Fonts dependency, so the offline-tolerant
+PWA shell does not depend on a third-party font CDN at runtime.
 
 ## Environment
 
