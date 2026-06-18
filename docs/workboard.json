@@ -960,7 +960,7 @@
       "id": "WEB-07",
       "title": "Integrate reference stylesheet into PWA shell",
       "description": "Copy the delivered stylesheet from reference/design_handoff_waunder_css/app.css to web/web/app.css and load it through go-app app.Handler Styles as /web/app.css. Keep the existing go-app components as the markup and behavior source of truth; do not copy static reference HTML or change product behavior. Add or adjust a small server/handler test if needed to prove the stylesheet is registered.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "WEB",
       "depends_on": [

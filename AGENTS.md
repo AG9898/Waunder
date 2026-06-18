@@ -490,3 +490,17 @@ The frontend design handoff lives at `reference/design_handoff_waunder_css/` and
 existing go-app class names. Do not copy the static wrapper HTML into the app; ship styling through
 `web/web/app.css` loaded by `app.Handler.Styles`, and self-host fonts or use system fallbacks for
 the offline-tolerant PWA shell.
+
+### 2026-06-18 — app.Handler.Styles wired; server tests of it need a registered route
+WEB-07 copied `reference/design_handoff_waunder_css/app.css` to `web/web/app.css` and added
+`Styles: []string{"/web/app.css"}` to the `app.Handler` built by a new `newAppHandler()` helper in
+`web/main.go` (extracted from `main()` so it's directly testable). Dropped the reference file's
+live `@import url("https://fonts.googleapis.com/...")` for Hanken Grotesk and its mention in
+`--font-sans` — STYLE_GUIDE.md/CONVENTIONS.md call for a self-hosted WOFF2 or system fallback for
+the offline-tolerant PWA shell, and no WOFF2 asset was added in this pass, so `--font-sans` now
+lists only the system-font fallback stack. Gotcha: `app.Handler.ServeHTTP` 404s on any path unless
+`routes.routed(path)` is true, i.e. an `app.Route(...)` was registered for it — this registration
+normally happens in `main()` before `RunWhenOnBrowser()`, so a server test that builds the handler
+directly (e.g. `httptest.NewServer(newAppHandler())`) must also call `app.Route("/", ...)` itself
+(it's a process-global, idempotent for an already-registered path) before hitting `GET /`, or every
+request 404s and the rendered `<link rel="stylesheet">` markup never appears in the body.

@@ -58,31 +58,14 @@ func main() {
 	// (display: standalone) and the offline app-shell service worker; we only
 	// supply the metadata, icon, and PWA chrome here.
 	//
-	// Static resources (including app.wasm and the icon) are served from the
-	// ./web directory under the /web/ URL prefix (go-app default convention).
+	// Static resources (including app.wasm, app.css, and the icon) are served
+	// from the ./web directory under the /web/ URL prefix (go-app default
+	// convention).
 	//
 	// VAPID_PUBLIC_KEY is the public web-push key. It is public by design and
 	// is forwarded into the PWA env so the client can subscribe; the private
 	// VAPID secret lives only in Rails. No other business logic crosses here.
-	mux.Handle("/", &app.Handler{
-		Name:            "Waunder",
-		ShortName:       "Waunder",
-		Title:           "Waunder",
-		Description:     "Personal job application assistant",
-		Lang:            "en",
-		StartURL:        "/",
-		BackgroundColor: "#2d2c2c",
-		ThemeColor:      "#2d2c2c",
-		Icon: app.Icon{
-			Default:  "/web/icon.svg",
-			Large:    "/web/icon.svg",
-			SVG:      "/web/icon.svg",
-			Maskable: "/web/icon.svg",
-		},
-		Env: map[string]string{
-			"VAPID_PUBLIC_KEY": os.Getenv("VAPID_PUBLIC_KEY"),
-		},
-	})
+	mux.Handle("/", newAppHandler())
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -92,6 +75,33 @@ func main() {
 	log.Printf("listening on :%s", port)
 	if err := http.ListenAndServe(":"+port, mux); err != nil {
 		log.Fatal(err)
+	}
+}
+
+// newAppHandler returns the go-app PWA handler: app shell metadata, icon,
+// and the stylesheet loaded from /web/app.css (the canonical visual system
+// in docs/STYLE_GUIDE.md). The go-app components remain the markup and
+// behavior source of truth; this handler only wires in static chrome.
+func newAppHandler() *app.Handler {
+	return &app.Handler{
+		Name:            "Waunder",
+		ShortName:       "Waunder",
+		Title:           "Waunder",
+		Description:     "Personal job application assistant",
+		Lang:            "en",
+		StartURL:        "/",
+		BackgroundColor: "#2d2c2c",
+		ThemeColor:      "#2d2c2c",
+		Styles:          []string{"/web/app.css"},
+		Icon: app.Icon{
+			Default:  "/web/icon.svg",
+			Large:    "/web/icon.svg",
+			SVG:      "/web/icon.svg",
+			Maskable: "/web/icon.svg",
+		},
+		Env: map[string]string{
+			"VAPID_PUBLIC_KEY": os.Getenv("VAPID_PUBLIC_KEY"),
+		},
 	}
 }
 
