@@ -601,3 +601,9 @@ as Docker context even after service `rootDirectory` was set. Do not point GitHu
 assume their service directory is the build context; instead use the root-context files under
 `deploy/` and set each service's `RAILWAY_DOCKERFILE_PATH` to the matching
 `deploy/railway-*.Dockerfile`.
+
+### 2026-06-18 — Rails passphrase logging needs an explicit filter
+Rails' default-ish `:passw` parameter filter does not match `passphrase`, so `/api/session`
+requests logged the owner passphrase in production until `:passphrase` was added explicitly to
+`api/config/initializers/filter_parameter_logging.rb`. When adding auth-like form keys, verify the
+exact parameter name is filtered before running live login smoke tests.
