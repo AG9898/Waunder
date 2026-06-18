@@ -554,6 +554,18 @@ button { font-family: inherit; }
   resize: vertical;
 }
 
+/* Pasted job postings and generated outreach drafts are free text that can
+   contain a long unbroken token (e.g. a URL with no spaces). The base
+   p/li/h1/h2/span overflow-wrap reset (see above) does not reach <textarea>
+   elements, and a textarea's default wrapping does not guarantee breaking an
+   unbroken token, so set it explicitly here to keep these fields usable at
+   mobile widths. */
+.manual-entry-text,
+.contact-outreach-template,
+.contact-outreach-message {
+  overflow-wrap: break-word;
+}
+
 input::placeholder,
 textarea::placeholder { color: var(--color-ink-faint); }
 

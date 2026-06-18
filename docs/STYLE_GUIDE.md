@@ -103,7 +103,10 @@ figures where possible.
   answer values) can contain long unbroken tokens (e.g. a pasted URL with no spaces) that would
   otherwise overflow a narrow card. The base reset applies `overflow-wrap: break-word` to
   `p`/`li`/`h1`/`h2`/`span` as a safe no-op default; raw-URL link text (`.draft-autofill-url`)
-  additionally uses `word-break: break-all` since the text itself is the link.
+  additionally uses `word-break: break-all` since the text itself is the link. That base reset
+  does not reach `<textarea>` elements, so the pasted-posting and outreach-draft fields
+  (`.manual-entry-text`, `.contact-outreach-template`, `.contact-outreach-message`) set
+  `overflow-wrap: break-word` directly to stay usable at mobile widths.
 - The profile screen's resume parse status (`.profile-resume-status`) and the push toggle's
   subscribed indicator (`.push-toggle-status-on`) reuse the same quiet pill idiom as the
   match-score pill, but tinted success-soft/sunken rather than sage, so "resume parsed" and

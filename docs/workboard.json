@@ -1162,7 +1162,7 @@
       "id": "WEB-13",
       "title": "Polish manual entry and contacts visuals",
       "description": "Compare /jobs/new and /jobs/:id/contacts against the reference manual-entry and contacts screenshots at mobile and desktop widths. Focus on input sizing, textarea behavior, success/error panels, contact cards, outreach draft wells, copy controls, and manual-send-only messaging without adding any send action.",
-      "status": "todo",
+      "status": "done",
       "priority": "low",
       "group_id": "WEB",
       "depends_on": [

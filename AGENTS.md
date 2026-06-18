@@ -579,3 +579,16 @@ whole component" pattern for dodging the OnPreRender reset). Also added a shared
 status-pill idiom (success-soft tint, `--radius-pill`, `--text-xs`) for "fact" indicators next to
 an action control — `.profile-resume-status-{parsed,pending}` and `.push-toggle-status-on` —
 distinct from the existing score/route pill (sage-soft) and error/success message pills.
+
+### 2026-06-18 — Manual entry/contacts CSS was already a pixel-exact reference copy; the real gap was textareas
+WEB-13 found that `web/web/app.css`'s `.manual-entry-*`/`.contact-*`/`.contact-outreach-*` rules
+(input sizing, focus rings, error/success panels, contact cards, outreach draft wells, copy
+button) were already byte-for-byte identical to `reference/design_handoff_waunder_css/app.css`
+for these selectors — WEB-07's wholesale stylesheet copy covered them completely, and the Go
+markup classes in `manual_entry.go`/`contacts.go` already matched the reference HTML 1:1. The one
+real gap: WEB-11's global `overflow-wrap: break-word` reset only targets `p`/`li`/`h1`/`h2`/`span`,
+which never reaches `<textarea>` — so `.manual-entry-text` (pasted posting text) and
+`.contact-outreach-template`/`.contact-outreach-message` (generated outreach drafts) needed the
+same rule applied directly to stay wrap-safe on mobile for an unbroken long token (e.g. a pasted
+URL). When a styling task's CSS/markup diff against the reference comes back empty, check
+non-`p/li/h1/h2/span` text containers (textareas, inputs) before concluding there is nothing to do.
