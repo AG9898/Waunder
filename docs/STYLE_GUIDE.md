@@ -91,6 +91,14 @@ figures where possible.
 - Inputs and textareas use warm surface fill, strong hairline border, 12px radius, and a
   visible sage focus ring.
 - Error and success messages use soft status pills. Loading uses a gentle opacity pulse.
+- Empty feed/list states (`.digest-empty`, `.job-list-empty`, `.contacts-empty`) render as a
+  quiet sunken well with centered faint-ink text — visually distinct from the danger-toned
+  `.load-error` so "nothing here yet" never reads as a failure.
+- The `Home` root (`.app-shell`) is a thin skeleton wrapper, not a routed screen container; it
+  renders `InstallGuide` directly. The install/notification guide (`.install-guide`) uses the
+  same sunken-well treatment as empty states, with a sage filled `.enable-notifications` button
+  matching the primary-button system and a faint `.install-status` line for the post-action
+  result.
 
 If a new screen is added, extend the same system: one centered column, a compact title,
 hairline sections, one primary action where possible, and no decorative background imagery.

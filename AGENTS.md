@@ -505,6 +505,21 @@ directly (e.g. `httptest.NewServer(newAppHandler())`) must also call `app.Route(
 (it's a process-global, idempotent for an already-registered path) before hitting `GET /`, or every
 request 404s and the rendered `<link rel="stylesheet">` markup never appears in the body.
 
+### 2026-06-18 — WEB-09 styling gap audit: diff emitted classes against app.css, don't eyeball screens
+To find every go-app class lacking an intentional style for WEB-09, grep all `.Class("literal")`
+call sites across `web/components/*.go` (covers `app.Foo().Class("x")` and chained
+`.Class("x").` on the next line — both patterns appear) into a sorted unique list, then diff
+against `web/web/app.css` selectors; `class` *variables* passed into shared helpers
+(`requirementList(heading, class string, ...)`, `answerList`, `textField`) are call-site
+literals already covered by the same grep, so no special-casing needed. The only real gaps were
+the three empty-feed states (`.digest-empty`/`.job-list-empty`/`.contacts-empty` — JobList,
+DigestView, ContactsView all render an empty-state `<p>` when their slice is length 0, but no
+rule existed) and the still-reachable `InstallGuide` block (`Home` renders it directly off `/`;
+`.install-guide`/`.enable-notifications`/`.install-status` had zero coverage). Resume-meta list
+items (`.profile-resume-title/-status/-file`) and `.contact-outreach-error` looked "missing" by
+exact-class grep but already inherit from a parent/group selector (`.profile-resume-meta li`,
+the shared error-message selector list) — verify inheritance before adding a redundant rule.
+
 ### 2026-06-18 — Hanken Grotesk self-hosted as one variable-font WOFF2
 WEB-08 self-hosted Hanken Grotesk at `web/web/fonts/hanken-grotesk.woff2` (latin subset) and
 added a single `@font-face { font-weight: 400 700; }` in `web/web/app.css`, because Google Fonts

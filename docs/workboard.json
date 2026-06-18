@@ -1031,7 +1031,7 @@
       "id": "WEB-09",
       "title": "Style current non-reference UI states",
       "description": "Audit the actual go-app classes and states that are not shown in the reference screenshots, including empty feed/digest/contact states, loading, load errors, profile resume metadata, push unsupported/busy/error states, and any still-reachable install-guide UI. Add CSS or narrow class compatibility fixes so those states fit the same warm utilitarian system without changing API calls or mount/render side effects.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "WEB",
       "depends_on": [
