@@ -621,3 +621,22 @@ the fixture matches the provider's *actual* payload shape — a green spec can s
 the provider never sends. End-to-end the Resend switch to `adenguo.com` works: DNS/MX, Resend
 inbound, the web proxy, and Svix signature verification all succeeded; only this body-shape bug
 was dropping the email.
+
+### 2026-06-19 — Solid Queue/Cache/Cable schemas weren't provisioned in prod; in-Puma not enabled
+With the webhook fix in place, the first real inbound `email.received` then 500'd on
+`PG::UndefinedTable: relation "solid_queue_jobs" does not exist`: the `InboundEmail` row saved
+(primary DB) but `ParseInboundEmailJob.perform_later` couldn't enqueue. Root cause: production
+runs four databases (primary/cache/queue/cable), and `db:prepare` only loads a database's schema
+when it *creates* that database — the Solid DBs have empty/absent `migrations_paths`
+(`db/queue_migrate` etc. don't exist), so once they exist-but-empty `db:migrate` is a no-op and
+`db/queue_schema.rb`/`cache_schema.rb`/`cable_schema.rb` never load. Fix: `api/bin/docker-entrypoint`
+now, after `db:prepare`, loads each Solid schema through the *same named connection the app uses*
+(`establish_connection(:queue)` etc., matching `config.solid_queue.connects_to`), guarded on the
+marker table (`solid_queue_jobs`/`solid_cache_entries`/`solid_cable_messages`) so it's idempotent
+and never drops data — and is robust whether the Solid DBs are separate or collapse onto the same
+physical DB. Second gap: jobs still wouldn't *run* because Solid Queue only executes inside Puma
+when `SOLID_QUEUE_IN_PUMA` is set (`config/puma.rb`), and the Railway `worker` service is the
+Node/Playwright submit worker, NOT a Rails job runner — so `SOLID_QUEUE_IN_PUMA=true` is now set on
+the `api` service (in-Puma is the right call for this single-user, no-Redis app). The entrypoint
+guard also broadened to fire when the final arg is `server` (covers the `./bin/thrust ./bin/rails
+server` CMD).

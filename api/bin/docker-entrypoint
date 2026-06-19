@@ -1,8 +1,35 @@
 #!/bin/bash -e
 
-# If running the rails server then create or migrate existing database
-if [ "${@: -2:1}" == "./bin/rails" ] && [ "${@: -1:1}" == "server" ]; then
+# When booting the Rails server, provision the databases. The server CMD is
+# `./bin/thrust ./bin/rails server`, so the final argument is `server`.
+if [ "${@: -1:1}" == "server" ]; then
   ./bin/rails db:prepare
+
+  # db:prepare only loads a database's schema when it CREATES that database. The Solid
+  # Queue/Cache/Cable databases have empty (in fact absent) migrations_paths, so once they
+  # exist db:migrate is a no-op and their *_schema.rb never loads — leaving e.g.
+  # solid_queue_jobs missing and every enqueue raising PG::UndefinedTable. Load each Solid
+  # schema through the same named connection the running app uses (so the tables land exactly
+  # where Active Record looks for them), guarded on its marker table so this is idempotent
+  # across deploys and never drops live data.
+  ./bin/rails runner - <<'RUBY'
+{
+  "queue" => ["solid_queue_jobs",     "db/queue_schema.rb"],
+  "cache" => ["solid_cache_entries",  "db/cache_schema.rb"],
+  "cable" => ["solid_cable_messages", "db/cable_schema.rb"],
+}.each do |name, (marker, schema_file)|
+  ActiveRecord::Base.establish_connection(name.to_sym)
+  if ActiveRecord::Base.connection.table_exists?(marker)
+    puts "[entrypoint] #{name} schema present (#{marker})"
+  else
+    puts "[entrypoint] loading #{name} schema (missing #{marker})"
+    load Rails.root.join(schema_file).to_s
+    puts "[entrypoint] loaded #{name} schema"
+  end
+rescue => e
+  warn "[entrypoint] WARNING: #{name} schema provisioning failed: #{e.class}: #{e.message}"
+end
+RUBY
 fi
 
 exec "${@}"
