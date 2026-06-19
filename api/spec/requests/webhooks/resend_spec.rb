@@ -43,11 +43,10 @@ RSpec.describe "Resend inbound webhook", type: :request do
 
     inbound_email = InboundEmail.last
     expect(inbound_email.provider).to eq("resend")
-    expect(inbound_email.event_id).to eq("evt_123")
+    expect(inbound_email.event_id).to eq("msg_123")
     expect(inbound_email.event_type).to eq("email.received")
     expect(inbound_email.provider_email_id).to eq("email_123")
     expect(inbound_email.raw_payload).to include(
-      "id" => "evt_123",
       "type" => "email.received",
     )
   end
@@ -104,16 +103,17 @@ RSpec.describe "Resend inbound webhook", type: :request do
       params: payload,
       headers: signed_headers(payload).merge("Content-Type" => "application/json")
 
-    expect(logged_lines.join("\n")).to include("event_id=evt_123")
+    expect(logged_lines.join("\n")).to include("event_id=msg_123")
     expect(logged_lines.join("\n")).not_to include("candidate@example.com")
     expect(logged_lines.join("\n")).not_to include("Forwarded job alert body")
   end
 
   private
 
+  # Mirrors Resend's real email.received webhook body: no top-level "id" (the unique
+  # message id arrives in the svix-id header, set to "msg_123" in signed_headers).
   def inbound_payload
     {
-      id: "evt_123",
       type: "email.received",
       data: {
         email_id: "email_123",

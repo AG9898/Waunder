@@ -11,9 +11,15 @@ module Webhooks
       return unauthorized("invalid_signature") unless event
       return unauthorized("unexpected_event") unless event["type"] == "email.received"
 
+      # Resend's email.received payload has no top-level "id"; the unique, retry-stable
+      # identifier is the Svix message id from the svix-id header (guaranteed present once
+      # verify_payload! succeeds). Using it as event_id makes Svix redeliveries idempotent.
+      event_id = request.headers["svix-id"]
+      return unauthorized("missing_message_id") if event_id.blank?
+
       inbound_email = InboundEmail.create!(
         provider: "resend",
-        event_id: event.fetch("id"),
+        event_id: event_id,
         event_type: event.fetch("type"),
         provider_email_id: event.dig("data", "email_id") || event.dig("data", "id"),
         raw_payload: event,

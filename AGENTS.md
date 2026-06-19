@@ -607,3 +607,17 @@ Rails' default-ish `:passw` parameter filter does not match `passphrase`, so `/a
 requests logged the owner passphrase in production until `:passphrase` was added explicitly to
 `api/config/initializers/filter_parameter_logging.rb`. When adding auth-like form keys, verify the
 exact parameter name is filtered before running live login smoke tests.
+
+### 2026-06-19 — Resend email.received has no top-level "id"; use the svix-id header
+A live inbound test (real Resend `email.received`) revealed `Webhooks::ResendController#inbound`
+was rejecting valid payloads with `KeyError` → 400 because it read `event.fetch("id")`, but
+Resend's `email.received` body only has `created_at`/`data`/`type` — there is NO top-level `id`.
+The unique, retry-stable identifier is the **`svix-id` request header** (Svix message id), which
+now feeds `inbound_emails.event_id` (and makes Svix redeliveries idempotent via the
+`[provider, event_id]` unique index). The old request spec passed only because its fixture
+injected a fake top-level `id: "evt_123"`; the spec now mirrors the real body (no top-level `id`)
+and asserts `event_id == svix-id`. When testing a webhook controller against a provider, verify
+the fixture matches the provider's *actual* payload shape — a green spec can still mask a field
+the provider never sends. End-to-end the Resend switch to `adenguo.com` works: DNS/MX, Resend
+inbound, the web proxy, and Svix signature verification all succeeded; only this body-shape bug
+was dropping the email.
