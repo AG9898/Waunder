@@ -675,3 +675,36 @@ a useful cross-check. Verified deterministically against a live forwarded digest
 correct title/company/location/canonical URL, no LLM. Scoring (ScoreJobPostJob → OpenRouter) is
 still a separate step and the free-tier model (`google/gemma-4-31b-it:free`) was 429-rate-limited
 during testing — ingestion now creates the JobPosts regardless.
+
+### 2026-06-22 — OpenRouter free tier collapsed; default model moved off Gemma
+The `google/gemma-4-31b-it:free` default became persistently 429 rate-limited (not transient — it
+failed across the client's full retry/backoff), so every real inbound JobPost scored `failed`. A
+live probe of OpenRouter's `/models` filtered to free (prompt+completion price 0) found most free
+slugs now 404 (moved to paid) or 429; only `openai/gpt-oss-120b:free` (and `gpt-oss-20b:free`) were
+responding. Default is now `openai/gpt-oss-120b:free` (env `OPENROUTER_MODEL` + code `DEFAULT_MODEL`
++ RESOLVED-17). It does NOT honor strict `response_format` json_object (returns the JSON as prose),
+but `OpenrouterClient`'s parse-fallback extracts the first balanced JSON object, so `complete_json`
+still yields a full scoring object — verified end-to-end (match_score 10–85 across 12 real posts).
+`google/gemini-2.5-flash-lite` is the documented cheap *paid* fallback (works cleanly, ~cents/digest)
+if the free tier degrades again. OpenRouter's free tier is volatile — re-probe `/models` when the
+configured free model starts 429-ing rather than assuming a specific slug stays free.
+
+### 2026-06-22 — LinkedIn has a SECOND native digest layout; parser now anchors on the job id
+A real direct (non-forwarded) LinkedIn alert from `jobalerts-noreply@linkedin.com` uses a different
+plain-text template than the forwarded one above: the `email_job_alert_digest_01` layout puts
+`title / company / location` on THREE separate lines (no `Company · Location` middle-dot pair) and
+prefixes the link with `View job: https://…/comm/jobs/view/<id>` (URL not at line start). The
+pair-anchored parser matched the sender but extracted 0 → fell back to the LLM (which got 6/6, so it
+*looked* fine in the JobPost feed but silently burned an LLM call). `InboundEmailParsers::LinkedIn`
+is now re-anchored on the **job-view id** (`/jobs/view/(\d+)`), the only element common to every
+template, with two passes over one token stream: pass 1 = the existing pair-anchored layout
+(unchanged), pass 2 = id-anchored native layout (reads up to 3 text lines preceding each link as
+location/company/title, nearest-first, bounded by the previous block's link so blocks don't bleed).
+The tokenizer now also detects mid-line `View job:` URLs, drops `---` divider rules, drops promo
+lines (`PROMO` regex: "This company is actively hiring", "N school alumni", header lines, "See all
+jobs"), and guards `Company · Location` pairs against `http` so the footer unsubscribe/help line (a
+` · ` separated pair of URLs) isn't mistaken for a posting. Verified against the REAL production
+inbound #6 body: 6/6 deterministic, identical to the LLM result, no LLM call. Lesson: a known-sender
+parser that matches the sender but returns 0 postings routes silently to the LLM — when adding/
+extending a parser, test it against a real captured body of EACH template, not one hand-written
+fixture.

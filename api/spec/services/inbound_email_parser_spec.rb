@@ -90,6 +90,54 @@ RSpec.describe InboundEmailParser do
       expect(second.posting_url).to eq("https://www.linkedin.com/jobs/view/4431317239/")
     end
 
+    it "parses a native LinkedIn digest (title / company / location / View job: URL)" do
+      # Mirrors the email_job_alert_digest_01 template: company and location are
+      # on their own lines (no "Company · Location" pair), the link is prefixed
+      # with "View job: ", blocks are dash-separated, and some carry a promo
+      # line between the location and the link.
+      text = <<~TEXT
+        Your job alert for software engineer in Vancouver
+        New jobs match your preferences.
+
+        AI / ML Engineer
+        BPM LLP
+        Canada
+
+        This company is actively hiring
+        View job: https://www.linkedin.com/comm/jobs/view/4309297029/?trackingId=abc&trk=eml-x
+
+        ---------------------------------------------------------
+
+        Python Developer (Remote)
+        Hire Feed
+        Canada
+        View job: https://www.linkedin.com/comm/jobs/view/4431606257/?trackingId=def&trk=eml-y
+
+        ---------------------------------------------------------
+
+        See all jobs on LinkedIn: https://www.linkedin.com/comm/jobs/search?keywords=software+engineer&originToLandingJobPostings=4309297029,4431606257
+      TEXT
+      email = inbound_email(from: "LinkedIn Job Alerts <jobalerts-noreply@linkedin.com>", text:)
+
+      result = described_class.new(email).call
+
+      expect(result.fallback?).to be(false)
+      expect(result.parser.source_name).to eq("linkedin")
+      expect(result.job_posts.size).to eq(2)
+
+      first = result.job_posts.first
+      expect(first.title).to eq("AI / ML Engineer")
+      expect(first.company.name).to eq("BPM LLP")
+      expect(first.location).to eq("Canada")
+      expect(first.posting_url).to eq("https://www.linkedin.com/jobs/view/4309297029/")
+
+      second = result.job_posts.last
+      expect(second.title).to eq("Python Developer (Remote)")
+      expect(second.company.name).to eq("Hire Feed")
+      expect(second.location).to eq("Canada")
+      expect(second.posting_url).to eq("https://www.linkedin.com/jobs/view/4431606257/")
+    end
+
     it "parses an Indeed alert into normalized JobPost rows" do
       text = <<~TEXT
         Staff Data Engineer - Globex Inc (Austin, TX)
