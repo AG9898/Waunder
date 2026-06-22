@@ -96,6 +96,38 @@ RSpec.describe InboundEmailParser do
       expect { described_class.new(email).call }.not_to change(Company, :count)
       expect(JobPost.last.company).to eq(existing)
     end
+
+    it "matches a forwarded alert via the original sender in the body" do
+      text = <<~TEXT
+        ---------- Forwarded message ---------
+        From: LinkedIn Job Alerts <jobalerts-noreply@linkedin.com>
+
+        Senior Backend Engineer
+        Acme Corp · San Francisco, CA
+        https://www.linkedin.com/jobs/view/3812345678/
+      TEXT
+      # Envelope From is the forwarder, not LinkedIn.
+      email = inbound_email(from: "Aden Guo <aden.guowe@gmail.com>", text:)
+
+      result = described_class.new(email).call
+
+      expect(result.fallback?).to be(false)
+      expect(result.parser.source_name).to eq("linkedin")
+      expect(result.job_posts.size).to eq(1)
+    end
+
+    it "does not duplicate a JobPost when the same posting URL is parsed twice" do
+      text = <<~TEXT
+        Senior Backend Engineer
+        Acme Corp · San Francisco, CA
+        https://www.linkedin.com/jobs/view/3812345678/
+      TEXT
+      first = inbound_email(from: "jobs@linkedin.com", text:)
+      described_class.new(first).call
+
+      second = inbound_email(from: "jobs@linkedin.com", text:)
+      expect { described_class.new(second).call }.not_to change(JobPost, :count)
+    end
   end
 
   describe "LLM fallback" do

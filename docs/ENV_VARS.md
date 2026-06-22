@@ -33,7 +33,8 @@ If any other doc mentions a variable, it should link here rather than restate it
 | `OPENROUTER_API_KEY` | Conditional | none | OpenRouter LLM gateway API key; required for scoring, summaries, and drafts. | `api` runtime (secret) |
 | `OPENROUTER_MODEL` | No | `google/gemma-4-31b-it:free` | Model id used for **all** LLM calls (scoring, summaries, drafts) — single model, no per-task tiers (RESOLVED-17). Free-tier default; configurable to any OpenRouter model id. | `api` runtime |
 | `RESEND_WEBHOOK_SECRET` | Conditional | none | Svix signing secret that validates Resend inbound (`email.received`) webhook signatures at `POST /webhooks/resend/inbound`; required for email ingestion (RESOLVED-13). | `api` runtime (secret) |
-| `RESEND_INBOUND_DOMAIN` | Conditional | none | The Resend-verified receiving domain that forwarded job alerts are sent to (reference/config; e.g. `inbound.example.com`). | `api` runtime |
+| `RESEND_API_KEY` | Conditional | none | Resend account API key used by `ResendInboundClient` to fetch the **body** of a received email (`GET /emails/receiving/{email_id}`). The `email.received` webhook delivers only metadata — no text/html — so without this key `ParseInboundEmailJob` has no body to parse and every alert dead-ends. | `api` runtime (secret) |
+| `RESEND_INBOUND_DOMAIN` | Conditional | none | The Resend-verified receiving domain that forwarded job alerts are sent to (reference/config; e.g. `adenguo.com`). | `api` runtime |
 | `VAPID_PUBLIC_KEY` | Conditional | none | Web Push VAPID public key. **Public by design** — exposed to the browser at `GET /api/push/vapid_public_key`, and also read by the `web` server (when set) to forward into the PWA env so the go-app client can subscribe. | `api` runtime + `web` runtime (forwarded to PWA env) |
 | `VAPID_PRIVATE_KEY` | Conditional | none | Web Push VAPID private key; signs push messages. | `api` runtime (secret) |
 | `VAPID_SUBJECT` | Conditional | none | VAPID contact (`mailto:` address or URL). | `api` runtime |
@@ -103,6 +104,7 @@ There is no staging environment — only Local dev and Production (Railway).
 | `OPENROUTER_API_KEY` | Conditional | Conditional |
 | `OPENROUTER_MODEL` | Optional | Optional |
 | `RESEND_WEBHOOK_SECRET` | Conditional | Conditional |
+| `RESEND_API_KEY` | Conditional | Conditional |
 | `RESEND_INBOUND_DOMAIN` | Conditional | Conditional |
 | `VAPID_PUBLIC_KEY` | Conditional | Conditional |
 | `VAPID_PRIVATE_KEY` | Conditional | Conditional |

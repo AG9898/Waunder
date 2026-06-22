@@ -185,8 +185,13 @@ The full topology and the rationale for the `/api` proxy routing decision live i
    public `web` service domain; `web` forwards that exact path to Rails over the private
    `API_INTERNAL_URL` proxy. The Svix signature (`svix-id`/`svix-timestamp`/`svix-signature`)
    is validated against `RESEND_WEBHOOK_SECRET`.
-3. Rails enqueues background jobs: parse alert → normalize job → resolve application route →
-   LLM score via OpenRouter → generate draft.
+3. Rails stores the webhook event (metadata only — the `email.received` payload carries no body)
+   and enqueues `ParseInboundEmailJob`, which first **hydrates the body** by fetching text/html
+   from Resend's receiving API (`ResendInboundClient` → `GET /emails/receiving/{email_id}`, using
+   `RESEND_API_KEY`), then: parse alert (deterministic known-sender parsers, forward-aware via the
+   in-body `From:` header) → if no postings, LLM fallback extraction (`InboundEmailLlmExtractor`)
+   → normalize each into a `JobPost` (shared `JobPostMaterializer`, deduped by `posting_url`) →
+   resolve application route → enqueue `ScoreJobPostJob` (LLM score via OpenRouter) → generate draft.
 4. A daily web-push digest is sent to subscribed PWA installs. `DailyDigestJob` (scheduled
    via `config/recurring.yml`, `every day at 8am`) builds the payload from recently scored
    JobPosts with `DailyDigestBuilder` and dispatches it with `WebPushDispatcher`, which signs

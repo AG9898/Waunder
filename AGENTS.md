@@ -640,3 +640,23 @@ Node/Playwright submit worker, NOT a Rails job runner — so `SOLID_QUEUE_IN_PUM
 the `api` service (in-Puma is the right call for this single-user, no-Redis app). The entrypoint
 guard also broadened to fire when the final arg is `server` (covers the `./bin/thrust ./bin/rails
 server` CMD).
+
+### 2026-06-22 — Resend webhook delivers no body; fetch it via the receiving API
+The Resend `email.received` webhook payload contains only metadata — `from`/`to`/`subject`/
+`email_id`/`attachments`, NO `text`/`html`. The original code stored `raw_payload: event` and the
+parsers read the body from `data["text"]`/`["html"]`, which are always nil, so EVERY inbound email
+extracted zero postings → flagged `needs_llm_fallback` → and that flag had no consumer, so 0
+JobPosts were ever created from real email. Fixes (INBOUND pipeline): (1) `ResendInboundClient`
+fetches the body via `GET https://api.resend.com/emails/receiving/{email_id}` with `RESEND_API_KEY`
+(stdlib Net::HTTP behind an `http:` seam, `MissingApiKeyError` guard — same shape as
+`OpenrouterClient`); `ParseInboundEmailJob#hydrate_body!` merges it onto `raw_payload["data"]`
+before parsing. (2) `InboundEmailParser#select_parser` is now forward-aware — it matches the
+envelope From AND any `From: ... <addr@domain>` in the forwarded body, because a forwarded/auto-
+forwarded LinkedIn alert arrives with the forwarder's address as the envelope From. (3)
+`InboundEmailLlmExtractor` is the actual `needs_llm_fallback` consumer — it asks the LLM for a
+`{postings:[...]}` JSON list and materializes each (skips gracefully with no `OPENROUTER_API_KEY`,
+idempotent on `llm_parsed`). (4) Both paths persist through the shared `JobPostMaterializer`
+(dedupes by `posting_url`, so job retries / repeat alerts don't duplicate) and `ParseInboundEmailJob`
+now enqueues `ScoreJobPostJob` for every created JobPost — previously inbound-created posts were
+never scored (scoring was only wired into the manual `Api::JobPostsController`). To retrieve any
+inbound body by hand: `resend emails receiving get <email_id>` (CLI), or `... receiving list`.

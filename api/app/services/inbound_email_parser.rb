@@ -40,27 +40,30 @@ class InboundEmailParser
 
   attr_reader :inbound_email
 
+  # Matches a parser against the envelope From first, then any sender found in a
+  # forwarded header inside the body. A LinkedIn/Indeed/Glassdoor alert that the
+  # owner forwards (or that Gmail auto-forwards) arrives with the forwarder's
+  # address as the envelope From, but the original sender survives as a
+  # "From: ... <addr@domain>" line in the quoted body — so deterministic parsing
+  # still applies when the layout matches.
   def select_parser
-    PARSERS.find { |parser| parser.matches?(from_address) }
+    candidate_from_addresses.each do |address|
+      parser = PARSERS.find { |parser| parser.matches?(address) }
+      return parser if parser
+    end
+    nil
+  end
+
+  FORWARDED_FROM = /^\s*From:\s*[^<\n]*<?\s*([A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,})/i
+
+  def candidate_from_addresses
+    addresses = [ from_address ]
+    "#{data['text']}\n#{data['html']}".scan(FORWARDED_FROM).each { |match| addresses << match[0] }
+    addresses.compact_blank.uniq
   end
 
   def persist(postings)
-    postings.map do |posting|
-      company = Company.find_or_create_by!(name: posting[:company])
-      job_post = JobPost.create!(
-        company: company,
-        title: posting[:title],
-        location: posting[:location],
-        posting_url: posting[:posting_url],
-        source_url: posting[:source_url],
-        source: posting[:source],
-        scoring_status: "pending"
-      )
-      # Resolve the application route deterministically right after
-      # normalization so downstream scoring/draft jobs have a recommended route.
-      ApplicationRouteResolver.new(job_post).call
-      job_post
-    end
+    postings.filter_map { |posting| JobPostMaterializer.new(posting).call }
   end
 
   def mark_parsed!(parser_class)

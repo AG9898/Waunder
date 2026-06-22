@@ -12,7 +12,7 @@ Railway variables and local ignored `.env` files.
 |---|---|
 | PWA / owner app | `https://web-production-9b240.up.railway.app` |
 | Resend webhook endpoint | `https://web-production-9b240.up.railway.app/webhooks/resend/inbound` |
-| Job-alert ingestion address | `job-alerts@ubcpsych.com` |
+| Job-alert ingestion address | `job-alerts@adenguo.com` |
 
 Rails (`api`) has no public domain. The public `web` service proxies `/api/*` and
 `/webhooks/resend/inbound` to Rails over Railway private networking via `API_INTERNAL_URL`.
@@ -48,6 +48,7 @@ Required production env is documented in [`ENV_VARS.md`](ENV_VARS.md). Key place
 | `DATABASE_URL` | `api` |
 | `OPENROUTER_API_KEY` | `api` |
 | `RESEND_WEBHOOK_SECRET` | `api` |
+| `RESEND_API_KEY` | `api` |
 | `RESEND_INBOUND_DOMAIN` | `api` |
 | `VAPID_PUBLIC_KEY` | `api` and `web` |
 | `VAPID_PRIVATE_KEY` | `api` |
@@ -66,18 +67,27 @@ Resend is configured with one enabled webhook for `email.received`:
 
 `https://web-production-9b240.up.railway.app/webhooks/resend/inbound`
 
-The receiving domain is `ubcpsych.com`; job alerts should ultimately arrive at:
+The receiving domain is `adenguo.com` (verified, receiving enabled in Resend; `RESEND_INBOUND_DOMAIN=adenguo.com`).
+Resend routes any local-part at the verified domain to the webhook, so job alerts should arrive at:
 
-`job-alerts@ubcpsych.com`
+`job-alerts@adenguo.com`
 
 The owner's readable mailbox can remain `aden.guowe@gmail.com`. Configure job boards one of two
 ways:
 
-1. Send job alerts directly to `job-alerts@ubcpsych.com`.
+1. Send job alerts directly to `job-alerts@adenguo.com`.
 2. Keep job alerts arriving at `aden.guowe@gmail.com` and add Gmail forwarding/filter rules that
-   forward matching job-alert messages to `job-alerts@ubcpsych.com`.
+   forward matching job-alert messages to `job-alerts@adenguo.com`.
 
 Do not forward all personal mail. Use filters scoped to job-alert senders or labels.
+
+**Body retrieval:** Resend's `email.received` webhook payload contains only metadata (from/to/
+subject/`email_id`/attachments) — **not** the message body. `ParseInboundEmailJob` fetches the
+text/html separately via `ResendInboundClient` (`GET /emails/receiving/{email_id}`) using
+`RESEND_API_KEY`, then parses it. Without `RESEND_API_KEY`, parsing has no content and no JobPost
+is ever created. Forwarded alerts (manual or Gmail-filter) are matched by the original sender found
+in the forwarded `From:` line; anything the deterministic parsers can't handle falls back to LLM
+extraction (`InboundEmailLlmExtractor`), and every resulting JobPost is enqueued for scoring.
 
 ---
 

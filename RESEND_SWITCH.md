@@ -6,12 +6,18 @@ added to `docs/INDEX.md`; it is a planning scratchpad for a later task.
 
 Date noted: 2026-06-17
 
+> **DONE (2026-06-19):** The switch was executed. The single verified Resend
+> receiving domain is now `adenguo.com` (verified, receiving enabled), and the
+> live ingestion address is `job-alerts@adenguo.com`. `ubcpsych.com` is no longer
+> in the Resend account. References to `ubcpsych.com` below are retained only as
+> the pre-switch state and as the rollback target.
+
 ## Current Production State
 
 - Waunder uses Resend for inbound job-alert email only.
 - The app sends no outbound email through Resend.
-- Current documented receiving domain: `ubcpsych.com`.
-- Current documented job-alert address: `job-alerts@ubcpsych.com`.
+- Live receiving domain: `adenguo.com` (was `ubcpsych.com` before the switch).
+- Live job-alert address: `job-alerts@adenguo.com` (was `job-alerts@ubcpsych.com`).
 - Public Resend webhook endpoint:
   `https://web-production-9b240.up.railway.app/webhooks/resend/inbound`
 - Rails remains private in production. The public `web` service proxies
