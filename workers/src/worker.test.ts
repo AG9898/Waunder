@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import type { Page } from "playwright";
 import { loadConfig } from "./config.js";
 import {
   fetchApprovedTasks,
@@ -7,6 +8,7 @@ import {
   reportTaskResult,
   runWorkerLoop,
 } from "./worker.js";
+import { registerHandler, unregisterHandler } from "./ats/index.js";
 import type { ApplicationTask, TaskResult } from "./types.js";
 
 const task: ApplicationTask = {
@@ -172,4 +174,49 @@ test("processTask fails safely when no ATS handler is registered", async () => {
   assert.match(result.reason ?? "", /unsupported ATS/);
   assert.deepEqual(result.screenshots, []);
   assert.deepEqual(result.logs, []);
+});
+
+test("processTask reports browser launch failures instead of crashing the loop", async () => {
+  const result = await processTask(task, {
+    createPage: async () => {
+      throw new Error("browser executable is missing");
+    },
+  });
+
+  assert.equal(result.applicationId, "42");
+  assert.equal(result.status, "failed");
+  assert.match(result.reason ?? "", /browser executable is missing/);
+  assert.deepEqual(result.screenshots, []);
+  assert.deepEqual(result.logs, []);
+});
+
+test("processTask reports results even when browser cleanup fails", async () => {
+  const ats = "cleanup_probe" as ApplicationTask["ats"];
+  registerHandler({
+    kind: ats,
+    fill: async () => ({
+      applicationId: "42",
+      status: "submitted",
+      screenshots: [],
+      logs: ["submitted"],
+    }),
+  });
+
+  try {
+    const result = await processTask({ ...task, ats }, {
+      createPage: async () => ({
+        page: { goto: async () => undefined } as unknown as Page,
+        close: async () => {
+          throw new Error("close failed");
+        },
+      }),
+    });
+
+    assert.equal(result.applicationId, "42");
+    assert.equal(result.status, "submitted");
+    assert.deepEqual(result.screenshots, []);
+    assert.deepEqual(result.logs, ["submitted", "browser cleanup failed: close failed"]);
+  } finally {
+    unregisterHandler(ats);
+  }
 });

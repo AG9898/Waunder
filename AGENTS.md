@@ -736,3 +736,12 @@ URL/resume metadata. Keep the PWA submit button disabled until the draft is read
 clear, and remember the Rails dispatcher is still the final safety gate. The submit dispatcher's
 age-sensitive regex must use `\bage\b`; a plain `age` alternative false-positives on fields like
 `programming languages`.
+
+### 2026-06-22 — Playwright image must exactly match the worker package
+Railway worker crashes can come from a Playwright package/image mismatch before the code reaches the
+normal task-report path (`chromium.launch` throws if the browser executable baked into the image is
+for an older package). Pin `workers/package.json` and both worker Dockerfiles to the same Playwright
+version, and keep `processTask` catching page-factory/browser-launch errors so Rails still receives a
+failed worker report instead of the process crash-looping. Do not let `browser.close()` errors escape
+either; cleanup failures should be appended to result logs so the worker can still POST the terminal
+status.

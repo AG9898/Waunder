@@ -118,8 +118,8 @@ Be honest about the current state — most of the suite is still to be written.
 - **workers/** — `src/safety.test.ts`: unit tests for sensitive-field detection
   (`isSensitiveField`) and answer partitioning (`partitionBySensitivity`).
 - **workers/** — `src/worker.test.ts`: unit tests for worker config loading, bearer-auth task
-  fetch/report calls, clean idle when `API_INTERNAL_URL` is unset, one-cycle poll orchestration, and
-  unsupported-ATS safe failure.
+  fetch/report calls, clean idle when `API_INTERNAL_URL` is unset, one-cycle poll orchestration,
+  unsupported-ATS safe failure, browser-launch failure reporting, and cleanup-failure reporting.
 - **workers/** — `src/ats/handlers.test.ts`: Playwright fixture tests for Greenhouse, Lever, and
   Ashby handler registration, approved-answer fill/submit behavior, and required unknown /
   sensitive-field pause behavior.

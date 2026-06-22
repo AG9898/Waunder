@@ -101,20 +101,42 @@ export async function processTask(
   }
 
   const pageFactory = options.createPage ?? (() => createPlaywrightPage(options.headless ?? true));
-  const { page, close } = await pageFactory();
+  let browserPage: { page: Page; close: () => Promise<void> };
 
   try {
-    await page.goto(task.applyUrl, { waitUntil: "domcontentloaded" });
-    return await handler.fill(page, task);
+    browserPage = await pageFactory();
   } catch (error) {
     return {
       ...base,
       status: "failed",
+      reason: error instanceof Error ? error.message : "failed to launch browser",
+    };
+  }
+
+  const { page, close } = browserPage;
+  let result: TaskResult;
+
+  try {
+    await page.goto(task.applyUrl, { waitUntil: "domcontentloaded" });
+    result = await handler.fill(page, task);
+  } catch (error) {
+    result = {
+      ...base,
+      status: "failed",
       reason: error instanceof Error ? error.message : "unknown worker error",
     };
-  } finally {
-    await close();
   }
+
+  try {
+    await close();
+  } catch (error) {
+    result.logs = [
+      ...result.logs,
+      `browser cleanup failed: ${error instanceof Error ? error.message : "unknown close error"}`,
+    ];
+  }
+
+  return result;
 }
 
 export async function runWorkerLoop(config: WorkerConfig, options: WorkerLoopOptions = {}): Promise<void> {

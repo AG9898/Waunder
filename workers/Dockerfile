@@ -2,14 +2,14 @@
 
 # The Playwright base image ships the browsers and OS dependencies the worker
 # needs. Keep the tag in sync with the playwright version in package.json.
-FROM mcr.microsoft.com/playwright:v1.49.0-jammy AS build
+FROM mcr.microsoft.com/playwright:v1.60.0-jammy AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM mcr.microsoft.com/playwright:v1.49.0-jammy
+FROM mcr.microsoft.com/playwright:v1.60.0-jammy
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./
