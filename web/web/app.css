@@ -53,6 +53,9 @@
   --color-success:       #4c6a58;
   --color-success-soft:  #e3ece4;
   --color-success-ink:   #36513f;
+  --color-warning:       #b07d35;
+  --color-warning-soft:  #f5ecd9;
+  --color-warning-ink:   #8a601f;
 
   /* Typography
      "Hanken Grotesk" is the target typeface (docs/STYLE_GUIDE.md), self-hosted
@@ -296,6 +299,9 @@ button { font-family: inherit; }
 .digest-link .job-source {
   grid-column: 1;
   justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   margin-top: 2px;
   padding: 2px 9px;
   border-radius: var(--radius-pill);
@@ -307,21 +313,50 @@ button { font-family: inherit; }
   white-space: nowrap;
 }
 
-/* match-score pill (list context) */
+/* source brand logo / emoji — sits inline before the source label */
+.job-source-logo {
+  width: 1em;
+  height: 1em;
+  display: block;
+  flex: none;
+}
+.job-source-emoji {
+  font-size: 1em;
+  line-height: 1;
+  flex: none;
+}
+
+/* match-score pill (list context) — sits on the title row, inline with it */
 .job-list-link .job-score,
 .digest-link .job-score {
   grid-column: 2;
-  grid-row: 1 / span 2;
+  grid-row: 1;
   justify-self: end;
   align-self: center;
   padding: 5px 11px;
   border-radius: var(--radius-pill);
-  background: var(--color-accent-soft);
-  color: var(--color-accent-ink);
   font-size: var(--text-xs);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+/* color-coded score bands (apply in both list and detail contexts) */
+.job-score--high {
+  background: var(--color-success-soft);
+  color: var(--color-success-ink);
+}
+.job-score--mid {
+  background: var(--color-warning-soft);
+  color: var(--color-warning-ink);
+}
+.job-score--low {
+  background: var(--color-danger-soft);
+  color: var(--color-danger-ink);
+}
+.job-score--pending {
+  background: var(--color-surface-sunken, var(--color-bg));
+  color: var(--color-ink-soft);
 }
 
 /* --------------------------------------------------------------------------
@@ -342,6 +377,11 @@ button { font-family: inherit; }
   font-size: var(--text-sm);
   color: var(--color-ink-soft);
 }
+.job-detail .job-source {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 .job-detail .job-compensation { font-weight: 600; }
 
 .job-detail .job-score {
@@ -350,8 +390,6 @@ button { font-family: inherit; }
   margin: 0 0 var(--space-5);
   padding: 6px 14px;
   border-radius: var(--radius-pill);
-  background: var(--color-accent-soft);
-  color: var(--color-accent-ink);
   font-size: var(--text-sm);
   font-weight: 600;
   font-variant-numeric: tabular-nums;

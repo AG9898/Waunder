@@ -49,11 +49,15 @@ The reference palette is warm paper plus sage, anchored by the existing PWA ink 
 | Sage | `#5e7d6a` | Primary actions and links |
 | Sage strong | `#4c6a58` | Hover/active actions |
 | Sage soft | `#e7ede7` | Score pills and subtle washes |
-| Danger | `#a8533f` / `#f4e3dc` / `#843d2c` | Error states and red-flag bullets |
-| Success | `#4c6a58` / `#e3ece4` / `#36513f` | Success states |
+| Danger | `#a8533f` / `#f4e3dc` / `#843d2c` | Error states, red-flag bullets, low match band |
+| Warning | `#b07d35` / `#f5ecd9` / `#8a601f` | Mid match band |
+| Success | `#4c6a58` / `#e3ece4` / `#36513f` | Success states, high match band |
 
-Do not introduce blue/purple accent systems or color-code match scores. Match scores stay
-quiet in a single sage-soft pill regardless of value.
+Do not introduce blue/purple accent systems. Match-score pills are color-coded by band so the
+score reads at a glance: high (≥75) success-soft/green, mid (50–74) warning-soft/amber, low
+(<50) danger-soft/red, and pending (not yet scored) a neutral sunken pill. The band class
+(`.job-score--high|mid|low|pending`) carries the color in both the feed/digest rows and the job
+detail; the base `.job-score` pill defines only shape and layout.
 
 ---
 
@@ -85,7 +89,13 @@ figures where possible.
   `.profile`, `.manual-entry`, and `.contacts-view` act as centered page containers.
 - There is no persistent nav or tab bar in the current design. Navigation remains in-flow
   through back links and screen-specific links.
-- Feed and digest rows are soft list cards with a score/status pill aligned on the right.
+- Feed and digest rows are soft list cards with a color-coded score pill aligned inline on the
+  title row (right), and an origin pill under the company line.
+- The origin pill leads with the source's official brand logo (LinkedIn/Glassdoor/Indeed),
+  self-hosted as SVGs under `web/web/icons/` (vendored from Simple Icons with the brand color
+  baked into the fill — no live CDN dependency, matching the self-hosted-font policy). Sources
+  without a brand logo (manual entry, generic email alert) use an emoji marker instead. The
+  logo/emoji sits inline before the source label via `flex` + `gap` on the pill.
 - Job detail, draft review, profile, and route sections use top hairlines plus spacing.
 - Primary actions use sage filled buttons; secondary actions use outline/surface buttons.
 - Inputs and textareas use warm surface fill, strong hairline border, 12px radius, and a

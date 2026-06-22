@@ -315,6 +315,75 @@ func TestSourceLabel(t *testing.T) {
 	}
 }
 
+func TestMatchScoreBand(t *testing.T) {
+	cases := []struct {
+		score  *int
+		status string
+		want   string
+	}{
+		{nil, "pending", "pending"},
+		{nil, "skipped", "pending"},
+		{intPtr(90), "scored", "high"},
+		{intPtr(75), "scored", "high"},
+		{intPtr(74), "scored", "mid"},
+		{intPtr(50), "scored", "mid"},
+		{intPtr(49), "scored", "low"},
+		{intPtr(0), "scored", "low"},
+	}
+	for _, tc := range cases {
+		if got := MatchScoreBand(tc.score, tc.status); got != tc.want {
+			t.Errorf("MatchScoreBand(%v,%q) = %q, want %q", tc.score, tc.status, got, tc.want)
+		}
+	}
+}
+
+func TestSourceIconPath(t *testing.T) {
+	cases := map[string]string{
+		"linkedin":    "/web/icons/linkedin.svg",
+		"glassdoor":   "/web/icons/glassdoor.svg",
+		"indeed":      "/web/icons/indeed.svg",
+		"manual":      "",
+		"inbound_llm": "",
+		"":            "",
+	}
+	for source, want := range cases {
+		if got := SourceIconPath(source); got != want {
+			t.Errorf("SourceIconPath(%q) = %q, want %q", source, got, want)
+		}
+	}
+}
+
+func TestSourceEmoji(t *testing.T) {
+	cases := map[string]string{
+		"manual":      "✍️",
+		"inbound_llm": "📧",
+		"inbound":     "📧",
+		"linkedin":    "", // branded sources render a logo, not an emoji
+		"glassdoor":   "",
+		"":            "",
+	}
+	for source, want := range cases {
+		if got := SourceEmoji(source); got != want {
+			t.Errorf("SourceEmoji(%q) = %q, want %q", source, got, want)
+		}
+	}
+}
+
+func TestJobListRendersScoreBandAndSourceLogo(t *testing.T) {
+	c := &JobList{Client: &mockClient{
+		jobs: []JobSummary{
+			{ID: 7, Title: "Staff Engineer", Company: "Acme", Source: "linkedin", MatchScore: intPtr(88), ScoringStatus: "scored"},
+			{ID: 9, Title: "Backend Dev", Company: "Globex", Source: "manual", MatchScore: nil, ScoringStatus: "pending"},
+		},
+	}}
+	html := renderHTML(t, c)
+	for _, want := range []string{"job-score--high", "job-score--pending", "job-source-logo", "/web/icons/linkedin.svg", "✍️"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("job list HTML missing %q\n%s", want, html)
+		}
+	}
+}
+
 func TestJobListRendersSourceOrigin(t *testing.T) {
 	c := &JobList{Client: &mockClient{
 		jobs: []JobSummary{

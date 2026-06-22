@@ -396,6 +396,56 @@ func MatchScoreLabel(score *int, scoringStatus string) string {
 	return fmt.Sprintf("%d%%", *score)
 }
 
+// MatchScoreBand classifies a job's match score into a coarse band used to
+// color-code the score pill: "high" (strong match), "mid" (partial), "low"
+// (weak), and "pending" when the job has no numeric score yet. The thresholds
+// mirror MatchScoreLabel's "not yet scored" handling so a pending job is never
+// colored as a real (low) score.
+func MatchScoreBand(score *int, scoringStatus string) string {
+	if score == nil {
+		return "pending"
+	}
+	switch {
+	case *score >= 75:
+		return "high"
+	case *score >= 50:
+		return "mid"
+	default:
+		return "low"
+	}
+}
+
+// SourceIconPath returns the same-origin path to a job source's official brand
+// logo (self-hosted SVG under /web/icons, vendored from Simple Icons with the
+// brand color baked in). It returns "" for sources without a brand logo (manual
+// entry, generic email alerts) — those fall back to SourceEmoji.
+func SourceIconPath(source string) string {
+	switch source {
+	case "linkedin":
+		return "/web/icons/linkedin.svg"
+	case "glassdoor":
+		return "/web/icons/glassdoor.svg"
+	case "indeed":
+		return "/web/icons/indeed.svg"
+	default:
+		return ""
+	}
+}
+
+// SourceEmoji returns a small emoji for job sources that have no official brand
+// logo (manual entry, generic email alerts). Branded sources return "" because
+// they render their SourceIconPath logo instead.
+func SourceEmoji(source string) string {
+	switch source {
+	case "manual":
+		return "✍️"
+	case "inbound_llm", "inbound":
+		return "📧"
+	default:
+		return ""
+	}
+}
+
 // SourceLabel renders a job's ingestion source as a short human-readable
 // origin tag (e.g. "LinkedIn", "Glassdoor") so the feed shows where each
 // posting came from. Unknown/empty sources fall back to a generic label.

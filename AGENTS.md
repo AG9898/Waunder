@@ -773,3 +773,24 @@ senders stay "inbound_llm". (4) `source` (+ detail `compensation`) is now in the
 read serializers and rendered as an origin tag in the PWA (`SourceLabel` in web/components/client.go,
 `.job-source` styles). NOTE: nothing here changes the apply flow — the user applies LinkedIn/Glassdoor
 manually for now. Pre-existing 6 JobPosts labeled "inbound_llm" (all really LinkedIn) are NOT backfilled.
+
+### 2026-06-22 — Color-coded score pills + self-hosted source brand logos
+Match-score pills are now color-coded by band (`MatchScoreBand` in web/components/client.go →
+`.job-score--high|mid|low|pending` classes): high ≥75 (success-soft), mid 50–74 (new
+`--color-warning*` amber token), low <50 (danger-soft), pending = neutral sunken. The band class
+owns the pill color in BOTH list/digest rows AND the job detail — so the base `.job-list-link
+.job-score`/`.job-detail .job-score` rules had their hardcoded `background`/`color` REMOVED (every
+pill always carries a band class now); leaving them set would have beaten the 0,1,0 band selectors
+via the 0,2,0 `.job-detail .job-score` context rule. In the list grid the score pill moved from
+`grid-row: 1 / span 2` (vertically centered, looked "floating") to `grid-row: 1` so it sits inline
+with the title. This deliberately overrides the old STYLE_GUIDE rule "do not color-code match
+scores" (updated in the same change at the user's request). Source origin pills now lead with the
+official brand logo for LinkedIn/Glassdoor/Indeed, self-hosted as SVGs under `web/web/icons/`
+(vendored from Simple Icons, brand hex baked into the path `fill` — NOT a live CDN, matching the
+self-hosted-WOFF2 font policy; go-app serves `web/web/` under `/web/` so `/web/icons/*.svg` needs
+no main.go route). NOTE: Simple Icons REMOVED `linkedin.svg` from its current set over a trademark
+request — pull it from a pinned older release (used `simple-icons@9.21.0` via jsdelivr); glassdoor/
+indeed are still in `develop`. Non-branded sources (manual ✍️, inbound/email 📧) use an emoji
+marker via `SourceEmoji`; `SourceIconPath` returns "" for them. The shared `sourceIcon(source)`
+helper in jobs.go renders logo-or-emoji-or-nothing and the source pill is `display:flex; gap` so
+the marker sits inline before the label.

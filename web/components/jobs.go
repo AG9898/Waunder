@@ -74,9 +74,14 @@ func (j *JobList) Render() app.UI {
 								app.Span().Class("job-title").Text(job.Title),
 								app.Span().Class("job-company").Text(job.Company),
 								app.If(SourceLabel(job.Source) != "", func() app.UI {
-									return app.Span().Class("job-source").Text(SourceLabel(job.Source))
+									return app.Span().Class("job-source").Body(
+										sourceIcon(job.Source),
+										app.Text(SourceLabel(job.Source)),
+									)
 								}),
-								app.Span().Class("job-score").
+								app.Span().
+									Class("job-score").
+									Class("job-score--"+MatchScoreBand(job.MatchScore, job.ScoringStatus)).
 									Text(MatchScoreLabel(job.MatchScore, job.ScoringStatus)),
 							),
 					)
@@ -216,12 +221,17 @@ func (d *JobDetailView) Render() app.UI {
 				app.H1().Class("job-title").Text(job.Title),
 				app.P().Class("job-company").Text(job.Company),
 				app.If(SourceLabel(job.Source) != "", func() app.UI {
-					return app.P().Class("job-source").Text("Source: "+SourceLabel(job.Source))
+					return app.P().Class("job-source").Body(
+						sourceIcon(job.Source),
+						app.Text("Source: "+SourceLabel(job.Source)),
+					)
 				}),
 				app.If(job.Compensation != "", func() app.UI {
 					return app.P().Class("job-compensation").Text(job.Compensation)
 				}),
-				app.P().Class("job-score").
+				app.P().
+					Class("job-score").
+					Class("job-score--"+MatchScoreBand(job.MatchScore, job.ScoringStatus)).
 					Text("Match: "+MatchScoreLabel(job.MatchScore, job.ScoringStatus)),
 				app.If(job.Summary != "", func() app.UI {
 					return app.P().Class("job-summary").Text(job.Summary)
@@ -417,9 +427,14 @@ func (v *DigestView) Render() app.UI {
 										app.Span().Class("job-title").Text(job.Title),
 										app.Span().Class("job-company").Text(job.Company),
 										app.If(SourceLabel(job.Source) != "", func() app.UI {
-											return app.Span().Class("job-source").Text(SourceLabel(job.Source))
+											return app.Span().Class("job-source").Body(
+												sourceIcon(job.Source),
+												app.Text(SourceLabel(job.Source)),
+											)
 										}),
-										app.Span().Class("job-score").
+										app.Span().
+											Class("job-score").
+											Class("job-score--"+MatchScoreBand(job.MatchScore, job.ScoringStatus)).
 											Text(MatchScoreLabel(job.MatchScore, job.ScoringStatus)),
 									),
 							)
@@ -432,6 +447,23 @@ func (v *DigestView) Render() app.UI {
 }
 
 // --- shared render helpers ---
+
+// sourceIcon renders the origin marker shown before a source label: the
+// official brand logo (self-hosted SVG) for branded sources, an emoji for
+// non-branded ones (manual/email), or nothing when neither applies.
+func sourceIcon(source string) app.UI {
+	if path := SourceIconPath(source); path != "" {
+		return app.Img().
+			Class("job-source-logo").
+			Src(path).
+			Alt(SourceLabel(source)).
+			Attr("loading", "lazy")
+	}
+	if e := SourceEmoji(source); e != "" {
+		return app.Span().Class("job-source-emoji").Text(e)
+	}
+	return app.Text("")
+}
 
 // applyResult updates the shared load state from an async fetch result. On a
 // 401 it leaves an auth-specific error so the caller could route to login.
