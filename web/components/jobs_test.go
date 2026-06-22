@@ -27,6 +27,11 @@ type mockClient struct {
 	digest    Digest
 	digestErr error
 
+	createApp        CreateApplicationResult
+	createAppErr     error
+	gotCreateAppID   int
+	createAppCalls   int
+
 	draft      ApplicationDraft
 	draftErr   error
 	gotDraftID int
@@ -80,6 +85,12 @@ func (m *mockClient) Job(_ context.Context, id int) (JobDetail, error) {
 
 func (m *mockClient) Digest(context.Context) (Digest, error) {
 	return m.digest, m.digestErr
+}
+
+func (m *mockClient) CreateApplication(_ context.Context, jobID int) (CreateApplicationResult, error) {
+	m.gotCreateAppID = jobID
+	m.createAppCalls++
+	return m.createApp, m.createAppErr
 }
 
 func (m *mockClient) ApplicationDraft(_ context.Context, id int) (ApplicationDraft, error) {
@@ -307,6 +318,54 @@ func TestJobDetailFetchesByID(t *testing.T) {
 	renderHTML(t, c)
 	if m.gotID != 42 {
 		t.Errorf("Job called with id %d, want 42", m.gotID)
+	}
+}
+
+func TestJobDetailRendersApplyButton(t *testing.T) {
+	c := &JobDetailView{JobID: 7, Client: &mockClient{job: JobDetail{ID: 7, Title: "X", Company: "Y"}}}
+	html := renderHTML(t, c)
+	for _, want := range []string{"job-apply-button", "Apply"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("job detail HTML missing apply control %q\n%s", want, html)
+		}
+	}
+}
+
+// TestJobDetailNeverAppliesOnRender asserts the apply action is explicit: a full
+// render lifecycle (OnMount/OnPreRender) must never start an application.
+func TestJobDetailNeverAppliesOnRender(t *testing.T) {
+	m := &mockClient{job: JobDetail{ID: 7, Title: "X", Company: "Y"}}
+	c := &JobDetailView{JobID: 7, Client: m}
+	renderHTML(t, c)
+	if m.createAppCalls != 0 {
+		t.Errorf("apply ran on render: createAppCalls = %d, want 0", m.createAppCalls)
+	}
+}
+
+func TestJobDetailApplyHappyPath(t *testing.T) {
+	m := &mockClient{createApp: CreateApplicationResult{ApplicationID: 31, Status: "draft"}}
+	c := &JobDetailView{JobID: 7, Client: m}
+	appID, ok := c.doApply(context.Background())
+	if !ok || appID != 31 {
+		t.Fatalf("doApply = (%d, %v), want (31, true)", appID, ok)
+	}
+	if m.createAppCalls != 1 || m.gotCreateAppID != 7 {
+		t.Errorf("CreateApplication calls=%d jobID=%d, want calls=1 jobID=7", m.createAppCalls, m.gotCreateAppID)
+	}
+	if c.applyState != applyIdle {
+		t.Errorf("applyState = %d, want applyIdle", c.applyState)
+	}
+}
+
+func TestJobDetailApplyError(t *testing.T) {
+	m := &mockClient{createAppErr: &APIError{Status: http.StatusInternalServerError}}
+	c := &JobDetailView{JobID: 7, Client: m}
+	appID, ok := c.doApply(context.Background())
+	if ok || appID != 0 {
+		t.Fatalf("doApply = (%d, %v), want (0, false)", appID, ok)
+	}
+	if c.applyState != applyError || c.applyErr == "" {
+		t.Errorf("expected applyError state with message, got state=%d err=%q", c.applyState, c.applyErr)
 	}
 }
 

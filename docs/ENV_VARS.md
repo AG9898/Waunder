@@ -40,7 +40,7 @@ If any other doc mentions a variable, it should link here rather than restate it
 | `VAPID_SUBJECT` | Conditional | none | VAPID contact (`mailto:` address or URL). | `api` runtime |
 | `WORKER_POLL_INTERVAL_MS` | No | `15000` | Worker poll interval (ms) for fetching approved tasks. | `worker` runtime |
 | `WORKER_HEADLESS` | No | `true` | Run Playwright headless. Set `false` to show the browser locally. | `worker` runtime |
-| `LINKEDIN_EASY_APPLY_ENABLED` | No | `false` | Feature flag gating the higher-risk LinkedIn Easy Apply trusted-submit flow. | `api` + `worker` runtime |
+| `LINKEDIN_EASY_APPLY_ENABLED` | No | `false` | Feature flag gating the higher-risk LinkedIn Easy Apply trusted-submit flow. Set `true` in local `.env` (RESOLVED-19); **production must also set this on the `api` and `worker` services** for LinkedIn auto-submit, otherwise LinkedIn jobs fall back to the manual "Open application" link. | `api` + `worker` runtime |
 | `REDIS_URL` | No (Conditional) | none | Redis connection string. Used only if Sidekiq is introduced later; unused while solid_queue is the job backend. | `api` + `worker` runtime |
 | `SOLID_QUEUE_IN_PUMA` | Conditional (Required in prod) | unset | When set, Puma runs the Solid Queue supervisor in-process (`config/puma.rb`), so the `api` service also processes background jobs (e.g. `ParseInboundEmailJob`). The Railway `worker` service is the Node/Playwright submit worker, **not** a Rails job runner, so without this no process drains the queue. | `api` runtime |
 

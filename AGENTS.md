@@ -708,3 +708,22 @@ inbound #6 body: 6/6 deterministic, identical to the LLM result, no LLM call. Le
 parser that matches the sender but returns 0 postings routes silently to the LLM — when adding/
 extending a parser, test it against a real captured body of EACH template, not one hand-written
 fixture.
+
+### 2026-06-22 — Apply flow front-door + single-click approve+submit were the missing wiring
+The trusted-submit back half (draft generator, `ApplicationSubmitDispatcher`, worker, ATS handlers)
+shipped complete, but NOTHING created an `Application`, enqueued `GenerateApplicationDraftJob`, or set
+`approved`/`approved_at` — so `/applications/:id` was unreachable and the job-detail "Apply" only opened
+the external LinkedIn URL (the `renderRoute` "Open application" link). Wired it end-to-end: `POST
+/api/applications` (`Api::ApplicationsController#create`, `{application: {job_post_id}}`) creates/reuses a
+draft-status Application (idempotent: reuses the latest `draft`/`approved` one, re-enqueues draft gen only
+when `application_draft` is nil) and the new `JobDetailView` Apply button navigates to the review screen.
+Per RESOLVED-19 the submit endpoint is now **single-click approve+submit**: `#submit` marks the app
+`approved`/`approved_at` (unless already `submitted`) before calling the dispatcher — the dispatcher's
+supported-ATS + clean-payload gates remain the real safety boundary, so the controller-side approve is
+safe. This flipped the old "rejects submit without approval ⇒ approval_required" request spec, which now
+asserts a draft submit auto-approves and dispatches. `LINKEDIN_EASY_APPLY_ENABLED` is now `true` in
+`api/.env` to include LinkedIn Easy Apply in trusted submit; **production must set it on the api+worker
+Railway services too** (the dispatcher's `supported_ats` reads it at runtime; specs leave it default-false
+so the greenhouse-only expectations are unaffected). Go side: `RailsClient.CreateApplication` + the
+`do*`/`apply*` handler split (test via `doApply` directly; assert `createAppCalls==0` after a full render to
+prove "never apply on mount").

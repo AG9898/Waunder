@@ -59,6 +59,57 @@ RSpec.describe "Api applications", type: :request do
     app
   end
 
+  describe "POST /api/applications" do
+    def build_job_post
+      company = Company.create!(name: "Acme Corp")
+      job_post = company.job_posts.create!(
+        title: "Senior Backend Engineer",
+        posting_url: "https://boards.greenhouse.io/acme/jobs/1"
+      )
+      job_post
+    end
+
+    it "creates a draft application, enqueues draft generation, and returns 201" do
+      sign_in!
+      job_post = build_job_post
+
+      expect do
+        post "/api/applications", params: { application: { job_post_id: job_post.id } }
+      end.to change(Application, :count).by(1)
+        .and have_enqueued_job(GenerateApplicationDraftJob)
+
+      expect(response).to have_http_status(:created)
+      body = JSON.parse(response.body).fetch("application")
+      expect(body["status"]).to eq("draft")
+      app = Application.find(body["application_id"])
+      expect(app.job_post).to eq(job_post)
+    end
+
+    it "reuses an existing draft application and does not duplicate" do
+      sign_in!
+      job_post = build_job_post
+      existing = Application.create!(job_post: job_post, status: "draft")
+      existing.create_application_draft!(structured_answers: [], autofill_payload: {})
+
+      expect do
+        post "/api/applications", params: { application: { job_post_id: job_post.id } }
+      end.not_to change(Application, :count)
+
+      # Draft already present, so generation is not re-enqueued.
+      expect(enqueued_jobs).to be_empty
+      expect(JSON.parse(response.body).dig("application", "application_id")).to eq(existing.id)
+    end
+
+    it "requires authentication" do
+      job_post = build_job_post
+
+      post "/api/applications", params: { application: { job_post_id: job_post.id } }
+
+      expect(response).to have_http_status(:unauthorized)
+      expect(enqueued_jobs).to be_empty
+    end
+  end
+
   describe "POST /api/applications/:id/submit" do
     it "enqueues worker dispatch, records an audit event, and returns 200 for approved clean payloads" do
       sign_in!
@@ -82,17 +133,21 @@ RSpec.describe "Api applications", type: :request do
       expect(event.metadata["ats"]).to eq("greenhouse")
     end
 
-    it "rejects submit without approval and does not enqueue" do
+    it "approves a draft on submit (single-click) and dispatches for clean supported payloads" do
       sign_in!
       app = build_application(status: "draft", approved_at: nil)
 
       expect do
         post "/api/applications/#{app.id}/submit"
-      end.not_to change(AuditEvent, :count)
+      end.to change(AuditEvent, :count).by(1)
+        .and have_enqueued_job(WorkerDispatchJob)
 
-      expect(response).to have_http_status(:unprocessable_content)
-      expect(JSON.parse(response.body).dig("error", "code")).to eq("approval_required")
-      expect(enqueued_jobs).to be_empty
+      expect(response).to have_http_status(:ok)
+      expect(JSON.parse(response.body)).to include("status" => "dispatched", "ats" => "greenhouse")
+
+      app.reload
+      expect(app.status).to eq("approved")
+      expect(app.approved_at).to be_present
     end
 
     it "rejects unsupported ATS targets and does not enqueue" do

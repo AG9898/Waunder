@@ -496,6 +496,19 @@ button { font-family: inherit; }
   color: var(--color-ink-soft);
 }
 
+/* apply control on the job-detail screen */
+.job-apply {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+.job-apply-note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+}
+
 /* --------------------------------------------------------------------------
    8. Forms — profile & manual entry
    -------------------------------------------------------------------------- */
@@ -739,6 +752,7 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
 .login-submit,
 .manual-entry-submit,
 .draft-submit-button,
+.job-apply-button,
 .profile-save,
 .contact-outreach-generate,
 .push-toggle-enable {
@@ -760,6 +774,7 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
 .login-submit:hover,
 .manual-entry-submit:hover,
 .draft-submit-button:hover,
+.job-apply-button:hover,
 .profile-save:hover,
 .contact-outreach-generate:hover,
 .push-toggle-enable:hover { background: var(--color-accent-strong); }
@@ -767,6 +782,7 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
 .login-submit:active,
 .manual-entry-submit:active,
 .draft-submit-button:active,
+.job-apply-button:active,
 .profile-save:active,
 .contact-outreach-generate:active,
 .push-toggle-enable:active { transform: translateY(1px); }
@@ -800,6 +816,7 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
 .login-submit:disabled,
 .manual-entry-submit:disabled,
 .draft-submit-button:disabled,
+.job-apply-button:disabled,
 .profile-save:disabled,
 .contact-outreach-generate:disabled,
 .push-toggle-busy {
@@ -845,6 +862,7 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
 .profile-save-error,
 .manual-entry-error,
 .draft-submit-error,
+.job-apply-error,
 .contact-outreach-error,
 .push-toggle-error {
   margin: var(--space-3) 0 0;

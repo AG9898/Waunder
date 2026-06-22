@@ -34,6 +34,12 @@ type RailsClient interface {
 	// Digest fetches the daily digest landing payload (GET /api/digest).
 	Digest(ctx context.Context) (Digest, error)
 
+	// CreateApplication starts (or reuses) an application for a job and kicks
+	// off draft generation in Rails (POST /api/applications). It returns the
+	// application id to navigate to its draft-review screen. It never approves
+	// or submits — that stays an explicit later action on the review screen.
+	CreateApplication(ctx context.Context, jobID int) (CreateApplicationResult, error)
+
 	// ApplicationDraft fetches the generated draft for an application
 	// (GET /api/applications/:id). It carries the resume emphasis, cover
 	// letter, structured answers, and worker-shaped autofill preview for
@@ -273,6 +279,14 @@ type AutofillPreview struct {
 	ResumeRef string             `json:"resume_ref"`
 }
 
+// CreateApplicationResult is the outcome of starting an application from a job
+// (POST /api/applications, HTTP 201). It carries the application id to navigate
+// to for draft review; draft generation runs asynchronously in Rails.
+type CreateApplicationResult struct {
+	ApplicationID int    `json:"application_id"`
+	Status        string `json:"status"`
+}
+
 // SubmitResult is the outcome of an approve+submit action. On success Rails
 // dispatches the trusted submit task and reports the resolved ATS; the
 // returned audit status lets the UI surface the submission result.
@@ -354,6 +368,17 @@ func (c *httpRailsClient) Digest(ctx context.Context) (Digest, error) {
 		return Digest{}, err
 	}
 	return out.Digest, nil
+}
+
+func (c *httpRailsClient) CreateApplication(ctx context.Context, jobID int) (CreateApplicationResult, error) {
+	body := map[string]any{"application": map[string]int{"job_post_id": jobID}}
+	var out struct {
+		Application CreateApplicationResult `json:"application"`
+	}
+	if err := c.sendJSON(ctx, http.MethodPost, "/api/applications", body, &out); err != nil {
+		return CreateApplicationResult{}, err
+	}
+	return out.Application, nil
 }
 
 func (c *httpRailsClient) ApplicationDraft(ctx context.Context, id int) (ApplicationDraft, error) {

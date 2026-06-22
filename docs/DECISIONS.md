@@ -325,3 +325,17 @@ What existing code or docs does this affect?>
 **Alternatives rejected:** Upload-and-parse a PDF (original PROFILE-01 scope) — lossy and unnecessary given canonical JSON exists. Pull from a published portfolio URL — requires exposing PII-bearing JSON and a polling/refresh job. Local file import (`../My_Portfolio`) — works only in dev; the portfolio repo is absent in Railway production. Active Storage local disk is ephemeral on Railway, accepted because the portfolio re-pushes the PDF on every export (self-healing); object storage is the durable upgrade if needed later.
 
 **Affects:** `api/` (`ResumeJsonImporter`, `Api::ProfileController`, `Api::ResumeDocumentsController`, Active Storage, routes), the external `My_Portfolio` repo (`scripts/sync-resume.js`, `sync:resume`/`publish:resume` npm scripts, its own `ENV_VARS.md`/`ARCHITECTURE.md`), [`ARCHITECTURE.md`](ARCHITECTURE.md), [`CONVENTIONS.md`](CONVENTIONS.md), PROFILE-01/WEB-04 on the workboard. See also RESOLVED-07, RESOLVED-08, RESOLVED-16.
+
+---
+
+### RESOLVED-19 — Apply flow is wired front-to-back; submit is a single-click approve+submit
+
+**Resolved:** 2026-06-22
+
+**Decision:** The "apply" pipeline is fully wired: the job-detail screen's **Apply** button calls `POST /api/applications` (`{application: {job_post_id}}`), which creates (or reuses) a draft-status `Application` and enqueues `GenerateApplicationDraftJob`; the PWA then navigates to `/applications/:id` to review the generated draft. The draft-review screen's submit action is a **single-click approve+submit**: `POST /api/applications/:id/submit` marks the application `approved`/`approved_at` (the explicit per-application approval) and then runs `ApplicationSubmitDispatcher`, which still independently re-checks the supported-ATS and clean-payload (no unresolved/sensitive fields) gates before dispatching to the worker. LinkedIn Easy Apply is included in trusted auto-submit (`LINKEDIN_EASY_APPLY_ENABLED=true`); all unsupported routes remain manual via the external "Open application" link.
+
+**Why:** The back half of the pipeline (draft generation, dispatcher, worker, ATS handlers) was already built, but nothing created an `Application`, enqueued draft generation, or set `approved` — so the flow was unreachable and "Apply" only opened the external URL. A single-click approve+submit keeps approval explicit and per-application (the click *is* the approval) while removing a redundant second tap; the dispatcher's gates remain the real safety boundary regardless of how approval is recorded. This upholds RESOLVED-12 (explicit per-application approval) without a separate approve step.
+
+**Alternatives rejected:** A distinct two-step approve-then-submit UI — more taps for no added safety, since the dispatcher re-validates the ATS/payload at dispatch time and the submit click is itself the explicit approval. Auto-creating an `Application` at scoring/ingest time — would spawn drafts and LLM spend for jobs the user never intends to apply to.
+
+**Affects:** `api/` (`Api::ApplicationsController#create`/`#submit`, routes), `web/` (`components.JobDetailView` Apply button, `RailsClient.CreateApplication`), `LINKEDIN_EASY_APPLY_ENABLED` in [`ENV_VARS.md`](ENV_VARS.md), [`ARCHITECTURE.md`](ARCHITECTURE.md), [`PRD.md`](PRD.md). See also RESOLVED-12, RESOLVED-15.

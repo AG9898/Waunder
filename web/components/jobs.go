@@ -1,6 +1,7 @@
 package components
 
 import (
+	"context"
 	"strconv"
 
 	"github.com/maxence-charriere/go-app/v10/pkg/app"
@@ -95,7 +96,21 @@ type JobDetailView struct {
 	state loadState
 	job   JobDetail
 	err   string
+
+	applyState applyStatus
+	applyErr   string
 }
+
+// applyStatus tracks the explicit "start application" action, separate from the
+// job fetch (loadState). It never fires on mount: it advances out of applyIdle
+// only on an explicit user click of the apply button.
+type applyStatus int
+
+const (
+	applyIdle applyStatus = iota
+	applyCreating
+	applyError
+)
 
 func (d *JobDetailView) OnMount(ctx app.Context)     { d.start(ctx) }
 func (d *JobDetailView) OnPreRender(ctx app.Context) { d.start(ctx) }
@@ -132,6 +147,59 @@ func (d *JobDetailView) load(ctx app.Context) {
 	})
 }
 
+// apply is the explicit user action that starts an application for this job: it
+// asks Rails to create (or reuse) an Application and generate a draft, then
+// navigates to the draft-review screen where the user approves and submits. It
+// runs only on an explicit click — the screen never starts an application on
+// mount or render.
+func (d *JobDetailView) apply(ctx app.Context, _ app.Event) {
+	if d.applyState == applyCreating {
+		return
+	}
+	d.applyState = applyCreating
+	d.applyErr = ""
+	ctx.Update()
+	reqCtx := ctx.Context
+	id := d.JobID
+	ctx.Async(func() {
+		res, err := d.Client.CreateApplication(reqCtx, id)
+		ctx.Dispatch(func(ctx app.Context) {
+			if appID, ok := d.applyCreateResult(res, err); ok {
+				ctx.Navigate("/applications/" + strconv.Itoa(appID))
+				return
+			}
+			ctx.Update()
+		})
+	})
+}
+
+// doApply performs the create-application call and applies the result
+// synchronously. It is the body invoked inside the async click handler; tests
+// drive it directly to exercise the path without the go-app engine.
+func (d *JobDetailView) doApply(ctx context.Context) (int, bool) {
+	d.applyState = applyCreating
+	res, err := d.Client.CreateApplication(ctx, d.JobID)
+	return d.applyCreateResult(res, err)
+}
+
+// applyCreateResult records the outcome of an apply attempt. It returns the new
+// application id and ok=true when the caller should navigate to the review
+// screen. Split out from the app.Context plumbing so the state transition is
+// unit-testable without the go-app engine.
+func (d *JobDetailView) applyCreateResult(res CreateApplicationResult, err error) (int, bool) {
+	if err != nil {
+		d.applyState = applyError
+		if IsUnauthorized(err) {
+			d.applyErr = sessionExpiredMessage
+		} else {
+			d.applyErr = "Could not start the application. Please try again."
+		}
+		return 0, false
+	}
+	d.applyState = applyIdle
+	return res.ApplicationID, true
+}
+
 func (d *JobDetailView) Render() app.UI {
 	return app.Div().Class("job-detail").Body(
 		app.A().Class("job-detail-back").Href("/jobs").Text("← Jobs"),
@@ -155,6 +223,7 @@ func (d *JobDetailView) Render() app.UI {
 					return app.P().Class("job-strategy").Text(job.ApplicationStrategy)
 				}),
 				renderRoute(job.Route),
+				d.renderApply(),
 				app.A().
 					Class("job-contacts-link").
 					Href("/jobs/"+strconv.Itoa(job.ID)+"/contacts").
@@ -162,6 +231,32 @@ func (d *JobDetailView) Render() app.UI {
 			)
 		}),
 	)
+}
+
+// renderApply shows the explicit "start application" control: it prepares a
+// tailored draft (and, for supported ATS targets, the trusted auto-submit
+// payload) for review before the user approves and submits on the next screen.
+// The button is the only path that starts an application.
+func (d *JobDetailView) renderApply() app.UI {
+	return app.Div().Class("job-apply").Body(
+		app.Button().
+			Class("job-apply-button").
+			Disabled(d.applyState == applyCreating).
+			OnClick(d.apply).
+			Text(applyButtonLabel(d.applyState)),
+		app.P().Class("job-apply-note").
+			Text("Generates a tailored draft to review before you approve and submit."),
+		app.If(d.applyState == applyError, func() app.UI {
+			return app.P().Class("job-apply-error").Text(d.applyErr)
+		}),
+	)
+}
+
+func applyButtonLabel(s applyStatus) string {
+	if s == applyCreating {
+		return "Preparing…"
+	}
+	return "Apply"
 }
 
 // Digest renders the daily digest landing: the date and the scored jobs

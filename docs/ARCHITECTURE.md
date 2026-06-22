@@ -106,7 +106,16 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   `POST /api/applications/:id/submit` (already served; returns `{status: "dispatched", ...}` or
   an error). The submit is fired only on an explicit user click — never on mount/render — which
   upholds the per-application approval rule; the dispatched ATS from the submit response is
-  surfaced as the audit result. Rails now serves `GET /api/applications/:id`:
+  surfaced as the audit result. The apply flow's front door is `POST /api/applications`
+  (`{application: {job_post_id}}`, served by `Api::ApplicationsController#create`): the job-detail
+  screen's **Apply** button calls it, Rails creates (or reuses) a draft-status `Application` for the
+  job and enqueues `GenerateApplicationDraftJob`, and the PWA navigates to `/applications/:id` to
+  review the generated draft. Per RESOLVED-19 the submit endpoint is a **single-click
+  approve+submit**: it marks the application `approved`/`approved_at` (the user's explicit
+  per-application approval) before invoking `ApplicationSubmitDispatcher`, which still re-checks the
+  supported-ATS and clean-payload (no unresolved/sensitive fields) gates. Trusted auto-submit covers
+  Greenhouse/Lever/Ashby, plus LinkedIn Easy Apply when `LINKEDIN_EASY_APPLY_ENABLED` is true;
+  every other route stays manual via the external "Open application" link. Rails now serves `GET /api/applications/:id`:
   session-guarded, read-only, returning `{application: {application_id, job_title, company,
   status, resume_emphasis_notes, cover_letter, structured_answers, autofill_payload}}` where
   `autofill_payload` is the worker-shaped preview (`ats`, `apply_url`, `answers`, `resume_ref`) the
