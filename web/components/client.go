@@ -46,6 +46,11 @@ type RailsClient interface {
 	// review before the user approves and submits.
 	ApplicationDraft(ctx context.Context, id int) (ApplicationDraft, error)
 
+	// UpdateApplicationDraft persists owner-reviewed edits to the autofill
+	// preview before submit (PATCH /api/applications/:id/draft). Rails keeps
+	// ATS/routing metadata authoritative and updates the answer values.
+	UpdateApplicationDraft(ctx context.Context, id int, autofill AutofillPreview) (ApplicationDraft, error)
+
 	// SubmitApplication explicitly approves and submits an application
 	// (POST /api/applications/:id/submit). This is only called on an explicit
 	// user action; Rails dispatches the trusted submit task to the worker.
@@ -258,8 +263,12 @@ type ApplicationDraft struct {
 	Status            string             `json:"status"`
 	ResumeEmphasis    string             `json:"resume_emphasis_notes"`
 	CoverLetter       string             `json:"cover_letter"`
+	DraftReady        bool               `json:"draft_ready"`
+	FailureReason     string             `json:"failure_reason"`
 	StructuredAnswers []StructuredAnswer `json:"structured_answers"`
 	Autofill          AutofillPreview    `json:"autofill_payload"`
+	AutofillWarnings  []AutofillWarning  `json:"autofill_warnings"`
+	WorkerReport      *WorkerReport      `json:"worker_report"`
 }
 
 // StructuredAnswer is one reviewed question/answer pair the worker will fill.
@@ -270,13 +279,31 @@ type StructuredAnswer struct {
 
 // AutofillPreview mirrors the worker ApplicationTask payload (workers/src/
 // types.ts): the resolved ATS, the apply URL, and the field answers the
-// worker would submit. It is shown read-only so the user can audit exactly
-// what will be filled before approving.
+// worker would submit. The draft screen lets the user edit answer values and
+// persists those edits before approving.
 type AutofillPreview struct {
 	ATS       string             `json:"ats"`
 	ApplyURL  string             `json:"apply_url"`
 	Answers   []StructuredAnswer `json:"answers"`
 	ResumeRef string             `json:"resume_ref"`
+}
+
+// AutofillWarning marks an answer field Rails will not allow through the
+// trusted-submit gate until the user handles it manually.
+type AutofillWarning struct {
+	Field   string `json:"field"`
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+// WorkerReport is the latest terminal report from the Playwright worker.
+// It lets the draft review stay visible while showing where a real submit
+// paused or failed.
+type WorkerReport struct {
+	Status      string   `json:"status"`
+	Reason      string   `json:"reason"`
+	Logs        []string `json:"logs"`
+	Screenshots []string `json:"screenshots"`
 }
 
 // CreateApplicationResult is the outcome of starting an application from a job
@@ -386,6 +413,23 @@ func (c *httpRailsClient) ApplicationDraft(ctx context.Context, id int) (Applica
 		Application ApplicationDraft `json:"application"`
 	}
 	if err := c.get(ctx, fmt.Sprintf("/api/applications/%d", id), &out); err != nil {
+		return ApplicationDraft{}, err
+	}
+	return out.Application, nil
+}
+
+func (c *httpRailsClient) UpdateApplicationDraft(ctx context.Context, id int, autofill AutofillPreview) (ApplicationDraft, error) {
+	body := map[string]any{
+		"application_draft": map[string]any{
+			"autofill_payload": map[string]any{
+				"answers": autofill.Answers,
+			},
+		},
+	}
+	var out struct {
+		Application ApplicationDraft `json:"application"`
+	}
+	if err := c.sendJSON(ctx, http.MethodPatch, fmt.Sprintf("/api/applications/%d/draft", id), body, &out); err != nil {
 		return ApplicationDraft{}, err
 	}
 	return out.Application, nil
@@ -548,6 +592,40 @@ func IsUnauthorized(err error) bool {
 		return false
 	}
 	return apiErr.Status == http.StatusUnauthorized
+}
+
+func APIErrorCode(err error) string {
+	detail := apiErrorDetail(err)
+	return detail.Code
+}
+
+func APIErrorMessage(err error) string {
+	detail := apiErrorDetail(err)
+	return detail.Message
+}
+
+type apiErrorPayload struct {
+	Error struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
+type apiErrorFields struct {
+	Code    string
+	Message string
+}
+
+func apiErrorDetail(err error) apiErrorFields {
+	var apiErr *APIError
+	if !asAPIError(err, &apiErr) || apiErr.Body == "" {
+		return apiErrorFields{}
+	}
+	var payload apiErrorPayload
+	if json.Unmarshal([]byte(apiErr.Body), &payload) != nil {
+		return apiErrorFields{}
+	}
+	return apiErrorFields{Code: payload.Error.Code, Message: payload.Error.Message}
 }
 
 func asAPIError(err error, target **APIError) bool {

@@ -2,6 +2,7 @@ package components
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -92,6 +93,60 @@ func TestClientJobDecodesFullDetail(t *testing.T) {
 	}
 	if job.ID != 7 || job.Route.RecommendedRoute != "direct_ats" || len(job.RelevantRequirements) != 1 {
 		t.Errorf("unexpected detail decode: %+v", job)
+	}
+}
+
+func TestClientUpdateApplicationDraftSendsAnswers(t *testing.T) {
+	var gotPath string
+	var gotAnswers []StructuredAnswer
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		if r.Method != http.MethodPatch {
+			t.Errorf("method = %s, want PATCH", r.Method)
+		}
+		var body struct {
+			ApplicationDraft struct {
+				AutofillPayload struct {
+					Answers []StructuredAnswer `json:"answers"`
+				} `json:"autofill_payload"`
+			} `json:"application_draft"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		gotAnswers = body.ApplicationDraft.AutofillPayload.Answers
+		_, _ = w.Write([]byte(`{"application":{"application_id":7,"draft_ready":true,"autofill_payload":{"ats":"greenhouse","apply_url":"https://x","answers":[{"field":"full_name","value":"Ada"}]}}}`))
+	}))
+	defer srv.Close()
+
+	c := &httpRailsClient{http: srv.Client(), base: srv.URL}
+	draft, err := c.UpdateApplicationDraft(context.Background(), 7, AutofillPreview{
+		Answers: []StructuredAnswer{{Field: "full_name", Value: "Ada"}},
+	})
+	if err != nil {
+		t.Fatalf("UpdateApplicationDraft: %v", err)
+	}
+	if gotPath != "/api/applications/7/draft" {
+		t.Errorf("path = %q, want /api/applications/7/draft", gotPath)
+	}
+	if len(gotAnswers) != 1 || gotAnswers[0].Value != "Ada" {
+		t.Errorf("answers sent = %+v", gotAnswers)
+	}
+	if !draft.DraftReady || draft.Autofill.ATS != "greenhouse" {
+		t.Errorf("unexpected draft response: %+v", draft)
+	}
+}
+
+func TestAPIErrorCodeParsesRailsErrorShape(t *testing.T) {
+	err := &APIError{
+		Status: http.StatusUnprocessableEntity,
+		Body:   `{"error":{"code":"unsafe_payload","message":"Autofill payload contains sensitive fields"}}`,
+	}
+	if got := APIErrorCode(err); got != "unsafe_payload" {
+		t.Errorf("APIErrorCode = %q", got)
+	}
+	if got := APIErrorMessage(err); got != "Autofill payload contains sensitive fields" {
+		t.Errorf("APIErrorMessage = %q", got)
 	}
 }
 

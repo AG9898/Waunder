@@ -176,6 +176,18 @@ RSpec.describe "Api applications", type: :request do
       expect(enqueued_jobs).to be_empty
     end
 
+    it "does not treat programming languages as an age-sensitive field" do
+      sign_in!
+      app = build_application(answers: [ { "field" => "programming languages", "value" => "Ruby, Go" } ])
+
+      expect do
+        post "/api/applications/#{app.id}/submit"
+      end.to change(AuditEvent, :count).by(1)
+        .and have_enqueued_job(WorkerDispatchJob)
+
+      expect(response).to have_http_status(:ok)
+    end
+
     it "requires authentication" do
       app = build_application
 
@@ -246,6 +258,94 @@ RSpec.describe "Api applications", type: :request do
       app = build_application
 
       get "/api/applications/#{app.id}"
+
+      expect(response).to have_http_status(:unauthorized)
+    end
+  end
+
+  describe "PATCH /api/applications/:id/draft" do
+    it "persists reviewed autofill answers and returns the refreshed preview" do
+      sign_in!
+      app = build_application(status: "draft", approved_at: nil)
+
+      patch "/api/applications/#{app.id}/draft", params: {
+        application_draft: {
+          autofill_payload: {
+            answers: [
+              { field: "full_name", value: "Aden Guo" },
+              { field: "programming languages", value: "Ruby, Go, TypeScript" }
+            ]
+          }
+        }
+      }
+
+      expect(response).to have_http_status(:ok)
+      body = JSON.parse(response.body).fetch("application")
+      expect(body["autofill_payload"]["answers"]).to eq(
+        [
+          { "field" => "full_name", "value" => "Aden Guo" },
+          { "field" => "programming languages", "value" => "Ruby, Go, TypeScript" }
+        ]
+      )
+      expect(body["autofill_payload"]).to include(
+        "ats" => "greenhouse",
+        "apply_url" => "https://boards.greenhouse.io/acme/jobs/1",
+        "resume_ref" => "resume-doc-1"
+      )
+      expect(body["autofill_warnings"]).to eq([])
+    end
+
+    it "returns safety warnings for fields that still require manual review" do
+      sign_in!
+      app = build_application(status: "draft", approved_at: nil)
+
+      patch "/api/applications/#{app.id}/draft", params: {
+        application_draft: {
+          autofill_payload: {
+            answers: [ { field: "salary expectation", value: "Open" } ]
+          }
+        }
+      }
+
+      expect(response).to have_http_status(:ok)
+      warning = JSON.parse(response.body).dig("application", "autofill_warnings").sole
+      expect(warning).to include(
+        "field" => "salary expectation",
+        "code" => "sensitive_field"
+      )
+    end
+
+    it "rejects malformed answer payloads" do
+      sign_in!
+      app = build_application(status: "draft", approved_at: nil)
+
+      patch "/api/applications/#{app.id}/draft", params: {
+        application_draft: { autofill_payload: { answers: "not-array" } }
+      }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(JSON.parse(response.body).dig("error", "code")).to eq("invalid_payload")
+    end
+
+    it "requires an existing draft" do
+      sign_in!
+      app = build_application(status: "draft", approved_at: nil)
+      app.application_draft.destroy!
+
+      patch "/api/applications/#{app.id}/draft", params: {
+        application_draft: { autofill_payload: { answers: [] } }
+      }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(JSON.parse(response.body).dig("error", "code")).to eq("draft_required")
+    end
+
+    it "requires authentication" do
+      app = build_application(status: "draft", approved_at: nil)
+
+      patch "/api/applications/#{app.id}/draft", params: {
+        application_draft: { autofill_payload: { answers: [] } }
+      }
 
       expect(response).to have_http_status(:unauthorized)
     end

@@ -21,7 +21,7 @@ class ApplicationSubmitDispatcher
     /gender|sex|race|ethnic|hispanic|latino/i,
     /sexual\s*orientation/i,
     /ssn|social\s*security|national\s*id/i,
-    /date\s*of\s*birth|dob|age/i
+    /date\s*of\s*birth|dob|\bage\b/i
   ].freeze
 
   UNRESOLVED_FIELD_PATTERNS = [
@@ -33,6 +33,23 @@ class ApplicationSubmitDispatcher
 
   Result = Struct.new(:ok, :code, :message, :payload, keyword_init: true) do
     def ok? = ok
+  end
+
+  def self.safety_warnings(payload)
+    return [] unless payload.is_a?(Hash)
+
+    Array(payload.deep_stringify_keys["answers"]).filter_map do |answer|
+      next unless answer.is_a?(Hash)
+
+      field = answer.deep_stringify_keys["field"].to_s.strip
+      next if field.blank?
+
+      if UNRESOLVED_FIELD_PATTERNS.any? { |pattern| pattern.match?(field) }
+        { "field" => field, "code" => "unresolved_field", "message" => "Needs manual review" }
+      elsif SENSITIVE_FIELD_PATTERNS.any? { |pattern| pattern.match?(field) }
+        { "field" => field, "code" => "sensitive_field", "message" => "Needs manual review" }
+      end
+    end
   end
 
   def initialize(application)

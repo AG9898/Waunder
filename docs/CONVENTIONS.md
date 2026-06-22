@@ -174,6 +174,12 @@ dispatch.
   configured it skips gracefully (no draft created, no raise); on an `OpenrouterClient::Error` it
   returns a `failed` result without creating a draft. It never logs prompt/completion contents or
   Profile/ResumeDocument PII.
+- The draft-review API exposes the worker payload as a review/edit surface, not as hidden state.
+  `GET /api/applications/:id` returns `draft_ready`, `autofill_warnings`, `failure_reason`, and
+  latest worker report context alongside the `autofill_payload`; `PATCH
+  /api/applications/:id/draft` may update only reviewed `answers`, preserving Rails-owned
+  ATS/routing/resume metadata. The PWA must keep submit disabled until the draft is ready and
+  warnings are clear, and should persist dirty preview edits before submit.
 - Contact candidates are persisted as `ContactCandidate` records linked directly to a `JobPost`;
   each record must include the reason the contact is relevant. Outreach text is persisted as
   `OutreachDraft` records linked to a contact candidate, with the loose source template and final

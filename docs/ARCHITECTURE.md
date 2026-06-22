@@ -101,11 +101,14 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   `application_url`); the digest reuses `DailyDigestBuilder#posts` for the recently scored,
   top-ranked set. None of these reads ever trigger scoring or the LLM, and an unknown id returns
   the standard `{error: {code: "not_found", ...}}` shape. The draft review screen additionally
-  expects `GET /api/applications/:id` (the generated `ApplicationDraft`: `resume_emphasis_notes`,
-  `cover_letter`, `structured_answers`, worker-shaped `autofill_payload`) and submits via
+  reads `GET /api/applications/:id` (the generated `ApplicationDraft`: `resume_emphasis_notes`,
+  `cover_letter`, `structured_answers`, worker-shaped editable `autofill_payload`,
+  `draft_ready`, `autofill_warnings`, and latest worker failure context) and can persist reviewed
+  autofill answer edits via `PATCH /api/applications/:id/draft` before submit. It submits via
   `POST /api/applications/:id/submit` (already served; returns `{status: "dispatched", ...}` or
-  an error). The submit is fired only on an explicit user click — never on mount/render — which
-  upholds the per-application approval rule; the dispatched ATS from the submit response is
+  an error). The submit is fired only on an explicit user click — never on mount/render — and is
+  disabled until a draft/autofill payload is ready and Rails reports no manual-review warnings,
+  which upholds the per-application approval rule; the dispatched ATS from the submit response is
   surfaced as the audit result. The apply flow's front door is `POST /api/applications`
   (`{application: {job_post_id}}`, served by `Api::ApplicationsController#create`): the job-detail
   screen's **Apply** button calls it, Rails creates (or reuses) a draft-status `Application` for the
@@ -117,10 +120,12 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   Greenhouse/Lever/Ashby, plus LinkedIn Easy Apply when `LINKEDIN_EASY_APPLY_ENABLED` is true;
   every other route stays manual via the external "Open application" link. Rails now serves `GET /api/applications/:id`:
   session-guarded, read-only, returning `{application: {application_id, job_title, company,
-  status, resume_emphasis_notes, cover_letter, structured_answers, autofill_payload}}` where
-  `autofill_payload` is the worker-shaped preview (`ats`, `apply_url`, `answers`, `resume_ref`) the
-  draft generator already built (it omits sensitive questions by construction). The read never
-  generates a draft, calls the LLM, or submits, and an unknown id returns the standard
+  status, resume_emphasis_notes, cover_letter, draft_ready, failure_reason, structured_answers,
+  autofill_payload, autofill_warnings, worker_report}}` where `autofill_payload` is the
+  worker-shaped preview (`ats`, `apply_url`, `answers`, `resume_ref`) the draft generator already
+  built. `PATCH /api/applications/:id/draft` updates only the reviewed `answers` list, preserving
+  Rails-owned ATS/routing/resume metadata. The read never generates a draft, calls the LLM, or
+  submits, and an unknown id returns the standard
   `{error: {code: "not_found", ...}}` shape. The profile screen
   reads/writes `GET /api/profile` and `PATCH /api/profile` (WEB-04, both served by PROFILE-01):
   the read exposes the editable text/URL fields plus contact `*_present` presence flags and a
@@ -240,7 +245,8 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 
 **Trusted submit**:
 1. User reviews and approves a prepared application in the PWA.
-2. Browser POSTs `POST /api/applications/:id/submit` (through the proxy) to Rails.
+2. Browser may PATCH reviewed autofill answer edits to `PATCH /api/applications/:id/draft`, then
+   POSTs `POST /api/applications/:id/submit` (through the proxy) to Rails.
 3. Rails verifies the application has explicit approval (`status: approved` plus
    `approved_at`), the draft has a supported ATS payload, and the payload contains no blank,
    unresolved, or sensitive fields requiring manual review.

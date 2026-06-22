@@ -27,14 +27,20 @@ type mockClient struct {
 	digest    Digest
 	digestErr error
 
-	createApp        CreateApplicationResult
-	createAppErr     error
-	gotCreateAppID   int
-	createAppCalls   int
+	createApp      CreateApplicationResult
+	createAppErr   error
+	gotCreateAppID int
+	createAppCalls int
 
 	draft      ApplicationDraft
 	draftErr   error
 	gotDraftID int
+
+	updateDraft      ApplicationDraft
+	updateDraftErr   error
+	gotUpdateDraftID int
+	updatedAutofill  AutofillPreview
+	updateDraftCalls int
 
 	submitResult SubmitResult
 	submitErr    error
@@ -96,6 +102,22 @@ func (m *mockClient) CreateApplication(_ context.Context, jobID int) (CreateAppl
 func (m *mockClient) ApplicationDraft(_ context.Context, id int) (ApplicationDraft, error) {
 	m.gotDraftID = id
 	return m.draft, m.draftErr
+}
+
+func (m *mockClient) UpdateApplicationDraft(_ context.Context, id int, autofill AutofillPreview) (ApplicationDraft, error) {
+	m.gotUpdateDraftID = id
+	m.updatedAutofill = autofill
+	m.updateDraftCalls++
+	if m.updateDraftErr != nil {
+		return ApplicationDraft{}, m.updateDraftErr
+	}
+	if m.updateDraft.ApplicationID != 0 {
+		return m.updateDraft, nil
+	}
+	draft := m.draft
+	draft.Autofill = autofill
+	draft.DraftReady = autofillReady(autofill)
+	return draft, nil
 }
 
 func (m *mockClient) SubmitApplication(_ context.Context, id int) (SubmitResult, error) {

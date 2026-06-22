@@ -18,6 +18,7 @@ func sampleDraft() ApplicationDraft {
 		Status:         "draft",
 		ResumeEmphasis: "Lead with the payments platform work.",
 		CoverLetter:    "Dear hiring team, I am excited to apply.",
+		DraftReady:     true,
 		StructuredAnswers: []StructuredAnswer{
 			{Field: "Why this role?", Value: "Deep backend fit."},
 		},
@@ -44,6 +45,7 @@ func TestDraftReviewRendersFields(t *testing.T) {
 		"Autofill preview", "ATS: greenhouse",
 		"https://boards.greenhouse.io/acme/jobs/7",
 		"first_name", "Ada",
+		"Preview saved",
 		"Approve and submit",
 	} {
 		if !strings.Contains(html, want) {
@@ -89,7 +91,7 @@ func TestDraftReviewApproveAndSubmit(t *testing.T) {
 		draft:        sampleDraft(),
 		submitResult: SubmitResult{Status: "dispatched", ApplicationID: 7, ATS: "greenhouse"},
 	}
-	c := &DraftReview{AppID: 7, Client: m}
+	c := &DraftReview{AppID: 7, Client: m, draft: sampleDraft()}
 	c.doSubmit(context.Background())
 
 	if m.submitCalls != 1 {
@@ -106,19 +108,102 @@ func TestDraftReviewApproveAndSubmit(t *testing.T) {
 	}
 }
 
+func TestDraftReviewSavesAutofillPreview(t *testing.T) {
+	m := &mockClient{draft: sampleDraft()}
+	c := &DraftReview{AppID: 7, Client: m, draft: sampleDraft(), dirty: true}
+	c.draft.Autofill.Answers[0].Value = "Ada Lovelace"
+
+	c.doSavePreview(context.Background())
+
+	if m.updateDraftCalls != 1 {
+		t.Fatalf("UpdateApplicationDraft called %d times, want 1", m.updateDraftCalls)
+	}
+	if m.gotUpdateDraftID != 7 {
+		t.Errorf("UpdateApplicationDraft id = %d, want 7", m.gotUpdateDraftID)
+	}
+	if got := m.updatedAutofill.Answers[0].Value; got != "Ada Lovelace" {
+		t.Errorf("saved autofill value = %q", got)
+	}
+	if c.dirty || c.save != saveDone {
+		t.Errorf("save state dirty=%v save=%v, want clean saveDone", c.dirty, c.save)
+	}
+}
+
+func TestDraftReviewSubmitSavesDirtyPreviewFirst(t *testing.T) {
+	draft := sampleDraft()
+	m := &mockClient{
+		draft:        draft,
+		submitResult: SubmitResult{Status: "dispatched", ApplicationID: 7, ATS: "greenhouse"},
+	}
+	c := &DraftReview{AppID: 7, Client: m, draft: draft, dirty: true}
+	c.draft.Autofill.Answers[0].Value = "Ada Lovelace"
+
+	c.doSubmit(context.Background())
+
+	if m.updateDraftCalls != 1 {
+		t.Fatalf("UpdateApplicationDraft called %d times, want 1", m.updateDraftCalls)
+	}
+	if m.submitCalls != 1 {
+		t.Fatalf("SubmitApplication called %d times, want 1", m.submitCalls)
+	}
+	if c.submit != submitDone {
+		t.Errorf("submit state = %v, want submitDone", c.submit)
+	}
+}
+
+func TestDraftReviewSubmitStopsWhenSavedPreviewHasWarnings(t *testing.T) {
+	draft := sampleDraft()
+	updated := sampleDraft()
+	updated.AutofillWarnings = []AutofillWarning{{Field: "salary expectation", Message: "Needs manual review"}}
+	m := &mockClient{
+		draft:       draft,
+		updateDraft: updated,
+	}
+	c := &DraftReview{AppID: 7, Client: m, draft: draft, dirty: true}
+
+	c.doSubmit(context.Background())
+
+	if m.updateDraftCalls != 1 {
+		t.Fatalf("UpdateApplicationDraft called %d times, want 1", m.updateDraftCalls)
+	}
+	if m.submitCalls != 0 {
+		t.Fatalf("SubmitApplication called %d times, want 0", m.submitCalls)
+	}
+	if !strings.Contains(c.submitErr, "Manual review") {
+		t.Errorf("submit error = %q, want manual-review message", c.submitErr)
+	}
+}
+
+func TestDraftReviewSubmitBlocksUntilReady(t *testing.T) {
+	draft := sampleDraft()
+	draft.DraftReady = false
+	draft.Autofill = AutofillPreview{}
+	m := &mockClient{draft: draft}
+	c := &DraftReview{AppID: 7, Client: m, draft: draft}
+
+	c.doSubmit(context.Background())
+
+	if m.submitCalls != 0 {
+		t.Fatalf("SubmitApplication called %d times, want 0", m.submitCalls)
+	}
+	if !strings.Contains(c.submitErr, "still being prepared") {
+		t.Errorf("submit error = %q, want draft-not-ready message", c.submitErr)
+	}
+}
+
 func TestDraftReviewSubmitError(t *testing.T) {
 	m := &mockClient{
 		draft:     sampleDraft(),
-		submitErr: &APIError{Status: http.StatusUnprocessableEntity, Body: "paused"},
+		submitErr: &APIError{Status: http.StatusUnprocessableEntity, Body: `{"error":{"code":"unsafe_payload","message":"Autofill payload contains sensitive fields"}}`},
 	}
-	c := &DraftReview{AppID: 7, Client: m}
+	c := &DraftReview{AppID: 7, Client: m, draft: sampleDraft()}
 	c.doSubmit(context.Background())
 
 	if c.submit != submitError {
 		t.Fatalf("submit state = %v, want submitError", c.submit)
 	}
-	if !strings.Contains(c.submitErr, "Submit failed") {
-		t.Errorf("submit error = %q, want generic failure message", c.submitErr)
+	if !strings.Contains(c.submitErr, "Manual review") {
+		t.Errorf("submit error = %q, want manual-review message", c.submitErr)
 	}
 }
 
@@ -127,7 +212,7 @@ func TestDraftReviewSubmitUnauthorized(t *testing.T) {
 		draft:     sampleDraft(),
 		submitErr: &APIError{Status: http.StatusUnauthorized},
 	}
-	c := &DraftReview{AppID: 7, Client: m}
+	c := &DraftReview{AppID: 7, Client: m, draft: sampleDraft()}
 	c.doSubmit(context.Background())
 
 	if !strings.Contains(c.submitErr, "session expired") {
@@ -152,9 +237,9 @@ func TestDraftReviewRendersSubmitStates(t *testing.T) {
 		AppID:     7,
 		Client:    &mockClient{draft: sampleDraft()},
 		submit:    submitError,
-		submitErr: "Submit failed. Please try again.",
+		submitErr: "Manual review is required before auto-submit.",
 	}
-	if html := submitChromeHTML(failed); !strings.Contains(html, "Submit failed") {
+	if html := submitChromeHTML(failed); !strings.Contains(html, "Manual review") {
 		t.Errorf("submitError chrome missing error message\n%s", html)
 	}
 }
@@ -189,17 +274,43 @@ func TestAppIDFromPath(t *testing.T) {
 }
 
 func TestSubmitButtonLabel(t *testing.T) {
+	ready := sampleDraft()
+	pending := sampleDraft()
+	pending.DraftReady = false
+	warned := sampleDraft()
+	warned.AutofillWarnings = []AutofillWarning{{Field: "salary", Message: "Needs manual review"}}
 	cases := []struct {
 		state submitState
+		draft ApplicationDraft
+		dirty bool
 		want  string
 	}{
-		{submitIdle, "Approve and submit"},
-		{submitSending, "Submitting…"},
-		{submitDone, "Submitted"},
+		{submitIdle, ready, false, "Approve and submit"},
+		{submitIdle, ready, true, "Save and submit"},
+		{submitIdle, pending, false, "Preparing draft..."},
+		{submitIdle, warned, false, "Manual review required"},
+		{submitSending, ready, false, "Submitting…"},
+		{submitDone, ready, false, "Submitted"},
 	}
 	for _, tc := range cases {
-		if got := submitButtonLabel(tc.state); got != tc.want {
+		if got := submitButtonLabel(tc.state, tc.draft, tc.dirty); got != tc.want {
 			t.Errorf("submitButtonLabel(%v) = %q, want %q", tc.state, got, tc.want)
+		}
+	}
+}
+
+func TestDraftReviewRendersWarningsAndWorkerFailure(t *testing.T) {
+	draft := sampleDraft()
+	draft.Status = "paused"
+	draft.FailureReason = "required field was not in the approved payload"
+	draft.AutofillWarnings = []AutofillWarning{{Field: "salary expectation", Message: "Needs manual review"}}
+	draft.WorkerReport = &WorkerReport{Logs: []string{"opened form", "paused on required field"}}
+	c := &DraftReview{AppID: 7, Client: &mockClient{draft: draft}}
+
+	html := renderHTML(t, c)
+	for _, want := range []string{"salary expectation", "Needs manual review", "required field", "paused on required field", "Manual review required"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("draft HTML missing %q\n%s", want, html)
 		}
 	}
 }

@@ -24,6 +24,7 @@ Rails.application.routes.draw do
       resources :outreach_drafts, only: %i[create]
     end
     resources :applications, only: %i[show create] do
+      patch :draft, on: :member
       post :submit, on: :member
     end
     resources :worker_tasks, only: %i[index] do

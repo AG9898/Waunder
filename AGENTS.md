@@ -727,3 +727,12 @@ Railway services too** (the dispatcher's `supported_ats` reads it at runtime; sp
 so the greenhouse-only expectations are unaffected). Go side: `RailsClient.CreateApplication` + the
 `do*`/`apply*` handler split (test via `doApply` directly; assert `createAppCalls==0` after a full render to
 prove "never apply on mount").
+
+### 2026-06-22 — Draft preview is an editable Rails-owned submit contract
+`GET /api/applications/:id` now returns `draft_ready`, `autofill_warnings`, `failure_reason`, and
+latest worker report context along with the worker-shaped `autofill_payload`; `PATCH
+/api/applications/:id/draft` updates only reviewed `answers` and preserves Rails-owned ATS/apply
+URL/resume metadata. Keep the PWA submit button disabled until the draft is ready and warnings are
+clear, and remember the Rails dispatcher is still the final safety gate. The submit dispatcher's
+age-sensitive regex must use `\bage\b`; a plain `age` alternative false-positives on fields like
+`programming languages`.
