@@ -47,12 +47,12 @@ RSpec.describe OpenrouterClient do
   end
 
   describe "model selection" do
-    it "defaults to the configured low-cost model when env is unset" do
+    it "defaults to the configured free-tier model when env is unset" do
       allow(ENV).to receive(:[]).and_call_original
       allow(ENV).to receive(:[]).with("OPENROUTER_MODEL").and_return(nil)
 
       client = described_class.new(api_key: "sk-test")
-      expect(client.model).to eq("google/gemini-2.5-flash-lite")
+      expect(client.model).to eq("openai/gpt-oss-120b:free")
     end
 
     it "uses OPENROUTER_MODEL from env when set" do

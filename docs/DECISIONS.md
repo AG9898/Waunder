@@ -302,13 +302,13 @@ What existing code or docs does this affect?>
 
 ---
 
-### RESOLVED-17 — Single OpenRouter model; default `google/gemini-2.5-flash-lite`
+### RESOLVED-17 — Single OpenRouter model; default `openai/gpt-oss-120b:free`
 
 **Resolved:** 2026-06-09 (default model revised 2026-06-22)
 
-**Decision:** Use a single `OPENROUTER_MODEL` for all LLM calls (scoring, summaries, drafts) — no per-task model tiers. This resolves the former OPEN-05 to its Option 1. The default was originally `google/gemma-4-31b-it:free` to stay on OpenRouter's free tier, but on 2026-06-22 OpenRouter's free tier had been pruned to the point that the Gemma free slug (and the surviving Nvidia/Llama free slugs) returned persistent HTTP 429 rate-limits, so scoring failed for every real inbound job. The default is now the low-cost `google/gemini-2.5-flash-lite`. Because models still vary in structured-output guarantees, the OpenRouter client requests structured JSON where supported and degrades gracefully (retry / parse-fallback) rather than assuming strict schema enforcement.
+**Decision:** Use a single `OPENROUTER_MODEL` for all LLM calls (scoring, summaries, drafts) — no per-task model tiers. This resolves the former OPEN-05 to its Option 1. The default was originally `google/gemma-4-31b-it:free`, but on 2026-06-22 OpenRouter's free tier had been pruned to the point that the Gemma free slug (and the surviving Nvidia/Llama free slugs) returned persistent HTTP 429 rate-limits, so scoring failed for every real inbound job. A live probe of all currently-free models found `openai/gpt-oss-120b:free` responding reliably and returning a complete, valid scoring JSON object, so it is now the default — keeping spend at zero. Note it does not honor strict `response_format` (returns the JSON as prose), so the client continues to request JSON where supported and degrades gracefully (retry / parse-fallback) rather than assuming strict schema enforcement. `google/gemini-2.5-flash-lite` is the recommended low-cost paid fallback if the free tier degrades again.
 
-**Why:** Single-user app; one model keeps configuration and routing simple. The free tier was preferred for zero spend but proved unreliable in production (persistent 429s); `gemini-2.5-flash-lite` is the cheapest model that reliably returns clean JSON for the scoring workload, at a few cents per digest.
+**Why:** Single-user, cost-sensitive app; one model keeps configuration and routing simple, and a working free model keeps spend at zero. OpenRouter's free tier is volatile, so the choice is revisited when the configured free model starts failing.
 
 **Alternatives rejected:** Per-task model tiers (Option 2) — extra config/routing for no current benefit. A paid default — unnecessary spend for the MVP.
 
