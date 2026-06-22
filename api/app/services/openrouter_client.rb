@@ -4,10 +4,12 @@ require "json"
 # Isolated client for the OpenRouter LLM gateway.
 #
 # Owns every outbound LLM call for the api/ service. Reads OPENROUTER_API_KEY
-# and OPENROUTER_MODEL from the environment (model defaults to the free-tier
-# `google/gemma-4-31b-it:free`, RESOLVED-17). Because free-tier models impose
-# rate limits and offer only loose structured-output guarantees, the client
-# requests JSON output where supported and degrades gracefully: it retries on
+# and OPENROUTER_MODEL from the environment (model defaults to the low-cost
+# `google/gemini-2.5-flash-lite`, RESOLVED-17). The former free-tier default
+# (`google/gemma-4-31b-it:free`) became persistently rate-limited (HTTP 429) as
+# OpenRouter pruned its free tier, so scoring/drafts failed in production. The
+# client still requests JSON output where supported and degrades gracefully: it
+# retries on
 # transient/rate-limit responses and, when the model returns prose around the
 # JSON, extracts the first balanced JSON object/array (parse fallback) rather
 # than assuming strict schema enforcement.
@@ -18,7 +20,7 @@ require "json"
 # - Never logs prompt or completion contents, which may contain PII. Only
 #   non-content metadata (model, status, attempt) is logged.
 class OpenrouterClient
-  DEFAULT_MODEL = "google/gemma-4-31b-it:free".freeze
+  DEFAULT_MODEL = "google/gemini-2.5-flash-lite".freeze
   ENDPOINT = "https://openrouter.ai/api/v1/chat/completions".freeze
   DEFAULT_MAX_RETRIES = 2
   RETRYABLE_STATUSES = [ 408, 429, 500, 502, 503, 504 ].freeze

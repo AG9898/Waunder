@@ -302,13 +302,13 @@ What existing code or docs does this affect?>
 
 ---
 
-### RESOLVED-17 — Single OpenRouter model; default `google/gemma-4-31b-it:free`
+### RESOLVED-17 — Single OpenRouter model; default `google/gemini-2.5-flash-lite`
 
-**Resolved:** 2026-06-09
+**Resolved:** 2026-06-09 (default model revised 2026-06-22)
 
-**Decision:** Use a single `OPENROUTER_MODEL` for all LLM calls (scoring, summaries, drafts) — no per-task model tiers. The default is `google/gemma-4-31b-it:free`, staying on OpenRouter's free tier. This resolves the former OPEN-05 to its Option 1. Because free-tier models impose rate limits and looser structured-output guarantees, the OpenRouter client requests structured JSON where supported and degrades gracefully (retry / parse-fallback) rather than assuming strict schema enforcement.
+**Decision:** Use a single `OPENROUTER_MODEL` for all LLM calls (scoring, summaries, drafts) — no per-task model tiers. This resolves the former OPEN-05 to its Option 1. The default was originally `google/gemma-4-31b-it:free` to stay on OpenRouter's free tier, but on 2026-06-22 OpenRouter's free tier had been pruned to the point that the Gemma free slug (and the surviving Nvidia/Llama free slugs) returned persistent HTTP 429 rate-limits, so scoring failed for every real inbound job. The default is now the low-cost `google/gemini-2.5-flash-lite`. Because models still vary in structured-output guarantees, the OpenRouter client requests structured JSON where supported and degrades gracefully (retry / parse-fallback) rather than assuming strict schema enforcement.
 
-**Why:** Single-user, cost-sensitive app; a free model keeps spend at zero and one model keeps configuration and routing simple. Per-task tiering is premature.
+**Why:** Single-user app; one model keeps configuration and routing simple. The free tier was preferred for zero spend but proved unreliable in production (persistent 429s); `gemini-2.5-flash-lite` is the cheapest model that reliably returns clean JSON for the scoring workload, at a few cents per digest.
 
 **Alternatives rejected:** Per-task model tiers (Option 2) — extra config/routing for no current benefit. A paid default — unnecessary spend for the MVP.
 
