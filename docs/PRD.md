@@ -36,7 +36,11 @@ Phase 1 delivers the full plan scenario: forward a job-alert email → Resend in
   optional stage independent of the worker automation status. The owner can mark jobs as
   interested, drafting, applied/waiting, interviewing, offer, rejected, withdrawn, archived, or
   needing review from the PWA. Successful trusted submit/report moves the tracker to
-  applied/waiting; worker pauses/failures move it to needs review.
+  applied/waiting; worker pauses/failures move it to needs review. The Applications screen has a
+  view selector: the default pipeline (cards) view, and an all-jobs **table view** — an in-app
+  spreadsheet-style tracker listing every job post with a link back to each posting. A stats
+  cluster in the header shows totals (total count for now). *Planned (not yet implemented):
+  filtering and sorting for the all-jobs table, and the same filtering for the main Jobs feed.*
 - **Trusted submit** to Greenhouse, Lever, and Ashby. LinkedIn Easy Apply is treated as higher-risk and gated behind an explicit feature flag. Submit only proceeds with explicit owner approval, a supported target, no unknown/sensitive fields, and an auditable status result.
 - **LinkedIn contact and outreach**: save contact candidates linked to jobs, track why each is relevant, and generate tailored outreach drafts from a loose template. Drafts are presented prefilled for manual sending — never auto-sent.
 - **Web push digest** via the VAPID-keyed Web Push API delivered to the installed PWA's service worker (the daily digest).

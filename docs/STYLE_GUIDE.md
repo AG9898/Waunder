@@ -96,12 +96,22 @@ figures where possible.
   baked into the fill — no live CDN dependency, matching the self-hosted-font policy). Sources
   without a brand logo (manual entry, generic email alert) use an emoji marker instead. The
   logo/emoji sits inline before the source label via `flex` + `gap` on the pill.
+- The Applications screen pairs its title with a stats cluster in the top-right
+  (`.applications-header` / `.applications-stats` — a value + small uppercase caption per stat;
+  total count for now) and a segmented `.applications-view-selector` that toggles between the
+  pipeline cards (`.applications-list`) and the all-jobs `.jobs-table`. The table is a quiet
+  spreadsheet-style tracker (sunken header row, hairline row dividers, hover row tint) listing
+  every job post; the title and a trailing "View" link both route to the job posting. Score and
+  source cells reuse the feed's color-coded score pill and source pill idioms.
+  *Planned (stubbed, not yet built): filter/sort controls for the all-jobs table and for the
+  main Jobs feed.*
 - Job detail, draft review, profile, and route sections use top hairlines plus spacing.
 - Primary actions use sage filled buttons; secondary actions use outline/surface buttons.
 - Inputs and textareas use warm surface fill, strong hairline border, 12px radius, and a
   visible sage focus ring.
 - Error and success messages use soft status pills. Loading uses a gentle opacity pulse.
-- Empty feed/list states (`.digest-empty`, `.job-list-empty`, `.contacts-empty`) render as a
+- Empty feed/list states (`.digest-empty`, `.job-list-empty`, `.jobs-table-empty`,
+  `.contacts-empty`) render as a
   quiet sunken well with centered faint-ink text — visually distinct from the danger-toned
   `.load-error` so "nothing here yet" never reads as a failure.
 - The `Home` root (`.app-shell`) is a thin skeleton wrapper, not a routed screen container; it

@@ -7,6 +7,14 @@ import (
 	"github.com/maxence-charriere/go-app/v10/pkg/app"
 )
 
+// Applications-tab view modes. The tab can show the tracked-application cards
+// (the default pipeline view) or a flat table of every job post — an in-app
+// spreadsheet-style tracker that links each row back to its job posting.
+const (
+	viewApplications = "applications"
+	viewTable        = "table"
+)
+
 type ApplicationsView struct {
 	app.Compo
 
@@ -17,6 +25,16 @@ type ApplicationsView struct {
 	err          string
 	savingID     int
 	statusErr    string
+
+	// view selects the active mode (viewApplications | viewTable). The zero
+	// value renders as viewApplications via currentView.
+	view string
+
+	// Table view state. Jobs are fetched lazily the first time the user opens
+	// the table, so the default applications view costs no extra request.
+	jobsState loadState
+	jobs      []JobSummary
+	jobsErr   string
 }
 
 func (v *ApplicationsView) OnMount(ctx app.Context)     { v.ensureClient(); v.load(ctx) }
@@ -43,18 +61,198 @@ func (v *ApplicationsView) load(ctx app.Context) {
 func (v *ApplicationsView) Render() app.UI {
 	return app.Div().Class("applications").Body(
 		renderAppTabs("applications"),
-		app.H1().Text("Applications"),
-		renderLoad(v.state, v.err, func() app.UI {
-			if len(v.applications) == 0 {
-				return app.P().Class("applications-empty").Text("No tracked applications yet.")
-			}
-			return app.Ul().Class("applications-list").Body(
-				app.Range(v.applications).Slice(func(i int) app.UI {
-					return v.renderApplication(v.applications[i])
-				}),
-			)
-		}),
+		v.renderHeader(),
+		v.renderViewSelector(),
+		v.renderActiveView(),
 	)
+}
+
+// currentView resolves the active view, treating the zero value as the default
+// applications (pipeline) view.
+func (v *ApplicationsView) currentView() string {
+	if v.view == viewTable {
+		return viewTable
+	}
+	return viewApplications
+}
+
+// renderHeader shows the screen title with a stats cluster in the top-right.
+// For now the only stat is the total count for the active view (tracked
+// applications, or all jobs in the table view); more stats can join the cluster
+// later.
+func (v *ApplicationsView) renderHeader() app.UI {
+	total := len(v.applications)
+	caption := "Total tracked"
+	if v.currentView() == viewTable {
+		total = len(v.jobs)
+		caption = "Total jobs"
+	}
+	return app.Div().Class("applications-header").Body(
+		app.H1().Text("Applications"),
+		app.Div().Class("applications-stats").Body(
+			app.Div().Class("applications-stat").Body(
+				app.Span().Class("applications-stat-value").Text(strconv.Itoa(total)),
+				app.Span().Class("applications-stat-label").Text(caption),
+			),
+		),
+	)
+}
+
+// renderViewSelector is the segmented control that switches between the tracked
+// applications cards and the all-jobs table.
+func (v *ApplicationsView) renderViewSelector() app.UI {
+	return app.Div().Class("applications-view-selector").Attr("role", "tablist").Body(
+		app.Button().
+			Class("view-selector-option").
+			Class(viewSelectorClass(v.currentView(), viewApplications)).
+			OnClick(v.showApplications).
+			Text("Applications"),
+		app.Button().
+			Class("view-selector-option").
+			Class(viewSelectorClass(v.currentView(), viewTable)).
+			OnClick(v.showTable).
+			Text("All jobs"),
+	)
+}
+
+func viewSelectorClass(active, name string) string {
+	if active == name {
+		return "view-selector-option-active"
+	}
+	return ""
+}
+
+func (v *ApplicationsView) renderActiveView() app.UI {
+	if v.currentView() == viewTable {
+		return v.renderTable()
+	}
+	return v.renderApplicationsList()
+}
+
+func (v *ApplicationsView) renderApplicationsList() app.UI {
+	return renderLoad(v.state, v.err, func() app.UI {
+		if len(v.applications) == 0 {
+			return app.P().Class("applications-empty").Text("No tracked applications yet.")
+		}
+		return app.Ul().Class("applications-list").Body(
+			app.Range(v.applications).Slice(func(i int) app.UI {
+				return v.renderApplication(v.applications[i])
+			}),
+		)
+	})
+}
+
+// renderTable renders the all-jobs spreadsheet-style tracker: one row per job
+// post with a link back to the job posting. Filtering/sorting is planned (see
+// docs/STYLE_GUIDE.md and docs/PRD.md) but not yet implemented — the table lists
+// every job for now.
+func (v *ApplicationsView) renderTable() app.UI {
+	return renderLoad(v.jobsState, v.jobsErr, func() app.UI {
+		if len(v.jobs) == 0 {
+			return app.P().Class("jobs-table-empty").Text("No jobs yet.")
+		}
+		return app.Div().Class("jobs-table-wrap").Body(
+			app.Table().Class("jobs-table").Body(
+				app.THead().Body(
+					app.Tr().Body(
+						app.Th().Text("Title"),
+						app.Th().Text("Company"),
+						app.Th().Text("Source"),
+						app.Th().Class("jobs-table-score-col").Text("Match"),
+						app.Th().Class("jobs-table-action-col").Text(""),
+					),
+				),
+				app.TBody().Body(
+					app.Range(v.jobs).Slice(func(i int) app.UI {
+						return v.renderJobRow(v.jobs[i])
+					}),
+				),
+			),
+		)
+	})
+}
+
+func (v *ApplicationsView) renderJobRow(job JobSummary) app.UI {
+	href := "/jobs/" + strconv.Itoa(job.ID)
+	return app.Tr().Class("jobs-table-row").Body(
+		app.Td().Class("jobs-table-title").Body(
+			app.A().Href(href).Text(job.Title),
+		),
+		app.Td().Class("jobs-table-company").Text(job.Company),
+		app.Td().Class("jobs-table-source").Body(
+			app.If(SourceLabel(job.Source) != "", func() app.UI {
+				return app.Span().Class("job-source").Body(
+					sourceIcon(job.Source),
+					app.Text(SourceLabel(job.Source)),
+				)
+			}),
+		),
+		app.Td().Class("jobs-table-score").Body(
+			app.Span().
+				Class("job-score").
+				Class("job-score--"+MatchScoreBand(job.MatchScore, job.ScoringStatus)).
+				Text(MatchScoreLabel(job.MatchScore, job.ScoringStatus)),
+		),
+		app.Td().Class("jobs-table-action").Body(
+			app.A().Class("jobs-table-view").Href(href).Text("View"),
+		),
+	)
+}
+
+// showApplications switches to the pipeline (cards) view.
+func (v *ApplicationsView) showApplications(ctx app.Context, _ app.Event) {
+	v.view = viewApplications
+	ctx.Update()
+}
+
+// showTable switches to the all-jobs table, lazily fetching the jobs the first
+// time it is opened.
+func (v *ApplicationsView) showTable(ctx app.Context, _ app.Event) {
+	v.view = viewTable
+	if v.jobsState == loadIdle {
+		v.loadJobs(ctx)
+		return
+	}
+	ctx.Update()
+}
+
+func (v *ApplicationsView) loadJobs(ctx app.Context) {
+	v.jobsState = loadLoading
+	ctx.Update()
+	reqCtx := ctx.Context
+	ctx.Async(func() {
+		jobs, err := v.Client.Jobs(reqCtx)
+		ctx.Dispatch(func(ctx app.Context) {
+			v.applyJobsResult(jobs, err)
+			ctx.Update()
+		})
+	})
+}
+
+// doShowTable is the engine-free body of showTable, used by tests to exercise
+// the lazy fetch + state transition without the go-app runtime.
+func (v *ApplicationsView) doShowTable(ctx context.Context) {
+	v.view = viewTable
+	if v.jobsState != loadIdle {
+		return
+	}
+	v.jobsState = loadLoading
+	jobs, err := v.Client.Jobs(ctx)
+	v.applyJobsResult(jobs, err)
+}
+
+func (v *ApplicationsView) applyJobsResult(jobs []JobSummary, err error) {
+	if err != nil {
+		v.jobsState = loadError
+		if IsUnauthorized(err) {
+			v.jobsErr = sessionExpiredMessage
+		} else {
+			v.jobsErr = "Could not load data. Please try again."
+		}
+		return
+	}
+	v.jobs = jobs
+	v.jobsState = loadDone
 }
 
 func (v *ApplicationsView) renderApplication(application ApplicationTracker) app.UI {

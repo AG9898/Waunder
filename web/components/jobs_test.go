@@ -17,8 +17,9 @@ type mockClient struct {
 	loginErr  error
 	loginPass string
 
-	jobs    []JobSummary
-	jobsErr error
+	jobs      []JobSummary
+	jobsErr   error
+	jobsCalls int
 
 	job    JobDetail
 	jobErr error
@@ -95,6 +96,7 @@ func (m *mockClient) Login(_ context.Context, passphrase string) error {
 }
 
 func (m *mockClient) Jobs(context.Context) ([]JobSummary, error) {
+	m.jobsCalls++
 	return m.jobs, m.jobsErr
 }
 

@@ -794,3 +794,27 @@ indeed are still in `develop`. Non-branded sources (manual ✍️, inbound/email
 marker via `SourceEmoji`; `SourceIconPath` returns "" for them. The shared `sourceIcon(source)`
 helper in jobs.go renders logo-or-emoji-or-nothing and the source pill is `display:flex; gap` so
 the marker sits inline before the label.
+
+### 2026-06-22 — Applications tab: view selector + all-jobs table + header stats
+`ApplicationsView` (web/components/applications.go) now has a segmented view selector toggling
+the pipeline cards (`viewApplications`, default) and an all-jobs `.jobs-table` (`viewTable`) — an
+in-app spreadsheet tracker rendering every JobPost via the existing `Jobs()` endpoint, each row
+linking back to `/jobs/:id` (title link + trailing "View" link). The header pairs the title with a
+top-right stats cluster (`.applications-stats`) showing the total for the active view (tracked
+apps vs jobs). Jobs are fetched LAZILY on first table open (`showTable`→`loadJobs`), so the default
+view costs no extra request — `view`/`jobs`/`jobsState` are separate from the applications
+`state`, and OnPreRender's `load` only touches the applications state, so a render test can pre-set
+`view: viewTable, jobsState: loadDone, jobs: [...]` and render `c.renderTable()` directly (the
+draft/push "render a sub-UI" pattern) without the lifecycle resetting it. Reused the `do*`/`apply*`
+split for the lazy load (`doShowTable`/`applyJobsResult`) so the fetch+state transition is
+unit-testable without the go-app engine; mockClient gained `jobsCalls` to assert "no jobs fetch on
+mount". The table reuses the feed's `.job-score--<band>` and source-pill idioms but needs its own
+`.jobs-table .job-score`/`.job-source` shape rules (the feed pill shape is scoped to
+`.job-list-link`/`.digest-link`/`.job-detail`, not the table). NOTE: wrapping the `<h1>` in
+`.applications-header` broke the `.applications > h1` title selector — retargeted it to
+`.applications-header h1`. GOTCHA (pre-existing, surfaced here): go-app renders element attributes
+from a Go MAP, so attribute ORDER is nondeterministic across process runs (you can see
+`selected="false"` land before/after `value` in one render). Any test asserting a multi-attribute
+substring like `class="..." href="..."` is therefore flaky (~30% here) — assert each attribute
+substring separately. Filtering/sorting for the table AND the main Jobs feed is documented as
+planned but NOT implemented (PRD.md, STYLE_GUIDE.md).
