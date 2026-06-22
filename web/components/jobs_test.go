@@ -298,6 +298,39 @@ func TestJobListRendersScoredFields(t *testing.T) {
 	}
 }
 
+func TestSourceLabel(t *testing.T) {
+	cases := map[string]string{
+		"linkedin":    "LinkedIn",
+		"glassdoor":   "Glassdoor",
+		"indeed":      "Indeed",
+		"manual":      "Manual entry",
+		"inbound_llm": "Email alert",
+		"":            "",
+		"weird":       "weird",
+	}
+	for source, want := range cases {
+		if got := SourceLabel(source); got != want {
+			t.Errorf("SourceLabel(%q) = %q, want %q", source, got, want)
+		}
+	}
+}
+
+func TestJobListRendersSourceOrigin(t *testing.T) {
+	c := &JobList{Client: &mockClient{
+		jobs: []JobSummary{
+			{ID: 7, Title: "Staff Engineer", Company: "Acme", Source: "linkedin", MatchScore: intPtr(88), ScoringStatus: "scored"},
+			{ID: 9, Title: "Backend Dev", Company: "Globex", Source: "glassdoor", MatchScore: nil, ScoringStatus: "pending"},
+		},
+	}}
+	html := renderHTML(t, c)
+
+	for _, want := range []string{"LinkedIn", "Glassdoor"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("job list HTML missing source origin %q\n%s", want, html)
+		}
+	}
+}
+
 func TestJobListEmpty(t *testing.T) {
 	c := &JobList{Client: &mockClient{jobs: nil}}
 	html := renderHTML(t, c)

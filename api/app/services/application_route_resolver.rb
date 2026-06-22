@@ -27,7 +27,7 @@ class ApplicationRouteResolver
     { route_type: "workday",             confidence: 0.95, matchers: [ /(?:^|\.)myworkdayjobs\.com$/, /(?:^|\.)myworkday\.com$/, /(?:^|\.)workday\.com$/ ] },
     { route_type: "linkedin_easy_apply", confidence: 0.90, matchers: [ /(?:^|\.)linkedin\.com$/ ] },
     { route_type: "indeed_apply",        confidence: 0.90, matchers: [ /(?:^|\.)indeed\.com$/ ] },
-    { route_type: "glassdoor_apply",     confidence: 0.90, matchers: [ /(?:^|\.)glassdoor\.com$/, /(?:^|\.)glassdoor\.co\.[a-z]+$/ ] }
+    { route_type: "glassdoor_apply",     confidence: 0.90, matchers: [ /(?:^|\.)glassdoor\.(?:com|ca)$/, /(?:^|\.)glassdoor\.co\.[a-z]+$/ ] }
   ].freeze
 
   # Recommended-route preference order (lower index = more preferred). The

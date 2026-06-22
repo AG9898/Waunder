@@ -131,9 +131,17 @@ class InboundEmailLlmExtractor
         location: raw["location"].to_s.strip.presence,
         posting_url: raw["posting_url"].to_s.strip.presence,
         source_url: raw["source_url"].to_s.strip.presence || raw["posting_url"].to_s.strip.presence,
-        source: "inbound_llm"
+        source: posting_source
       }
     end
+  end
+
+  # Preserve provider attribution: when a known-sender parser matched the
+  # envelope (e.g. "linkedin"/"glassdoor") but its layout extraction came up
+  # empty, the LLM-extracted postings still belong to that provider. Only a
+  # genuinely unknown sender falls back to the generic "inbound_llm" label.
+  def posting_source
+    inbound_email.raw_payload.dig("parse_result", "parser").presence || "inbound_llm"
   end
 
   # Prefer the plain-text body; fall back to a tag-stripped HTML body.

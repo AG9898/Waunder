@@ -753,3 +753,23 @@ status.
 changes (`PATCH /api/applications/:id/status`, `PATCH /api/job_posts/:id/application_status`) must
 never enqueue worker jobs; successful submit/report syncs the tracker to applied/waiting, and
 paused/failed worker reports sync it to needs_review.
+
+### 2026-06-22 — Glassdoor parser rewrite + provider attribution surfaced to UI
+Real Glassdoor "Jobs for You" alerts (incl. manually forwarded ones) use a `Company <rating> ★` /
+title / location / salary / `Easy Apply` / age block ending in a `partner/jobListing.htm?...&jobListingId=<id>`
+link on the `.ca` (or any) Glassdoor TLD — NOT the `title / Company — Location / URL` shape the old
+`InboundEmailParsers::Glassdoor` assumed, and NOT `.com` only. The old parser matched the sender but
+extracted 0 → silent LLM fallback (same trap as the LinkedIn digest). Rewrote it to anchor on the
+job link, walk back to the nearest `★` company line (bounded by the previous block's link), and read
+title/location/salary; kept a `legacy_block` fallback for the rating-less `Company — Location` layout
+so the old synthetic spec still passes. Verified 5/5 against the REAL production body (IE 7) — anchor
+on `jobListingId=` excludes the header `/Job/jobs.htm` search link. Also: (1) `ApplicationRouteResolver`
+glassdoor matcher now includes `glassdoor.ca` (was `.com` + `.co.<tld>` only, so every `.ca` posting
+resolved to `unknown`/manual). (2) Added a `compensation:` field through the `Base#posting` helper →
+`JobPostMaterializer` → `job_posts.compensation` (Glassdoor carries salary; LinkedIn usually doesn't).
+(3) Provider attribution now survives the LLM fallback: `InboundEmailLlmExtractor` sets `source` from
+`parse_result["parser"]` (linkedin/glassdoor) instead of always "inbound_llm" — only truly unknown
+senders stay "inbound_llm". (4) `source` (+ detail `compensation`) is now in the `Api::JobPostsController`
+read serializers and rendered as an origin tag in the PWA (`SourceLabel` in web/components/client.go,
+`.job-source` styles). NOTE: nothing here changes the apply flow — the user applies LinkedIn/Glassdoor
+manually for now. Pre-existing 6 JobPosts labeled "inbound_llm" (all really LinkedIn) are NOT backfilled.

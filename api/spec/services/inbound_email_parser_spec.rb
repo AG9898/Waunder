@@ -174,6 +174,73 @@ RSpec.describe InboundEmailParser do
       expect(post.source).to eq("glassdoor")
     end
 
+    it "parses a manually forwarded Glassdoor 'Jobs for You' digest (.ca, ★ layout, salary)" do
+      text = <<~TEXT
+        ---------- Forwarded message ---------
+        From: Glassdoor Jobs <noreply@glassdoor.com>
+        To: <owner@example.com>
+
+        [image: Glassdoor]
+
+        Jobs for You
+
+        See the latest roles at DataAnnotation and more. To help refine this list, search for more jobs.
+        <https://www.glassdoor.ca/Job/jobs.htm?sc.occupationParam=AI+Trainer&locId=2285197>
+
+        DataAnnotation 4.1 ★
+
+        AI Training Specialist – Quantitative
+        Hamilton
+        $55 - $60 (Employer Est.)
+        Easy Apply
+        <https://www.glassdoor.ca/partner/jobListing.htm?pos=101&jobListingId=1010108476620&cb=1782162147176>
+        Jobber 3.5 ★
+
+        Intermediate Software Engineer
+        Vancouver
+        $107K - $144K (Employer Est.)
+        5d
+        <https://www.glassdoor.ca/partner/jobListing.htm?pos=103&jobListingId=1010030039818>
+      TEXT
+      email = inbound_email(from: "owner@example.com", text:)
+
+      result = described_class.new(email).call
+
+      expect(result.fallback?).to be(false)
+      expect(result.parser.source_name).to eq("glassdoor")
+      expect(result.job_posts.size).to eq(2)
+
+      first = result.job_posts.first
+      expect(first.title).to eq("AI Training Specialist – Quantitative")
+      expect(first.company.name).to eq("DataAnnotation")
+      expect(first.location).to eq("Hamilton")
+      expect(first.compensation).to eq("$55 - $60 (Employer Est.)")
+      expect(first.source).to eq("glassdoor")
+      expect(first.posting_url).to eq("https://www.glassdoor.ca/job-listing/index.htm?jl=1010108476620")
+      expect(first.source_url).to include("partner/jobListing.htm")
+
+      second = result.job_posts.second
+      expect(second.title).to eq("Intermediate Software Engineer")
+      expect(second.company.name).to eq("Jobber")
+      expect(second.location).to eq("Vancouver")
+      expect(second.compensation).to eq("$107K - $144K (Employer Est.)")
+    end
+
+    it "ignores the Glassdoor header search link and does not treat it as a posting" do
+      text = <<~TEXT
+        From: Glassdoor Jobs <noreply@glassdoor.com>
+
+        Jobs for You
+        <https://www.glassdoor.ca/Job/jobs.htm?sc.occupationParam=AI+Trainer>
+      TEXT
+      email = inbound_email(from: "owner@example.com", text:)
+
+      result = described_class.new(email).call
+
+      expect(result.job_posts).to be_empty
+      expect(result.fallback?).to be(true)
+    end
+
     it "reuses an existing company instead of duplicating it" do
       existing = Company.create!(name: "Acme Corp")
       text = <<~TEXT

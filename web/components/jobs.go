@@ -73,6 +73,9 @@ func (j *JobList) Render() app.UI {
 							Body(
 								app.Span().Class("job-title").Text(job.Title),
 								app.Span().Class("job-company").Text(job.Company),
+								app.If(SourceLabel(job.Source) != "", func() app.UI {
+									return app.Span().Class("job-source").Text(SourceLabel(job.Source))
+								}),
 								app.Span().Class("job-score").
 									Text(MatchScoreLabel(job.MatchScore, job.ScoringStatus)),
 							),
@@ -212,6 +215,12 @@ func (d *JobDetailView) Render() app.UI {
 			return app.Div().Class("job-detail-body").Body(
 				app.H1().Class("job-title").Text(job.Title),
 				app.P().Class("job-company").Text(job.Company),
+				app.If(SourceLabel(job.Source) != "", func() app.UI {
+					return app.P().Class("job-source").Text("Source: "+SourceLabel(job.Source))
+				}),
+				app.If(job.Compensation != "", func() app.UI {
+					return app.P().Class("job-compensation").Text(job.Compensation)
+				}),
 				app.P().Class("job-score").
 					Text("Match: "+MatchScoreLabel(job.MatchScore, job.ScoringStatus)),
 				app.If(job.Summary != "", func() app.UI {
@@ -407,6 +416,9 @@ func (v *DigestView) Render() app.UI {
 									Body(
 										app.Span().Class("job-title").Text(job.Title),
 										app.Span().Class("job-company").Text(job.Company),
+										app.If(SourceLabel(job.Source) != "", func() app.UI {
+											return app.Span().Class("job-source").Text(SourceLabel(job.Source))
+										}),
 										app.Span().Class("job-score").
 											Text(MatchScoreLabel(job.MatchScore, job.ScoringStatus)),
 									),

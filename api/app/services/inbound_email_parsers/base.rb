@@ -52,11 +52,12 @@ module InboundEmailParsers
 
     # Build a normalized posting hash, dropping blank values so callers can
     # validate required fields explicitly.
-    def posting(title:, company:, posting_url:, location: nil, source_url: nil)
+    def posting(title:, company:, posting_url:, location: nil, source_url: nil, compensation: nil)
       {
         title: title&.strip.presence,
         company: company&.strip.presence,
         location: location&.strip.presence,
+        compensation: compensation&.strip.presence,
         posting_url: posting_url&.strip.presence,
         source_url: (source_url || posting_url)&.strip.presence,
         source: self.class.source_name

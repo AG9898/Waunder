@@ -21,7 +21,8 @@ RSpec.describe ApplicationRouteResolver do
       "https://acme.wd1.myworkdayjobs.com/External/job/123" => "workday",
       "https://www.linkedin.com/jobs/view/12345" => "linkedin_easy_apply",
       "https://www.indeed.com/viewjob?jk=abc" => "indeed_apply",
-      "https://www.glassdoor.com/job-listing/foo" => "glassdoor_apply"
+      "https://www.glassdoor.com/job-listing/foo" => "glassdoor_apply",
+      "https://www.glassdoor.ca/partner/jobListing.htm?jobListingId=123" => "glassdoor_apply"
     }.each do |url, expected_type|
       it "maps #{url} to #{expected_type}" do
         resolution = described_class.new(job_post_with(posting_url: url)).resolve

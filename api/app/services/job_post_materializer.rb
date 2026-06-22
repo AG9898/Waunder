@@ -28,6 +28,7 @@ class JobPostMaterializer
       company: company,
       title: title,
       location: @posting[:location].presence,
+      compensation: @posting[:compensation].presence,
       posting_url: @posting[:posting_url].presence,
       source_url: @posting[:source_url].presence,
       source: @posting[:source].presence || "inbound",

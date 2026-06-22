@@ -77,6 +77,7 @@ module Api
         id: job_post.id,
         title: job_post.title,
         company: job_post.company&.name,
+        source: job_post.source,
         match_score: job_post.match_score,
         scoring_status: job_post.scoring_status,
         summary: job_post.summary
@@ -91,7 +92,9 @@ module Api
         id: job_post.id,
         title: job_post.title,
         company: job_post.company&.name,
+        source: job_post.source,
         posting_url: job_post.posting_url,
+        compensation: job_post.compensation,
         match_score: job_post.match_score,
         scoring_status: job_post.scoring_status,
         summary: job_post.summary,

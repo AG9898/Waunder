@@ -225,6 +225,7 @@ type JobSummary struct {
 	ID            int    `json:"id"`
 	Title         string `json:"title"`
 	Company       string `json:"company"`
+	Source        string `json:"source"`
 	MatchScore    *int   `json:"match_score"`
 	ScoringStatus string `json:"scoring_status"`
 	Summary       string `json:"summary"`
@@ -238,7 +239,9 @@ type JobDetail struct {
 	ID                   int                 `json:"id"`
 	Title                string              `json:"title"`
 	Company              string              `json:"company"`
+	Source               string              `json:"source"`
 	PostingURL           string              `json:"posting_url"`
+	Compensation         string              `json:"compensation"`
 	MatchScore           *int                `json:"match_score"`
 	ScoringStatus        string              `json:"scoring_status"`
 	Summary              string              `json:"summary"`
@@ -391,6 +394,28 @@ func MatchScoreLabel(score *int, scoringStatus string) string {
 		}
 	}
 	return fmt.Sprintf("%d%%", *score)
+}
+
+// SourceLabel renders a job's ingestion source as a short human-readable
+// origin tag (e.g. "LinkedIn", "Glassdoor") so the feed shows where each
+// posting came from. Unknown/empty sources fall back to a generic label.
+func SourceLabel(source string) string {
+	switch source {
+	case "linkedin":
+		return "LinkedIn"
+	case "glassdoor":
+		return "Glassdoor"
+	case "indeed":
+		return "Indeed"
+	case "manual":
+		return "Manual entry"
+	case "inbound_llm", "inbound":
+		return "Email alert"
+	case "":
+		return ""
+	default:
+		return source
+	}
 }
 
 // httpRailsClient is the production RailsClient. It targets same-origin paths

@@ -291,6 +291,22 @@ button { font-family: inherit; }
   color: var(--color-ink-soft);
 }
 
+/* origin tag (where the posting was ingested from) */
+.job-list-link .job-source,
+.digest-link .job-source {
+  grid-column: 1;
+  justify-self: start;
+  margin-top: 2px;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunken, var(--color-accent-soft));
+  color: var(--color-ink-soft);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
 /* match-score pill (list context) */
 .job-list-link .job-score,
 .digest-link .job-score {
@@ -319,6 +335,14 @@ button { font-family: inherit; }
   font-size: var(--text-base);
   color: var(--color-ink-soft);
 }
+
+.job-detail .job-source,
+.job-detail .job-compensation {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+}
+.job-detail .job-compensation { font-weight: 600; }
 
 .job-detail .job-score {
   display: inline-flex;
