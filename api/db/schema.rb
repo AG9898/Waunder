@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_11_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_22_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -76,11 +76,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_11_130000) do
     t.datetime "created_at", null: false
     t.text "failure_reason"
     t.bigint "job_post_id", null: false
+    t.datetime "last_status_change_at"
+    t.date "next_follow_up_on"
+    t.text "pipeline_note"
+    t.string "pipeline_stage"
+    t.string "pipeline_status", default: "interested", null: false
     t.string "status", default: "draft", null: false
     t.datetime "submitted_at"
     t.datetime "updated_at", null: false
     t.index ["job_post_id"], name: "index_applications_on_job_post_id"
+    t.index ["last_status_change_at"], name: "index_applications_on_last_status_change_at"
+    t.index ["pipeline_status"], name: "index_applications_on_pipeline_status"
     t.index ["status"], name: "index_applications_on_status"
+    t.check_constraint "pipeline_status::text = ANY (ARRAY['interested'::character varying, 'drafting'::character varying, 'applied'::character varying, 'interviewing'::character varying, 'offer'::character varying, 'rejected'::character varying, 'withdrawn'::character varying, 'archived'::character varying, 'needs_review'::character varying]::text[])", name: "applications_pipeline_status_check"
     t.check_constraint "status::text = ANY (ARRAY['draft'::character varying, 'approved'::character varying, 'submitted'::character varying, 'paused'::character varying, 'failed'::character varying]::text[])", name: "applications_status_check"
   end
 

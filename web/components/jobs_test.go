@@ -47,6 +47,20 @@ type mockClient struct {
 	gotSubmitID  int
 	submitCalls  int
 
+	applications []ApplicationTracker
+	appsErr      error
+
+	updateAppStatus      ApplicationTracker
+	updateAppStatusErr   error
+	gotUpdateAppStatusID int
+	gotUpdateAppStatus   ApplicationStatusUpdate
+	updateAppStatusCalls int
+	updateJobStatus      ApplicationTracker
+	updateJobStatusErr   error
+	gotUpdateJobStatusID int
+	gotUpdateJobStatus   ApplicationStatusUpdate
+	updateJobStatusCalls int
+
 	profile       Profile
 	profileErr    error
 	updated       ProfileEdit
@@ -124,6 +138,24 @@ func (m *mockClient) SubmitApplication(_ context.Context, id int) (SubmitResult,
 	m.gotSubmitID = id
 	m.submitCalls++
 	return m.submitResult, m.submitErr
+}
+
+func (m *mockClient) Applications(context.Context) ([]ApplicationTracker, error) {
+	return m.applications, m.appsErr
+}
+
+func (m *mockClient) UpdateApplicationStatus(_ context.Context, id int, update ApplicationStatusUpdate) (ApplicationTracker, error) {
+	m.gotUpdateAppStatusID = id
+	m.gotUpdateAppStatus = update
+	m.updateAppStatusCalls++
+	return m.updateAppStatus, m.updateAppStatusErr
+}
+
+func (m *mockClient) UpdateJobApplicationStatus(_ context.Context, jobID int, update ApplicationStatusUpdate) (ApplicationTracker, error) {
+	m.gotUpdateJobStatusID = jobID
+	m.gotUpdateJobStatus = update
+	m.updateJobStatusCalls++
+	return m.updateJobStatus, m.updateJobStatusErr
 }
 
 func (m *mockClient) Profile(context.Context) (Profile, error) {
@@ -353,6 +385,29 @@ func TestJobDetailRendersApplyButton(t *testing.T) {
 	}
 }
 
+func TestJobDetailRendersPipelineStatusControls(t *testing.T) {
+	c := &JobDetailView{
+		JobID: 7,
+		Client: &mockClient{job: JobDetail{
+			ID:      7,
+			Title:   "Staff",
+			Company: "Acme",
+			Application: &ApplicationTracker{
+				ApplicationID:  9,
+				JobPostID:      7,
+				PipelineStatus: "interviewing",
+				PipelineStage:  "technical",
+			},
+		}},
+	}
+	html := renderHTML(t, c)
+	for _, want := range []string{"Application status", "pipeline-status-select", "pipeline-stage-select", "Interviewing", "Technical"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("job detail HTML missing status control %q\n%s", want, html)
+		}
+	}
+}
+
 // TestJobDetailNeverAppliesOnRender asserts the apply action is explicit: a full
 // render lifecycle (OnMount/OnPreRender) must never start an application.
 func TestJobDetailNeverAppliesOnRender(t *testing.T) {
@@ -361,6 +416,40 @@ func TestJobDetailNeverAppliesOnRender(t *testing.T) {
 	renderHTML(t, c)
 	if m.createAppCalls != 0 {
 		t.Errorf("apply ran on render: createAppCalls = %d, want 0", m.createAppCalls)
+	}
+}
+
+func TestJobDetailNeverUpdatesPipelineStatusOnRender(t *testing.T) {
+	m := &mockClient{job: JobDetail{ID: 7, Title: "X", Company: "Y"}}
+	c := &JobDetailView{JobID: 7, Client: m}
+	renderHTML(t, c)
+	if m.updateJobStatusCalls != 0 {
+		t.Fatalf("job status update calls after render = %d, want 0", m.updateJobStatusCalls)
+	}
+}
+
+func TestJobDetailDoJobStatusUpdate(t *testing.T) {
+	m := &mockClient{
+		job: JobDetail{ID: 7, Title: "X", Company: "Y"},
+		updateJobStatus: ApplicationTracker{
+			ApplicationID:  11,
+			JobPostID:      7,
+			PipelineStatus: "applied",
+			PipelineStage:  "waiting",
+		},
+	}
+	c := &JobDetailView{JobID: 7, Client: m}
+
+	c.doJobStatusUpdate(context.Background(), ApplicationStatusUpdate{PipelineStatus: "applied"})
+
+	if m.gotUpdateJobStatusID != 7 || m.gotUpdateJobStatus.PipelineStatus != "applied" {
+		t.Fatalf("unexpected job status call: id=%d update=%+v", m.gotUpdateJobStatusID, m.gotUpdateJobStatus)
+	}
+	if c.statusErr != "" || c.statusSaving {
+		t.Fatalf("unexpected status state: err=%q saving=%v", c.statusErr, c.statusSaving)
+	}
+	if c.job.Application == nil || c.job.Application.PipelineStage != "waiting" {
+		t.Fatalf("job application not updated: %+v", c.job.Application)
 	}
 }
 

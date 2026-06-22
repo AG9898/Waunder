@@ -140,6 +140,7 @@ func (p *ProfileView) doSave(ctx context.Context) {
 
 func (p *ProfileView) Render() app.UI {
 	return app.Div().Class("profile").Body(
+		renderAppTabs("profile"),
 		app.H1().Text("Profile"),
 		renderLoad(p.state, p.err, func() app.UI {
 			return app.Div().Class("profile-body").Body(

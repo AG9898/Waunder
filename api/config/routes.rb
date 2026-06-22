@@ -18,13 +18,15 @@ Rails.application.routes.draw do
     resource :push_subscription, only: %i[create destroy]
     get "digest", to: "digest#show"
     resources :job_posts, only: %i[index show create] do
+      patch :application_status, on: :member
       resources :contact_candidates, only: %i[index create]
     end
     resources :contact_candidates, only: [] do
       resources :outreach_drafts, only: %i[create]
     end
-    resources :applications, only: %i[show create] do
+    resources :applications, only: %i[index show create] do
       patch :draft, on: :member
+      patch :status, on: :member
       post :submit, on: :member
     end
     resources :worker_tasks, only: %i[index] do

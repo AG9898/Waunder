@@ -3,6 +3,17 @@ module Api
   class ApplicationsController < BaseController
     rescue_from ActiveRecord::RecordNotFound, with: :render_not_found
 
+    # User-facing application tracker. This is separate from the worker task
+    # queue: it lists every tracked Application, including manually marked
+    # jobs and drafts that have not been submitted yet.
+    def index
+      applications = ::Application
+        .includes(:application_draft, :audit_events, job_post: :company)
+        .order(Arel.sql("COALESCE(last_status_change_at, applications.updated_at) DESC"))
+
+      render json: { applications: applications.map { |application| serialize_tracker(application) } }
+    end
+
     # Generated draft for an application, for the PWA draft-review screen.
     # Read-only: it never generates a draft or calls the LLM (that happens in
     # GenerateApplicationDraftJob) and never submits.
@@ -22,6 +33,7 @@ module Api
       job_post = JobPost.find(params.dig(:application, :job_post_id) || params[:job_post_id])
       application = reusable_application_for(job_post) ||
         ::Application.create!(job_post: job_post, status: "draft")
+      application.apply_pipeline_status!(status: "drafting")
 
       GenerateApplicationDraftJob.perform_later(application) if application.application_draft.nil?
 
@@ -44,6 +56,7 @@ module Api
       result = ApplicationSubmitDispatcher.new(application).call
 
       if result.ok?
+        application.apply_pipeline_status!(status: "applied", stage: "waiting")
         render json: {
           status: "dispatched",
           application_id: application.id,
@@ -57,6 +70,13 @@ module Api
           }
         }, status: :unprocessable_content
       end
+    end
+
+    def status
+      application = ::Application.includes(job_post: :company).find(params[:id])
+      return unless update_pipeline_status(application)
+
+      render json: { application: serialize_tracker(application.reload) }
     end
 
     # Persists owner-reviewed edits to the worker-shaped autofill payload before
@@ -105,6 +125,11 @@ module Api
         job_title: job_post&.title,
         company: job_post&.company&.name,
         status: application.status,
+        pipeline_status: application.pipeline_status,
+        pipeline_stage: application.pipeline_stage,
+        pipeline_note: application.pipeline_note,
+        last_status_change_at: application.last_status_change_at,
+        next_follow_up_on: application.next_follow_up_on,
         resume_emphasis_notes: draft&.resume_emphasis_notes,
         cover_letter: draft&.cover_letter,
         draft_ready: draft_ready?(draft),
@@ -114,6 +139,62 @@ module Api
         autofill_warnings: serialize_autofill_warnings(draft&.autofill_payload),
         worker_report: serialize_latest_worker_report(application)
       }
+    end
+
+    def serialize_tracker(application)
+      job_post = application.job_post
+
+      {
+        application_id: application.id,
+        job_post_id: job_post.id,
+        job_title: job_post.title,
+        company: job_post.company&.name,
+        status: application.status,
+        automation_status: application.status,
+        pipeline_status: application.pipeline_status,
+        pipeline_stage: application.pipeline_stage,
+        pipeline_note: application.pipeline_note,
+        last_status_change_at: application.last_status_change_at,
+        next_follow_up_on: application.next_follow_up_on,
+        approved_at: application.approved_at,
+        submitted_at: application.submitted_at,
+        failure_reason: application.failure_reason,
+        draft_ready: draft_ready?(application.application_draft),
+        worker_report: serialize_latest_worker_report(application)
+      }
+    end
+
+    def update_pipeline_status(application)
+      status_params = pipeline_status_params
+      application.assign_pipeline_status(
+        status: status_params.fetch(:pipeline_status),
+        stage: status_params[:pipeline_stage],
+        note: status_params[:pipeline_note],
+        next_follow_up_on: status_params[:next_follow_up_on]
+      )
+
+      unless application.save
+        render_submit_error("invalid_status", application.errors.full_messages.to_sentence)
+        return false
+      end
+
+      application.audit_events.create!(
+        event_type: "pipeline_status_changed",
+        status: application.status,
+        metadata: {
+          "pipeline_status" => application.pipeline_status,
+          "pipeline_stage" => application.pipeline_stage,
+          "next_follow_up_on" => application.next_follow_up_on
+        }.compact
+      )
+      true
+    end
+
+    def pipeline_status_params
+      source = params[:application].presence || params
+      permitted = source.permit(:pipeline_status, :pipeline_stage, :pipeline_note, :next_follow_up_on)
+      permitted[:pipeline_status] = permitted[:pipeline_status].to_s
+      permitted
     end
 
     # Normalizes a stored [{field, value}, ...] list to string keys, tolerating

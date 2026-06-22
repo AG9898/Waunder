@@ -55,6 +55,14 @@ module Api
       }, status: :created
     end
 
+    def application_status
+      job_post = JobPost.includes(:company).find(params[:id])
+      application = tracked_application_for(job_post)
+      return unless update_pipeline_status(application)
+
+      render json: { application: serialize_application(application.reload) }
+    end
+
     private
 
     def job_post_params
@@ -92,6 +100,7 @@ module Api
         red_flags: job_post.red_flags,
         resume_alignment_notes: job_post.resume_alignment_notes,
         application_strategy: job_post.application_strategy,
+        application: serialize_application(job_post.applications.order(created_at: :desc).first),
         route: {
           route_type: route&.route_type,
           recommended_route: route&.recommended_route,
@@ -100,10 +109,72 @@ module Api
       }
     end
 
+    def tracked_application_for(job_post)
+      job_post.applications.order(created_at: :desc).first ||
+        job_post.applications.create!(status: "draft")
+    end
+
+    def update_pipeline_status(application)
+      status_params = pipeline_status_params
+      application.assign_pipeline_status(
+        status: status_params.fetch(:pipeline_status),
+        stage: status_params[:pipeline_stage],
+        note: status_params[:pipeline_note],
+        next_follow_up_on: status_params[:next_follow_up_on]
+      )
+
+      unless application.save
+        render_invalid_status(application.errors.full_messages.to_sentence)
+        return false
+      end
+
+      application.audit_events.create!(
+        event_type: "pipeline_status_changed",
+        status: application.status,
+        metadata: {
+          "pipeline_status" => application.pipeline_status,
+          "pipeline_stage" => application.pipeline_stage,
+          "next_follow_up_on" => application.next_follow_up_on
+        }.compact
+      )
+      true
+    end
+
+    def pipeline_status_params
+      source = params[:application].presence || params
+      permitted = source.permit(:pipeline_status, :pipeline_stage, :pipeline_note, :next_follow_up_on)
+      permitted[:pipeline_status] = permitted[:pipeline_status].to_s
+      permitted
+    end
+
+    def serialize_application(application)
+      return nil if application.nil?
+
+      {
+        application_id: application.id,
+        job_post_id: application.job_post_id,
+        status: application.status,
+        automation_status: application.status,
+        pipeline_status: application.pipeline_status,
+        pipeline_stage: application.pipeline_stage,
+        pipeline_note: application.pipeline_note,
+        last_status_change_at: application.last_status_change_at,
+        next_follow_up_on: application.next_follow_up_on,
+        submitted_at: application.submitted_at,
+        failure_reason: application.failure_reason
+      }
+    end
+
     def render_not_found
       render json: {
         error: { code: "not_found", message: "JobPost not found" }
       }, status: :not_found
+    end
+
+    def render_invalid_status(message)
+      render json: {
+        error: { code: "invalid_status", message: message }
+      }, status: :unprocessable_content
     end
   end
 end

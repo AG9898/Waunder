@@ -57,6 +57,7 @@ func (j *JobList) load(ctx app.Context) {
 
 func (j *JobList) Render() app.UI {
 	return app.Div().Class("job-list").Body(
+		renderAppTabs("jobs"),
 		app.H1().Text("Jobs"),
 		renderLoad(j.state, j.err, func() app.UI {
 			if len(j.jobs) == 0 {
@@ -99,6 +100,9 @@ type JobDetailView struct {
 
 	applyState applyStatus
 	applyErr   string
+
+	statusSaving bool
+	statusErr    string
 }
 
 // applyStatus tracks the explicit "start application" action, separate from the
@@ -223,6 +227,7 @@ func (d *JobDetailView) Render() app.UI {
 					return app.P().Class("job-strategy").Text(job.ApplicationStrategy)
 				}),
 				renderRoute(job.Route),
+				d.renderPipelineStatus(job.Application),
 				d.renderApply(),
 				app.A().
 					Class("job-contacts-link").
@@ -231,6 +236,93 @@ func (d *JobDetailView) Render() app.UI {
 			)
 		}),
 	)
+}
+
+func (d *JobDetailView) renderPipelineStatus(application *ApplicationTracker) app.UI {
+	status := "interested"
+	stage := ""
+	if application != nil {
+		status = application.PipelineStatus
+		stage = application.PipelineStage
+	}
+	return app.Div().Class("job-pipeline-status").Body(
+		app.H2().Text("Application status"),
+		app.Label().Class("pipeline-select-label").Body(
+			app.Span().Text("Status"),
+			app.Select().
+				Class("pipeline-status-select").
+				OnChange(d.jobStatusSetter(stage)).
+				Body(pipelineStatusOptions(status)...),
+		),
+		app.Label().Class("pipeline-select-label").Body(
+			app.Span().Text("Stage"),
+			app.Select().
+				Class("pipeline-stage-select").
+				OnChange(d.jobStageSetter(status)).
+				Body(pipelineStageOptions(stage)...),
+		),
+		app.If(d.statusSaving, func() app.UI {
+			return app.P().Class("job-pipeline-saving").Text("Saving…")
+		}),
+		app.If(d.statusErr != "", func() app.UI {
+			return app.P().Class("job-pipeline-error").Text(d.statusErr)
+		}),
+	)
+}
+
+func (d *JobDetailView) jobStatusSetter(_ string) app.EventHandler {
+	return func(ctx app.Context, _ app.Event) {
+		next := ctx.JSSrc().Get("value").String()
+		d.saveJobPipelineStatus(ctx, ApplicationStatusUpdate{PipelineStatus: next})
+	}
+}
+
+func (d *JobDetailView) jobStageSetter(status string) app.EventHandler {
+	return func(ctx app.Context, _ app.Event) {
+		next := ctx.JSSrc().Get("value").String()
+		if status == "" {
+			status = "interested"
+		}
+		d.saveJobPipelineStatus(ctx, ApplicationStatusUpdate{PipelineStatus: status, PipelineStage: next})
+	}
+}
+
+func (d *JobDetailView) saveJobPipelineStatus(ctx app.Context, update ApplicationStatusUpdate) {
+	if d.statusSaving {
+		return
+	}
+	d.statusSaving = true
+	d.statusErr = ""
+	ctx.Update()
+	reqCtx := ctx.Context
+	id := d.JobID
+	ctx.Async(func() {
+		application, err := d.Client.UpdateJobApplicationStatus(reqCtx, id, update)
+		ctx.Dispatch(func(ctx app.Context) {
+			d.applyJobStatusResult(application, err)
+			ctx.Update()
+		})
+	})
+}
+
+func (d *JobDetailView) doJobStatusUpdate(ctx context.Context, update ApplicationStatusUpdate) {
+	d.statusSaving = true
+	application, err := d.Client.UpdateJobApplicationStatus(ctx, d.JobID, update)
+	d.applyJobStatusResult(application, err)
+}
+
+func (d *JobDetailView) applyJobStatusResult(application ApplicationTracker, err error) {
+	d.statusSaving = false
+	if err != nil {
+		if IsUnauthorized(err) {
+			d.statusErr = sessionExpiredMessage
+		} else {
+			d.statusErr = "Could not update application status."
+		}
+		return
+	}
+	d.job.Application = &application
+	d.statusErr = ""
 }
 
 // renderApply shows the explicit "start application" control: it prepares a
@@ -295,6 +387,7 @@ func (v *DigestView) load(ctx app.Context) {
 
 func (v *DigestView) Render() app.UI {
 	return app.Div().Class("digest").Body(
+		renderAppTabs("digest"),
 		app.H1().Text("Daily digest"),
 		renderLoad(v.state, v.err, func() app.UI {
 			return app.Div().Class("digest-body").Body(

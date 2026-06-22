@@ -175,6 +175,30 @@ RSpec.describe "Api job posts", type: :request do
         "recommended_route" => "direct_ats",
         "application_url" => "https://boards.greenhouse.io/acme"
       )
+      expect(detail["application"]).to be_nil
+    end
+
+    it "includes the current tracker state when a job has an application" do
+      sign_in!
+      company = Company.create!(name: "Acme")
+      job_post = JobPost.create!(company: company, title: "Staff Engineer")
+      application = Application.create!(
+        job_post: job_post,
+        status: "draft",
+        pipeline_status: "interviewing",
+        pipeline_stage: "phone_screen"
+      )
+
+      get "/api/job_posts/#{job_post.id}"
+
+      expect(response).to have_http_status(:ok)
+      tracker = JSON.parse(response.body).dig("job_post", "application")
+      expect(tracker).to include(
+        "application_id" => application.id,
+        "automation_status" => "draft",
+        "pipeline_status" => "interviewing",
+        "pipeline_stage" => "phone_screen"
+      )
     end
 
     it "returns the consistent JSON error shape for an unknown id" do
@@ -192,6 +216,51 @@ RSpec.describe "Api job posts", type: :request do
       get "/api/job_posts/1"
 
       expect(response).to have_http_status(:unauthorized)
+    end
+  end
+
+  describe "PATCH /api/job_posts/:id/application_status" do
+    it "creates a tracker application for a job and updates its pipeline state" do
+      sign_in!
+      company = Company.create!(name: "Acme")
+      job_post = JobPost.create!(company: company, title: "Staff Engineer")
+
+      expect do
+        patch "/api/job_posts/#{job_post.id}/application_status", params: {
+          application: { pipeline_status: "applied" }
+        }
+      end.to change(Application, :count).by(1)
+        .and change(AuditEvent, :count).by(1)
+
+      expect(response).to have_http_status(:ok)
+      tracker = JSON.parse(response.body).fetch("application")
+      expect(tracker).to include(
+        "job_post_id" => job_post.id,
+        "automation_status" => "draft",
+        "pipeline_status" => "applied",
+        "pipeline_stage" => "waiting"
+      )
+      app = Application.sole
+      expect(app.job_post).to eq(job_post)
+      expect(app.status).to eq("draft")
+      expect(app.pipeline_status).to eq("applied")
+      expect(app.pipeline_stage).to eq("waiting")
+    end
+
+    it "reuses the latest application for manual status changes" do
+      sign_in!
+      company = Company.create!(name: "Acme")
+      job_post = JobPost.create!(company: company, title: "Staff Engineer")
+      existing = Application.create!(job_post: job_post, status: "draft")
+
+      expect do
+        patch "/api/job_posts/#{job_post.id}/application_status", params: {
+          application: { pipeline_status: "rejected", pipeline_stage: "" }
+        }
+      end.not_to change(Application, :count)
+
+      expect(response).to have_http_status(:ok)
+      expect(existing.reload.pipeline_status).to eq("rejected")
     end
   end
 end

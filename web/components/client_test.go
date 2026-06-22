@@ -137,6 +137,86 @@ func TestClientUpdateApplicationDraftSendsAnswers(t *testing.T) {
 	}
 }
 
+func TestClientApplicationsDecodesTrackerList(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/applications" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(`{"applications":[{"application_id":7,"job_post_id":42,"job_title":"Staff","company":"Acme","automation_status":"submitted","pipeline_status":"applied","pipeline_stage":"waiting"}]}`))
+	}))
+	defer srv.Close()
+
+	c := &httpRailsClient{http: srv.Client(), base: srv.URL}
+	applications, err := c.Applications(context.Background())
+	if err != nil {
+		t.Fatalf("Applications: %v", err)
+	}
+	if len(applications) != 1 || applications[0].PipelineStatus != "applied" || applications[0].JobPostID != 42 {
+		t.Errorf("unexpected applications decode: %+v", applications)
+	}
+}
+
+func TestClientUpdateApplicationStatusSendsPipelineUpdate(t *testing.T) {
+	var gotPath string
+	var gotBody struct {
+		Application ApplicationStatusUpdate `json:"application"`
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		if r.Method != http.MethodPatch {
+			t.Errorf("method = %s, want PATCH", r.Method)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		_, _ = w.Write([]byte(`{"application":{"application_id":7,"job_post_id":42,"pipeline_status":"interviewing","pipeline_stage":"technical"}}`))
+	}))
+	defer srv.Close()
+
+	c := &httpRailsClient{http: srv.Client(), base: srv.URL}
+	application, err := c.UpdateApplicationStatus(context.Background(), 7, ApplicationStatusUpdate{
+		PipelineStatus: "interviewing",
+		PipelineStage:  "technical",
+	})
+	if err != nil {
+		t.Fatalf("UpdateApplicationStatus: %v", err)
+	}
+	if gotPath != "/api/applications/7/status" {
+		t.Errorf("path = %q, want /api/applications/7/status", gotPath)
+	}
+	if gotBody.Application.PipelineStatus != "interviewing" || gotBody.Application.PipelineStage != "technical" {
+		t.Errorf("unexpected body: %+v", gotBody)
+	}
+	if application.PipelineStage != "technical" {
+		t.Errorf("unexpected response: %+v", application)
+	}
+}
+
+func TestClientUpdateJobApplicationStatusSendsPipelineUpdate(t *testing.T) {
+	var gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		if r.Method != http.MethodPatch {
+			t.Errorf("method = %s, want PATCH", r.Method)
+		}
+		_, _ = w.Write([]byte(`{"application":{"application_id":9,"job_post_id":42,"pipeline_status":"applied","pipeline_stage":"waiting"}}`))
+	}))
+	defer srv.Close()
+
+	c := &httpRailsClient{http: srv.Client(), base: srv.URL}
+	application, err := c.UpdateJobApplicationStatus(context.Background(), 42, ApplicationStatusUpdate{PipelineStatus: "applied"})
+	if err != nil {
+		t.Fatalf("UpdateJobApplicationStatus: %v", err)
+	}
+	if gotPath != "/api/job_posts/42/application_status" {
+		t.Errorf("path = %q, want /api/job_posts/42/application_status", gotPath)
+	}
+	if application.ApplicationID != 9 || application.PipelineStage != "waiting" {
+		t.Errorf("unexpected response: %+v", application)
+	}
+}
+
 func TestAPIErrorCodeParsesRailsErrorShape(t *testing.T) {
 	err := &APIError{
 		Status: http.StatusUnprocessableEntity,

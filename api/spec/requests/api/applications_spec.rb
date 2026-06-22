@@ -59,6 +59,40 @@ RSpec.describe "Api applications", type: :request do
     app
   end
 
+  describe "GET /api/applications" do
+    it "returns the application tracker list with job context and pipeline state" do
+      sign_in!
+      app = build_application(status: "submitted", approved_at: 1.hour.ago)
+      app.update!(
+        pipeline_status: "applied",
+        pipeline_stage: "waiting",
+        last_status_change_at: Time.current,
+        submitted_at: Time.current
+      )
+
+      get "/api/applications"
+
+      expect(response).to have_http_status(:ok)
+      application = JSON.parse(response.body).fetch("applications").sole
+      expect(application).to include(
+        "application_id" => app.id,
+        "job_post_id" => app.job_post_id,
+        "job_title" => "Senior Backend Engineer",
+        "company" => "Acme Corp",
+        "automation_status" => "submitted",
+        "pipeline_status" => "applied",
+        "pipeline_stage" => "waiting"
+      )
+      expect(application["submitted_at"]).to be_present
+    end
+
+    it "requires authentication" do
+      get "/api/applications"
+
+      expect(response).to have_http_status(:unauthorized)
+    end
+  end
+
   describe "POST /api/applications" do
     def build_job_post
       company = Company.create!(name: "Acme Corp")
@@ -83,6 +117,7 @@ RSpec.describe "Api applications", type: :request do
       expect(body["status"]).to eq("draft")
       app = Application.find(body["application_id"])
       expect(app.job_post).to eq(job_post)
+      expect(app.pipeline_status).to eq("drafting")
     end
 
     it "reuses an existing draft application and does not duplicate" do
@@ -148,6 +183,8 @@ RSpec.describe "Api applications", type: :request do
       app.reload
       expect(app.status).to eq("approved")
       expect(app.approved_at).to be_present
+      expect(app.pipeline_status).to eq("applied")
+      expect(app.pipeline_stage).to eq("waiting")
     end
 
     it "rejects unsupported ATS targets and does not enqueue" do
@@ -195,6 +232,47 @@ RSpec.describe "Api applications", type: :request do
 
       expect(response).to have_http_status(:unauthorized)
       expect(enqueued_jobs).to be_empty
+    end
+  end
+
+  describe "PATCH /api/applications/:id/status" do
+    it "updates user-facing pipeline status without changing automation status" do
+      sign_in!
+      app = build_application(status: "approved", approved_at: Time.current)
+
+      expect do
+        patch "/api/applications/#{app.id}/status", params: {
+          application: {
+            pipeline_status: "interviewing",
+            pipeline_stage: "technical",
+            pipeline_note: "Second round scheduled",
+            next_follow_up_on: "2026-06-30"
+          }
+        }
+      end.to change(AuditEvent, :count).by(1)
+
+      expect(response).to have_http_status(:ok)
+      body = JSON.parse(response.body).fetch("application")
+      expect(body).to include(
+        "automation_status" => "approved",
+        "pipeline_status" => "interviewing",
+        "pipeline_stage" => "technical",
+        "pipeline_note" => "Second round scheduled",
+        "next_follow_up_on" => "2026-06-30"
+      )
+      expect(app.reload.status).to eq("approved")
+    end
+
+    it "rejects unknown pipeline statuses" do
+      sign_in!
+      app = build_application
+
+      patch "/api/applications/#{app.id}/status", params: {
+        application: { pipeline_status: "made_up" }
+      }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(JSON.parse(response.body).dig("error", "code")).to eq("invalid_status")
     end
   end
 

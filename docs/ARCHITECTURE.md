@@ -77,7 +77,9 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   created post with a `/jobs/:id` link to follow it into the feed once Rails scores it), a single
   job's scored detail (`/jobs/:id`, `components.JobDetailView` — summary, match score,
   relevant/missing requirements, red flags, alignment/strategy notes, and the resolved
-  application route), the application draft review (`/applications/:id`,
+  application route), the applications tracker (`/applications`,
+  `components.ApplicationsView` — tracked applications with status/stage controls), the
+  application draft review (`/applications/:id`,
   `components.DraftReview` — resume emphasis, cover letter, structured answers, and a read-only
   worker autofill preview, plus an explicit approve+submit control), the contacts/outreach screen
   (`/jobs/:id/contacts`, `components.ContactsView` — saved contact candidates for a job plus
@@ -106,7 +108,10 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   `draft_ready`, `autofill_warnings`, and latest worker failure context) and can persist reviewed
   autofill answer edits via `PATCH /api/applications/:id/draft` before submit. It submits via
   `POST /api/applications/:id/submit` (already served; returns `{status: "dispatched", ...}` or
-  an error). The submit is fired only on an explicit user click — never on mount/render — and is
+  an error). The applications tracker reads `GET /api/applications` and updates user-facing
+  pipeline state with `PATCH /api/applications/:id/status`; job detail can create/reuse the
+  tracker application for a job with `PATCH /api/job_posts/:id/application_status`. These tracker
+  updates never submit or enqueue worker jobs. The submit is fired only on an explicit user click — never on mount/render — and is
   disabled until a draft/autofill payload is ready and Rails reports no manual-review warnings,
   which upholds the per-application approval rule; the dispatched ATS from the submit response is
   surfaced as the audit result. The apply flow's front door is `POST /api/applications`
@@ -116,12 +121,15 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   review the generated draft. Per RESOLVED-19 the submit endpoint is a **single-click
   approve+submit**: it marks the application `approved`/`approved_at` (the user's explicit
   per-application approval) before invoking `ApplicationSubmitDispatcher`, which still re-checks the
-  supported-ATS and clean-payload (no unresolved/sensitive fields) gates. Trusted auto-submit covers
+  supported-ATS and clean-payload (no unresolved/sensitive fields) gates and moves the user-facing
+  tracker to `applied`/`waiting` on successful dispatch. Trusted auto-submit covers
   Greenhouse/Lever/Ashby, plus LinkedIn Easy Apply when `LINKEDIN_EASY_APPLY_ENABLED` is true;
   every other route stays manual via the external "Open application" link. Rails now serves `GET /api/applications/:id`:
   session-guarded, read-only, returning `{application: {application_id, job_title, company,
-  status, resume_emphasis_notes, cover_letter, draft_ready, failure_reason, structured_answers,
-  autofill_payload, autofill_warnings, worker_report}}` where `autofill_payload` is the
+  status, pipeline_status, pipeline_stage, pipeline_note, last_status_change_at,
+  next_follow_up_on, resume_emphasis_notes, cover_letter, draft_ready, failure_reason,
+  structured_answers, autofill_payload, autofill_warnings, worker_report}}` where
+  `autofill_payload` is the
   worker-shaped preview (`ats`, `apply_url`, `answers`, `resume_ref`) the draft generator already
   built. `PATCH /api/applications/:id/draft` updates only the reviewed `answers` list, preserving
   Rails-owned ATS/routing/resume metadata. The read never generates a draft, calls the LLM, or
@@ -257,8 +265,9 @@ The full topology and the rationale for the `/api` proxy routing decision live i
    not accepted on this endpoint.
 6. The worker uses Playwright to fill the supported ATS form, then posts its terminal result to
    `POST /api/worker_tasks/:id/report` with status, reason, screenshot references, and logs.
-7. Rails updates the final application status and records a `worker_status_reported`
-   `AuditEvent` containing the audit artifacts.
+7. Rails updates the final worker automation status, records a `worker_status_reported`
+   `AuditEvent` containing the audit artifacts, and syncs the user-facing tracker:
+   `submitted` confirms applied/waiting while `paused` or `failed` becomes needs review.
 
 ---
 

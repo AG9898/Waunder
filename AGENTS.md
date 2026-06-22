@@ -745,3 +745,11 @@ version, and keep `processTask` catching page-factory/browser-launch errors so R
 failed worker report instead of the process crash-looping. Do not let `browser.close()` errors escape
 either; cleanup failures should be appended to result logs so the worker can still POST the terminal
 status.
+
+### 2026-06-22 — Application tracker status is separate from worker status
+`applications.status` remains the trusted-submit/worker lifecycle (`draft`/`approved`/`submitted`/
+`paused`/`failed`), while the user-facing tracker uses `pipeline_status` plus optional
+`pipeline_stage` (`applied` + `waiting` means submitted but awaiting a response). Manual tracker
+changes (`PATCH /api/applications/:id/status`, `PATCH /api/job_posts/:id/application_status`) must
+never enqueue worker jobs; successful submit/report syncs the tracker to applied/waiting, and
+paused/failed worker reports sync it to needs_review.

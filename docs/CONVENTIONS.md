@@ -236,9 +236,11 @@ dispatch.
   directly.
 - `ApplicationRoute::ROUTE_TYPES` is the canonical route-type list. Keep the model inclusion
   validation and the database check constraint in sync whenever route types change.
-- `Application::STATUSES` is the canonical application lifecycle (`draft`, `approved`,
-  `submitted`, `paused`, `failed`). Keep the model inclusion validation and database check
-  constraints in sync whenever lifecycle values change.
+- `Application::STATUSES` is the canonical worker automation lifecycle (`draft`, `approved`,
+  `submitted`, `paused`, `failed`). `Application::PIPELINE_STATUSES` is the owner-facing tracker
+  lifecycle (`interested`, `drafting`, `applied`, `interviewing`, `offer`, `rejected`,
+  `withdrawn`, `archived`, `needs_review`), with optional slug-style `pipeline_stage`. Keep model
+  validations and database check constraints in sync whenever status values change.
 - Sensitive resume/profile fields use Active Record Encryption (`encrypts :field`) so they are
   encrypted at rest.
 - `DATABASE_URL` comes from the environment only — never hardcode connection strings.
@@ -256,8 +258,12 @@ dispatch.
   `WorkerDispatchJob`. `Api::WorkerTasksController#index` exposes only approved applications with
   a `submit_dispatched` audit event as worker-shaped tasks, and `#report` accepts only terminal
   worker statuses (`submitted`, `paused`, `failed`), updates the `Application`, and stores
-  screenshots/log refs on a `worker_status_reported` `AuditEvent`. The worker enforces the
-  matching guard on its side (see below).
+  screenshots/log refs on a `worker_status_reported` `AuditEvent`. User-facing pipeline status is
+  separate: successful submit/report moves the tracker to `applied`/`waiting`, while paused/failed
+  worker reports move it to `needs_review`. Manual tracker updates use
+  `PATCH /api/applications/:id/status` or `PATCH /api/job_posts/:id/application_status`; those
+  endpoints must never enqueue worker jobs. The worker enforces the matching guard on its side
+  (see below).
 
 ---
 

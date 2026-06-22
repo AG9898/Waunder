@@ -193,6 +193,8 @@ func (r *DraftReview) applySubmitResult(res SubmitResult, err error) {
 		return
 	}
 	r.submitResult = res
+	r.draft.PipelineStatus = "applied"
+	r.draft.PipelineStage = "waiting"
 	r.submit = submitDone
 }
 
@@ -228,6 +230,10 @@ func (r *DraftReview) Render() app.UI {
 				app.H1().Class("draft-title").Text(draftHeading(d)),
 				app.If(d.Status != "", func() app.UI {
 					return app.P().Class("draft-status").Text("Status: " + d.Status)
+				}),
+				app.If(d.PipelineStatus != "", func() app.UI {
+					return app.P().Class("draft-pipeline-status").
+						Text("Application: " + PipelineStatusLabel(d.PipelineStatus, d.PipelineStage))
 				}),
 				app.If(d.ResumeEmphasis != "", func() app.UI {
 					return app.Div().Class("draft-resume-emphasis").Body(

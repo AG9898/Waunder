@@ -56,6 +56,20 @@ type RailsClient interface {
 	// user action; Rails dispatches the trusted submit task to the worker.
 	SubmitApplication(ctx context.Context, id int) (SubmitResult, error)
 
+	// Applications fetches the user-facing application tracker
+	// (GET /api/applications). This is distinct from the worker task queue: it
+	// lists pipeline status/stage for jobs the owner is tracking.
+	Applications(ctx context.Context) ([]ApplicationTracker, error)
+
+	// UpdateApplicationStatus changes a tracked application's user-facing
+	// pipeline state (PATCH /api/applications/:id/status). It never submits.
+	UpdateApplicationStatus(ctx context.Context, id int, update ApplicationStatusUpdate) (ApplicationTracker, error)
+
+	// UpdateJobApplicationStatus changes or creates the tracked application
+	// state for a job post (PATCH /api/job_posts/:id/application_status). It is
+	// used by job-detail status controls and never submits.
+	UpdateJobApplicationStatus(ctx context.Context, jobID int, update ApplicationStatusUpdate) (ApplicationTracker, error)
+
 	// Profile fetches the single-user structured profile (GET /api/profile).
 	// Sensitive contact details come back as presence flags only; Rails never
 	// serializes the raw encrypted PII.
@@ -221,19 +235,20 @@ type JobSummary struct {
 // alignment and application strategy notes, and the deterministically
 // resolved application route.
 type JobDetail struct {
-	ID                   int      `json:"id"`
-	Title                string   `json:"title"`
-	Company              string   `json:"company"`
-	PostingURL           string   `json:"posting_url"`
-	MatchScore           *int     `json:"match_score"`
-	ScoringStatus        string   `json:"scoring_status"`
-	Summary              string   `json:"summary"`
-	RelevantRequirements []string `json:"relevant_requirements"`
-	MissingRequirements  []string `json:"missing_requirements"`
-	RedFlags             []string `json:"red_flags"`
-	ResumeAlignment      string   `json:"resume_alignment_notes"`
-	ApplicationStrategy  string   `json:"application_strategy"`
-	Route                JobRoute `json:"route"`
+	ID                   int                 `json:"id"`
+	Title                string              `json:"title"`
+	Company              string              `json:"company"`
+	PostingURL           string              `json:"posting_url"`
+	MatchScore           *int                `json:"match_score"`
+	ScoringStatus        string              `json:"scoring_status"`
+	Summary              string              `json:"summary"`
+	RelevantRequirements []string            `json:"relevant_requirements"`
+	MissingRequirements  []string            `json:"missing_requirements"`
+	RedFlags             []string            `json:"red_flags"`
+	ResumeAlignment      string              `json:"resume_alignment_notes"`
+	ApplicationStrategy  string              `json:"application_strategy"`
+	Route                JobRoute            `json:"route"`
+	Application          *ApplicationTracker `json:"application"`
 }
 
 // JobRoute is the resolved application route for a job: how the application
@@ -261,6 +276,11 @@ type ApplicationDraft struct {
 	JobTitle          string             `json:"job_title"`
 	Company           string             `json:"company"`
 	Status            string             `json:"status"`
+	PipelineStatus    string             `json:"pipeline_status"`
+	PipelineStage     string             `json:"pipeline_stage"`
+	PipelineNote      string             `json:"pipeline_note"`
+	LastStatusChange  string             `json:"last_status_change_at"`
+	NextFollowUpOn    string             `json:"next_follow_up_on"`
 	ResumeEmphasis    string             `json:"resume_emphasis_notes"`
 	CoverLetter       string             `json:"cover_letter"`
 	DraftReady        bool               `json:"draft_ready"`
@@ -269,6 +289,37 @@ type ApplicationDraft struct {
 	Autofill          AutofillPreview    `json:"autofill_payload"`
 	AutofillWarnings  []AutofillWarning  `json:"autofill_warnings"`
 	WorkerReport      *WorkerReport      `json:"worker_report"`
+}
+
+// ApplicationTracker is the user-facing status row for a job application. The
+// pipeline fields are separate from AutomationStatus, which remains Rails'
+// worker-submit lifecycle.
+type ApplicationTracker struct {
+	ApplicationID    int           `json:"application_id"`
+	JobPostID        int           `json:"job_post_id"`
+	JobTitle         string        `json:"job_title"`
+	Company          string        `json:"company"`
+	Status           string        `json:"status"`
+	AutomationStatus string        `json:"automation_status"`
+	PipelineStatus   string        `json:"pipeline_status"`
+	PipelineStage    string        `json:"pipeline_stage"`
+	PipelineNote     string        `json:"pipeline_note"`
+	LastStatusChange string        `json:"last_status_change_at"`
+	NextFollowUpOn   string        `json:"next_follow_up_on"`
+	ApprovedAt       string        `json:"approved_at"`
+	SubmittedAt      string        `json:"submitted_at"`
+	FailureReason    string        `json:"failure_reason"`
+	DraftReady       bool          `json:"draft_ready"`
+	WorkerReport     *WorkerReport `json:"worker_report"`
+}
+
+// ApplicationStatusUpdate is the user-facing pipeline edit. Status is required;
+// stage/note/follow-up are optional.
+type ApplicationStatusUpdate struct {
+	PipelineStatus string `json:"pipeline_status"`
+	PipelineStage  string `json:"pipeline_stage"`
+	PipelineNote   string `json:"pipeline_note"`
+	NextFollowUpOn string `json:"next_follow_up_on"`
 }
 
 // StructuredAnswer is one reviewed question/answer pair the worker will fill.
@@ -447,6 +498,38 @@ func (c *httpRailsClient) SubmitApplication(ctx context.Context, id int) (Submit
 		return SubmitResult{}, err
 	}
 	return out, nil
+}
+
+func (c *httpRailsClient) Applications(ctx context.Context) ([]ApplicationTracker, error) {
+	var out struct {
+		Applications []ApplicationTracker `json:"applications"`
+	}
+	if err := c.get(ctx, "/api/applications", &out); err != nil {
+		return nil, err
+	}
+	return out.Applications, nil
+}
+
+func (c *httpRailsClient) UpdateApplicationStatus(ctx context.Context, id int, update ApplicationStatusUpdate) (ApplicationTracker, error) {
+	body := map[string]any{"application": update}
+	var out struct {
+		Application ApplicationTracker `json:"application"`
+	}
+	if err := c.sendJSON(ctx, http.MethodPatch, fmt.Sprintf("/api/applications/%d/status", id), body, &out); err != nil {
+		return ApplicationTracker{}, err
+	}
+	return out.Application, nil
+}
+
+func (c *httpRailsClient) UpdateJobApplicationStatus(ctx context.Context, jobID int, update ApplicationStatusUpdate) (ApplicationTracker, error) {
+	body := map[string]any{"application": update}
+	var out struct {
+		Application ApplicationTracker `json:"application"`
+	}
+	if err := c.sendJSON(ctx, http.MethodPatch, fmt.Sprintf("/api/job_posts/%d/application_status", jobID), body, &out); err != nil {
+		return ApplicationTracker{}, err
+	}
+	return out.Application, nil
 }
 
 func (c *httpRailsClient) Profile(ctx context.Context) (Profile, error) {

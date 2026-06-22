@@ -24,6 +24,11 @@ module Api
         submitted_at: status == "submitted" ? Time.current : application.submitted_at,
         failure_reason: status == "submitted" ? nil : params[:reason].presence
       )
+      if status == "submitted"
+        application.apply_pipeline_status!(status: "applied", stage: "waiting")
+      elsif %w[paused failed].include?(status)
+        application.apply_pipeline_status!(status: "needs_review")
+      end
       application.audit_events.create!(
         event_type: "worker_status_reported",
         status: status,

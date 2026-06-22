@@ -32,6 +32,11 @@ Phase 1 delivers the full plan scenario: forward a job-alert email → Resend in
 - **Application route resolution** separating where a job was discovered from where it should be submitted. Stores source URL, canonical posting URL, application URL, route type, recommended route, and route confidence. Route types: `company_careers`, `greenhouse`, `lever`, `ashby`, `workday`, `linkedin_easy_apply`, `indeed_apply`, `glassdoor_apply`, `unknown`. Preference order: Direct ATS/company application URL > company careers page > job-board external apply URL > LinkedIn Easy Apply / Indeed Apply / Glassdoor Apply > manual apply only.
 - **LLM scoring and summaries** via OpenRouter (structured JSON where supported): job summary, match score, relevant requirements, missing/weak requirements, resume alignment notes, suggested application strategy, and red flags.
 - **Application assistance**: tailored resume emphasis notes, cover letter / message drafts where relevant, structured application answers, and reviewable/editable autofill payloads for known form systems.
+- **Application tracking**: every job can be tracked through a user-facing pipeline status and
+  optional stage independent of the worker automation status. The owner can mark jobs as
+  interested, drafting, applied/waiting, interviewing, offer, rejected, withdrawn, archived, or
+  needing review from the PWA. Successful trusted submit/report moves the tracker to
+  applied/waiting; worker pauses/failures move it to needs review.
 - **Trusted submit** to Greenhouse, Lever, and Ashby. LinkedIn Easy Apply is treated as higher-risk and gated behind an explicit feature flag. Submit only proceeds with explicit owner approval, a supported target, no unknown/sensitive fields, and an auditable status result.
 - **LinkedIn contact and outreach**: save contact candidates linked to jobs, track why each is relevant, and generate tailored outreach drafts from a loose template. Drafts are presented prefilled for manual sending — never auto-sent.
 - **Web push digest** via the VAPID-keyed Web Push API delivered to the installed PWA's service worker (the daily digest).
@@ -59,6 +64,8 @@ Phase 1 delivers the full plan scenario: forward a job-alert email → Resend in
 - A forwarded job-alert email reliably becomes a normalized, scored job record.
 - The daily push digest is delivered to the installed PWA via Web Push (VAPID).
 - The owner can review a scored job and a generated application draft, and must approve before any submit occurs.
+- The owner can see tracked applications in the PWA, manually change pipeline status/stage, and
+  treat submitted applications as applied/waiting while later interview stages remain trackable.
 - The worker fills supported ATS forms (Greenhouse, Lever, Ashby) and pauses or fails safely on unknown or sensitive fields, reporting an auditable status with logs/screenshots back to Rails.
 - Sensitive resume/profile fields are encrypted at rest (Rails encryption).
 - Trusted submit never fires without explicit per-application approval and the Rails submit gate

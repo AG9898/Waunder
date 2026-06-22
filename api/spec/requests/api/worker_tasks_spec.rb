@@ -139,6 +139,22 @@ RSpec.describe "Api worker tasks", type: :request do
       expect(application.status).to eq("submitted")
       expect(application.submitted_at).to be_present
       expect(application.failure_reason).to be_nil
+      expect(application.pipeline_status).to eq("applied")
+      expect(application.pipeline_stage).to eq("waiting")
+    end
+
+    it "marks failed or paused worker outcomes as needing review in the tracker" do
+      application = build_dispatched_application
+
+      post "/api/worker_tasks/#{application.id}/report",
+           params: { status: "failed", reason: "browser launch failed", screenshots: [], logs: [] },
+           headers: worker_headers
+
+      expect(response).to have_http_status(:ok)
+      application.reload
+      expect(application.status).to eq("failed")
+      expect(application.pipeline_status).to eq("needs_review")
+      expect(application.failure_reason).to eq("browser launch failed")
     end
 
     it "rejects a human session cookie without a worker bearer token" do

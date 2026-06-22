@@ -55,13 +55,16 @@ Be honest about the current state — most of the suite is still to be written.
   auth gating with no enqueue on refused paths; plus `GET /api/applications/:id` and `PATCH
   /api/applications/:id/draft`, covering draft + job context, editable worker-shaped autofill
   preview, safety warnings, read-only GET behavior (no audit/enqueue), unknown-id not-found JSON
-  shape, malformed edit rejection, and auth gating.
+  shape, malformed edit rejection, and auth gating; plus `GET /api/applications` and
+  `PATCH /api/applications/:id/status`, covering tracker list/update behavior and
+  automation-vs-pipeline status separation.
 - **api/** — `spec/requests/api/job_posts_spec.rb`: request specs for authenticated manual
   `POST /api/job_posts`, covering deterministic JobPost creation, route resolution, scoring-job
   enqueueing, unauthenticated refusal, and invalid-input JSON errors; plus the read endpoints
   `GET /api/job_posts` (scored feed ranked by match score, auth gating) and
-  `GET /api/job_posts/:id` (scored detail + resolved route, unknown-id not-found JSON shape, auth
-  gating).
+  `GET /api/job_posts/:id` (scored detail, resolved route, current tracker state, auth gating),
+  plus `PATCH /api/job_posts/:id/application_status` for tracker application create/reuse and
+  status updates.
 - **api/** — `spec/requests/api/digest_spec.rb`: request specs for `GET /api/digest`, covering the
   latest digest of recently scored JobPosts (no scoring/LLM on read), the empty-jobs case, and 401
   auth gating.
@@ -126,12 +129,13 @@ Be honest about the current state — most of the suite is still to be written.
 - **web/** — `components/pwa_test.go`: table-driven `go test` coverage of the PWA install/push
   gating helpers — iOS/iPadOS detection and version parsing (`DetectIOS`), the iOS 16.4+ Web Push
   threshold (`SupportsIOSWebPush`), and the install/permission gate decision (`EvaluatePushGate`).
-- **web/** — `components/jobs_test.go`, `components/login_test.go`, `components/client_test.go`:
-  render tests for the job list, job detail, and daily-digest screens (scored fields, empty,
+- **web/** — `components/jobs_test.go`, `components/applications_test.go`,
+  `components/login_test.go`, `components/client_test.go`: render tests for the job list, job
+  detail, applications tracker, and daily-digest screens (scored fields, tracker state, empty,
   error, and 401 states) plus the login form, driven by a mocked `RailsClient`. Render tests use
   the go-app `NewTestEngine` (which fires `OnPreRender`, so data screens load in both `OnMount`
   and `OnPreRender`). The `httpRailsClient` is exercised against an `httptest` server to assert
-  the `/api`-namespaced paths, JSON decode of scored fields/route, session-cookie carry between
+  the `/api`-namespaced paths, JSON decode of scored fields/route/tracker state, session-cookie carry between
   requests, and 401 → `APIError`/`IsUnauthorized` mapping. Pure helpers (`MatchScoreLabel`,
   `RouteLabel`, `jobIDFromPath`, `loginErrorStatus`) are table-tested.
 - **web/** — `components/profile_test.go`, `components/push_test.go`: render and unit tests for the
@@ -232,9 +236,10 @@ Keep this table up to date — add a row when adding a new test file.
 | `workers/src/worker.test.ts` | Worker orchestration | config loading, bearer-auth task fetch/report calls, clean idle without `API_INTERNAL_URL`, one-cycle poll orchestration, and unsupported-ATS safe failure |
 | `workers/src/ats/handlers.test.ts` | Worker ATS handlers | Playwright fixture coverage for Greenhouse/Lever/Ashby registration, approved field fill/submit, unknown required field pauses, and sensitive-field pauses |
 | `web/components/pwa_test.go` | Web (go-app PWA) | iOS/iPadOS detection + version parsing, iOS 16.4+ Web Push threshold, and the install/notification-permission gate decision |
-| `web/components/jobs_test.go` | Web (go-app PWA) | Job list / job detail / daily-digest render tests (scored fields, empty/error/401 states) via a mocked `RailsClient` and `NewTestEngine`; `MatchScoreLabel`/`RouteLabel`/`jobIDFromPath` helpers |
+| `web/components/jobs_test.go` | Web (go-app PWA) | Job list / job detail / daily-digest render tests (scored fields, tracker status controls, empty/error/401 states) via a mocked `RailsClient` and `NewTestEngine`; explicit no-apply/no-status-update-on-render assertions; `MatchScoreLabel`/`RouteLabel`/`jobIDFromPath` helpers |
+| `web/components/applications_test.go` | Web (go-app PWA) | Applications tracker render tests, empty/error/401 states, explicit no-status-update-on-render assertion, and direct status-update state tests |
 | `web/components/login_test.go` | Web (go-app PWA) | Login form render and `loginErrorStatus`/`loginButtonText` status mapping (401 → "Incorrect passphrase") |
-| `web/components/client_test.go` | Web (go-app PWA) | `httpRailsClient` against `httptest`: `/api`-namespaced paths, scored-field/route JSON decode, draft PATCH payload shape, Rails error-code parsing, session-cookie carry, 401 → `APIError` |
+| `web/components/client_test.go` | Web (go-app PWA) | `httpRailsClient` against `httptest`: `/api`-namespaced paths, scored-field/route/tracker JSON decode, application/job tracker PATCH payloads, draft PATCH payload shape, Rails error-code parsing, session-cookie carry, 401 → `APIError` |
 | `web/components/profile_test.go` | Web (go-app PWA) | Profile/resume render (editable fields, contact presence flags with no PII leak, resume metadata/empty) and `doSave` write path (reseed/error/401) via a mocked `RailsClient` |
 | `web/components/push_test.go` | Web (go-app PWA) | Push toggle subscribe/unsubscribe flow via a mocked `PushSubscriber` (public VAPID key fetched then persisted; browser cancel before Rails), state-mapping helpers, and no-auto-subscribe-on-render |
 | `web/components/contacts_test.go` | Web (go-app PWA) | Contacts/outreach render (candidate fields, empty/error/401), explicit `doGenerate` draft path, no-auto-generate-on-mount and no-send-affordance safety tests, and `applyGenerateResult`/`contactRole`/`generateButtonLabel`/`contactsJobIDFromPath` helpers, via a mocked `RailsClient` |
