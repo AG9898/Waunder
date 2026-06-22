@@ -48,6 +48,48 @@ RSpec.describe InboundEmailParser do
       expect(email.reload.raw_payload.dig("parse_result", "needs_llm_fallback")).to be(false)
     end
 
+    it "parses a real LinkedIn digest (title / tracked URL / Company · Location)" do
+      # Mirrors the actual digest layout: per job the job-view link sits BETWEEN
+      # the title and the "Company · Location" line, uses /comm/jobs/view/, and
+      # is surrounded by image-alt and promo noise.
+      text = <<~TEXT
+        Your job alert for *artificial intelligence engineer*
+        New jobs in Vancouver match your preferences.
+        [image: VRIFY]
+        <https://www.linkedin.com/comm/jobs/view/4388176608/?trk=eml-x&otpToken=abc>
+        Senior Geo Data Scientist
+        <https://www.linkedin.com/comm/jobs/view/4388176608/?trk=eml-y&otpToken=abc>
+        VRIFY · Canada (Remote)
+        [image: University of Calgary]
+        5 school alumni
+        [image: Microsoft]
+        <https://www.linkedin.com/comm/jobs/view/4431317239/?trk=eml-z>
+        Software Engineer
+        <https://www.linkedin.com/comm/jobs/view/4431317239/?trk=eml-z2>
+        Microsoft · Vancouver, BC (Hybrid)
+        Actively recruiting
+        See all jobs
+      TEXT
+      email = inbound_email(from: "LinkedIn Job Alerts <jobalerts-noreply@linkedin.com>", text:)
+
+      result = described_class.new(email).call
+
+      expect(result.parser.source_name).to eq("linkedin")
+      expect(result.job_posts.size).to eq(2)
+
+      first = result.job_posts.first
+      expect(first.title).to eq("Senior Geo Data Scientist")
+      expect(first.company.name).to eq("VRIFY")
+      expect(first.location).to eq("Canada (Remote)")
+      expect(first.posting_url).to eq("https://www.linkedin.com/jobs/view/4388176608/")
+
+      second = result.job_posts.last
+      expect(second.title).to eq("Software Engineer")
+      expect(second.company.name).to eq("Microsoft")
+      expect(second.location).to eq("Vancouver, BC (Hybrid)")
+      expect(second.posting_url).to eq("https://www.linkedin.com/jobs/view/4431317239/")
+    end
+
     it "parses an Indeed alert into normalized JobPost rows" do
       text = <<~TEXT
         Staff Data Engineer - Globex Inc (Austin, TX)

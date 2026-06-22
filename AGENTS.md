@@ -660,3 +660,18 @@ idempotent on `llm_parsed`). (4) Both paths persist through the shared `JobPostM
 now enqueues `ScoreJobPostJob` for every created JobPost — previously inbound-created posts were
 never scored (scoring was only wired into the manual `Api::JobPostsController`). To retrieve any
 inbound body by hand: `resend emails receiving get <email_id>` (CLI), or `... receiving list`.
+
+### 2026-06-22 — Real LinkedIn job-alert digests need order-agnostic parsing
+The original LinkedIn parser assumed clean `linkedin.com/jobs/view/<id>` URLs with the layout
+`title / Company·Location / URL`. Real LinkedIn job-alert **digest** emails don't match: they use
+tracked `/comm/jobs/view/<id>` links, wrap them in `<...>`, pad with the `͏` (U+034F) filler char
+and `[image: X]` alt lines, and order each posting block as `title / URL / "Company · Location"`
+(URL BEFORE the pair). The rewritten `InboundEmailParsers::LinkedIn` anchors on the `Company ·
+Location` line (a spaced middle-dot pair), takes the title from the nearest preceding text line,
+and attaches the job id from the nearest `/jobs/view/(\d+)` link searching outward (handles URL
+before OR after the pair, so it still parses the old/simple format too). The 6 job ids in a digest
+also appear in the `originToLandingJobPostings=<id,id,...>` query param of the alert's search link —
+a useful cross-check. Verified deterministically against a live forwarded digest: 6/6 postings with
+correct title/company/location/canonical URL, no LLM. Scoring (ScoreJobPostJob → OpenRouter) is
+still a separate step and the free-tier model (`google/gemma-4-31b-it:free`) was 429-rate-limited
+during testing — ingestion now creates the JobPosts regardless.
