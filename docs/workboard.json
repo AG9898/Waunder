@@ -1264,7 +1264,7 @@
       "id": "INTAKE-02",
       "title": "Filter, sort, and paginate the job_posts feed",
       "description": "Extend GET /api/job_posts (Api::JobPostsController#index) with server-side filtering, sorting, and pagination. Query params: status (scored default | unscored), state (active default | backlog | removed), sort (oldest default = created_at ASC | score = match_score DESC NULLS LAST, triage_score DESC NULLS LAST, then recency), score_band (high>=75 | mid 50-74 | low<50 | unscored), source, location, date_from/date_to (created_at range), and page (1-based). Filters AND-combine and state defaults to active. Page size is the JOBS_PAGE_SIZE constant (default 30, env-overridable). Wrap rows in the envelope {job_posts:[...], page:{number,size,total,has_next}} and add lifecycle_state to the summary serializer. Reads remain read-only (never score or call the LLM).",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "INTAKE",
       "depends_on": [

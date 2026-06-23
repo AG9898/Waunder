@@ -104,13 +104,13 @@ RSpec.describe "Api job posts", type: :request do
   end
 
   describe "GET /api/job_posts" do
-    it "returns the scored feed ranked by match score by default" do
+    it "returns the scored active feed oldest-ingestion-first by default with a page envelope" do
       sign_in!
       company = Company.create!(name: "Acme")
-      JobPost.create!(company: company, title: "Lower", match_score: 40,
-        scoring_status: "scored", summary: "lower match")
-      JobPost.create!(company: company, title: "Higher", match_score: 90,
-        scoring_status: "scored", summary: "higher match")
+      older = JobPost.create!(company: company, title: "Older", match_score: 40,
+        scoring_status: "scored", summary: "older", created_at: 2.days.ago)
+      newer = JobPost.create!(company: company, title: "Newer", match_score: 90,
+        scoring_status: "scored", summary: "newer", created_at: 1.day.ago)
       JobPost.create!(company: company, title: "Filtered", scoring_status: "filtered",
         triage_status: "rejected", triage_score: 20)
 
@@ -118,17 +118,122 @@ RSpec.describe "Api job posts", type: :request do
 
       expect(response).to have_http_status(:ok)
       body = JSON.parse(response.body)
-      titles = body["job_posts"].map { |jp| jp["title"] }
-      expect(titles).to eq(%w[Higher Lower])
+      expect(body["job_posts"].map { |jp| jp["id"] }).to eq([ older.id, newer.id ])
       first = body["job_posts"].first
       expect(first).to include(
-        "title" => "Higher",
+        "title" => "Older",
         "company" => "Acme",
-        "match_score" => 90,
+        "match_score" => 40,
         "scoring_status" => "scored",
-        "triage_status" => "unreviewed",
-        "summary" => "higher match"
+        "lifecycle_state" => "active",
+        "summary" => "older"
       )
+      expect(body["page"]).to eq(
+        "number" => 1,
+        "size" => 30,
+        "total" => 2,
+        "has_next" => false
+      )
+    end
+
+    it "ranks by match score when sort=score" do
+      sign_in!
+      company = Company.create!(name: "Acme")
+      JobPost.create!(company: company, title: "Lower", match_score: 40, scoring_status: "scored")
+      JobPost.create!(company: company, title: "Higher", match_score: 90, scoring_status: "scored")
+
+      get "/api/job_posts", params: { sort: "score" }
+
+      expect(response).to have_http_status(:ok)
+      titles = JSON.parse(response.body)["job_posts"].map { |jp| jp["title"] }
+      expect(titles).to eq(%w[Higher Lower])
+    end
+
+    it "excludes backlog and removed jobs from the active default" do
+      sign_in!
+      company = Company.create!(name: "Acme")
+      active = JobPost.create!(company: company, title: "Active", match_score: 50,
+        scoring_status: "scored", lifecycle_state: "active")
+      JobPost.create!(company: company, title: "Backlogged", match_score: 60,
+        scoring_status: "scored", lifecycle_state: "backlog")
+      JobPost.create!(company: company, title: "Removed", match_score: 70,
+        scoring_status: "scored", lifecycle_state: "removed")
+
+      get "/api/job_posts"
+
+      ids = JSON.parse(response.body)["job_posts"].map { |jp| jp["id"] }
+      expect(ids).to eq([ active.id ])
+    end
+
+    it "returns backlog jobs when state=backlog" do
+      sign_in!
+      company = Company.create!(name: "Acme")
+      backlogged = JobPost.create!(company: company, title: "Backlogged", match_score: 60,
+        scoring_status: "scored", lifecycle_state: "backlog")
+      JobPost.create!(company: company, title: "Active", match_score: 50,
+        scoring_status: "scored", lifecycle_state: "active")
+
+      get "/api/job_posts", params: { state: "backlog" }
+
+      ids = JSON.parse(response.body)["job_posts"].map { |jp| jp["id"] }
+      expect(ids).to eq([ backlogged.id ])
+    end
+
+    it "filters by score_band, source, location, and date range (AND-combined)" do
+      sign_in!
+      company = Company.create!(name: "Acme")
+      target = JobPost.create!(company: company, title: "Target", match_score: 80,
+        scoring_status: "scored", source: "linkedin", location: "Vancouver, BC",
+        created_at: Time.zone.parse("2026-06-10 09:00"))
+      JobPost.create!(company: company, title: "Low score", match_score: 40,
+        scoring_status: "scored", source: "linkedin", location: "Vancouver, BC",
+        created_at: Time.zone.parse("2026-06-10 09:00"))
+      JobPost.create!(company: company, title: "Wrong source", match_score: 80,
+        scoring_status: "scored", source: "glassdoor", location: "Vancouver, BC",
+        created_at: Time.zone.parse("2026-06-10 09:00"))
+      JobPost.create!(company: company, title: "Wrong location", match_score: 80,
+        scoring_status: "scored", source: "linkedin", location: "Toronto, ON",
+        created_at: Time.zone.parse("2026-06-10 09:00"))
+      JobPost.create!(company: company, title: "Out of range", match_score: 80,
+        scoring_status: "scored", source: "linkedin", location: "Vancouver, BC",
+        created_at: Time.zone.parse("2026-06-01 09:00"))
+
+      get "/api/job_posts", params: {
+        score_band: "high", source: "linkedin", location: "vancouver",
+        date_from: "2026-06-05", date_to: "2026-06-15"
+      }
+
+      titles = JSON.parse(response.body)["job_posts"].map { |jp| jp["title"] }
+      expect(titles).to eq([ "Target" ])
+      expect(JobPost.find(target.id)).to be_present
+    end
+
+    it "paginates with JOBS_PAGE_SIZE and reports has_next" do
+      sign_in!
+      company = Company.create!(name: "Acme")
+      created = 3.times.map do |i|
+        JobPost.create!(company: company, title: "Job #{i}", match_score: 50,
+          scoring_status: "scored", created_at: i.days.ago)
+      end
+
+      original_page_size = ENV["JOBS_PAGE_SIZE"]
+      ENV["JOBS_PAGE_SIZE"] = "2"
+
+      get "/api/job_posts", params: { page: 1 }
+
+      body = JSON.parse(response.body)
+      expect(body["page"]).to include("size" => 2, "total" => 3, "number" => 1, "has_next" => true)
+      expect(body["job_posts"].length).to eq(2)
+
+      get "/api/job_posts", params: { page: 2 }
+
+      body = JSON.parse(response.body)
+      expect(body["page"]).to include("number" => 2, "has_next" => false)
+      expect(body["job_posts"].length).to eq(1)
+      # oldest-first default: page 2 carries the most recent job
+      expect(body["job_posts"].first["id"]).to eq(created.first.id)
+    ensure
+      original_page_size.nil? ? ENV.delete("JOBS_PAGE_SIZE") : ENV["JOBS_PAGE_SIZE"] = original_page_size
     end
 
     it "returns unscored jobs when requested" do

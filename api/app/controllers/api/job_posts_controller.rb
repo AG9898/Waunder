@@ -3,14 +3,38 @@ module Api
   class JobPostsController < BaseController
     rescue_from ActiveRecord::RecordNotFound, with: :render_not_found
 
-    # Scored job feed for the PWA. Read-only; never triggers scoring or the LLM.
+    DEFAULT_PAGE_SIZE = 30
+    PAGE_SIZE_ENV = "JOBS_PAGE_SIZE".freeze
+
+    # Server-side page size for the paginated job feed; env-overridable.
+    def self.page_size
+      raw = ENV.fetch(PAGE_SIZE_ENV, DEFAULT_PAGE_SIZE).to_s.strip
+      return DEFAULT_PAGE_SIZE if raw.blank?
+
+      size = Integer(raw, exception: false).to_i
+      size.positive? ? size.clamp(1, 1_000) : DEFAULT_PAGE_SIZE
+    end
+
+    # Scored job feed for the PWA. Server-side filter/sort/paginate.
+    # Read-only; never triggers scoring or the LLM.
     def index
-      job_posts = scoped_job_posts.includes(:company).order(
-        Arel.sql("match_score DESC NULLS LAST"), Arel.sql("triage_score DESC NULLS LAST"), created_at: :desc
-      )
+      relation = filtered_job_posts.includes(:company)
+      total = relation.count
+
+      page_size = self.class.page_size
+      page_number = requested_page
+      offset = (page_number - 1) * page_size
+
+      rows = ordered(relation).limit(page_size).offset(offset)
 
       render json: {
-        job_posts: job_posts.map { |job_post| serialize_summary(job_post) }
+        job_posts: rows.map { |job_post| serialize_summary(job_post) },
+        page: {
+          number: page_number,
+          size: page_size,
+          total: total,
+          has_next: offset + rows.length < total
+        }
       }
     end
 
@@ -72,13 +96,96 @@ module Api
 
     private
 
-    def scoped_job_posts
+    def filtered_job_posts
+      relation = status_scoped(JobPost.all)
+      relation = state_scoped(relation)
+      relation = score_band_scoped(relation)
+      relation = source_scoped(relation)
+      relation = location_scoped(relation)
+      date_scoped(relation)
+    end
+
+    def status_scoped(relation)
       case params[:status].to_s
       when "unscored"
-        JobPost.where.not(scoring_status: JobScorer::STATUS_SCORED)
+        relation.where.not(scoring_status: JobScorer::STATUS_SCORED)
       else
-        JobPost.where(scoring_status: JobScorer::STATUS_SCORED)
+        relation.where(scoring_status: JobScorer::STATUS_SCORED)
       end
+    end
+
+    def state_scoped(relation)
+      case params[:state].to_s
+      when "backlog"
+        relation.backlog
+      when "removed"
+        relation.removed
+      else
+        relation.active
+      end
+    end
+
+    def score_band_scoped(relation)
+      case params[:score_band].to_s
+      when "high"
+        relation.where(match_score: 75..)
+      when "mid"
+        relation.where(match_score: 50..74)
+      when "low"
+        relation.where(match_score: ..49)
+      when "unscored"
+        relation.where(match_score: nil)
+      else
+        relation
+      end
+    end
+
+    def source_scoped(relation)
+      source = params[:source].to_s.strip
+      return relation if source.blank?
+
+      relation.where(source: source)
+    end
+
+    def location_scoped(relation)
+      location = params[:location].to_s.strip
+      return relation if location.blank?
+
+      relation.where("location ILIKE ?", "%#{location}%")
+    end
+
+    def date_scoped(relation)
+      relation = relation.where(created_at: parse_date(params[:date_from]).beginning_of_day..) if parsed_date?(params[:date_from])
+      relation = relation.where(created_at: ..parse_date(params[:date_to]).end_of_day) if parsed_date?(params[:date_to])
+      relation
+    end
+
+    def ordered(relation)
+      case params[:sort].to_s
+      when "score"
+        relation.order(
+          Arel.sql("match_score DESC NULLS LAST"),
+          Arel.sql("triage_score DESC NULLS LAST"),
+          created_at: :desc
+        )
+      else
+        relation.order(created_at: :asc)
+      end
+    end
+
+    def requested_page
+      page = params[:page].to_i
+      page.positive? ? page : 1
+    end
+
+    def parsed_date?(value)
+      !parse_date(value).nil?
+    end
+
+    def parse_date(value)
+      Date.parse(value.to_s)
+    rescue ArgumentError, TypeError
+      nil
     end
 
     def enqueue_manual_score(job_post)

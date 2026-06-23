@@ -874,3 +874,16 @@ signals plus Vancouver/Calgary/remote location priority decide whether a post is
 distinction between `scoring_status: "filtered"` (triage rejected), `"deferred"` (eligible but
 budget-held), and `"pending"` (explicitly queued); manual entries and `POST /api/job_posts/:id/score`
 bypass the inbound budget.
+
+### 2026-06-23 — job_posts feed filter/sort/paginate (INTAKE-02)
+`Api::JobPostsController#index` now filters/sorts/paginates server-side: `status` (scored default |
+unscored), `state` (active default | backlog | removed — uses the JobPost `.active/.backlog/.removed`
+scopes), `sort` (oldest default = `created_at ASC` | `score`), `score_band` (high≥75 | mid 50–74 |
+low≤49 | unscored=`match_score IS NULL`), `source` (exact), `location` (`ILIKE %...%`), and
+`date_from`/`date_to` (`created_at` day range, silently ignored if unparseable). Filters AND-combine,
+default state is active, and rows wrap in `{job_posts:[...], page:{number,size,total,has_next}}`. Page
+size is `JobPostsController.page_size` (env `JOBS_PAGE_SIZE`, default 30); `has_next` is computed from
+`offset + rows.length < total`, NOT a separate count query. The contract was already documented by
+INTAKE-01 (ARCHITECTURE/CONVENTIONS/ENV_VARS), so this pass only added the TESTING.md spec-row update.
+NOTE: this repo has no ClimateControl/WebMock — toggle `ENV["JOBS_PAGE_SIZE"]` directly in specs with
+an `ensure` restore (mirrors the existing auth-env around-hook pattern).
