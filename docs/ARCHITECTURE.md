@@ -77,13 +77,17 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   `components.JobList` — scored/unscored status tabs, lifecycle bin tabs (Active default /
   Backlog / Removed), filter controls (score band, source, location, ingestion-date range), an
   oldest/highest-score sort toggle, and Prev/Next 30-per-page pagination reading the server page
-  envelope; explicit score requests on unscored rows; INTAKE-07), the manual job
+  envelope; explicit score requests on unscored rows; INTAKE-07; plus per-row and multi-select
+  bulk intake actions — Backlog/Remove in the Active bin and Restore in the Backlog/Removed bins —
+  calling `PATCH /api/job_posts/:id/lifecycle` and bulk `PATCH /api/job_posts/lifecycle` via
+  `RailsClient.SetJobLifecycle`; INTAKE-08), the manual job
   entry form (`/jobs/new`, `components.ManualEntry` — a URL and/or pasted posting text plus
   optional title/company hints, posting to `POST /api/job_posts`; on success it surfaces the
   created post with a `/jobs/:id` link to follow it into the feed once Rails scores it), a single
   job's scored detail (`/jobs/:id`, `components.JobDetailView` — summary, match score,
-  relevant/missing requirements, red flags, alignment/strategy notes, and the resolved
-  application route), the applications tracker (`/applications`,
+  relevant/missing requirements, red flags, alignment/strategy notes, the resolved
+  application route, and an intake block exposing Backlog/Remove (or Restore) via
+  `SetJobLifecycle`; INTAKE-08), the applications tracker (`/applications`,
   `components.ApplicationsView` — tracked applications with status/stage controls), the
   application draft review (`/applications/:id`,
   `components.DraftReview` — resume emphasis, cover letter, structured answers, and a read-only

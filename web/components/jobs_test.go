@@ -32,6 +32,12 @@ type mockClient struct {
 	gotScoreJobID     int
 	scoreJobCalls     int
 
+	lifecycleResult []JobSummary
+	lifecycleErr    error
+	gotLifecycleIDs []int
+	gotLifecycle    string
+	lifecycleCalls  int
+
 	job    JobDetail
 	jobErr error
 	gotID  int
@@ -128,6 +134,16 @@ func (m *mockClient) ScoreJobPost(_ context.Context, id int) (JobSummary, error)
 	m.gotScoreJobID = id
 	m.scoreJobCalls++
 	return m.scoreJob, m.scoreJobErr
+}
+
+func (m *mockClient) SetJobLifecycle(_ context.Context, ids []int, state string) ([]JobSummary, error) {
+	m.lifecycleCalls++
+	m.gotLifecycleIDs = ids
+	m.gotLifecycle = state
+	if m.lifecycleErr != nil {
+		return nil, m.lifecycleErr
+	}
+	return m.lifecycleResult, nil
 }
 
 func (m *mockClient) Job(_ context.Context, id int) (JobDetail, error) {
@@ -609,6 +625,143 @@ func TestJobListError(t *testing.T) {
 	}
 }
 
+func TestJobListRendersLifecycleControls(t *testing.T) {
+	// Active bin: rows expose Backlog + Remove and the bulk Backlog/Remove bar.
+	active := &JobList{Client: &mockClient{jobs: []JobSummary{{ID: 7, Title: "Eng", Company: "Acme"}}}}
+	html := renderHTML(t, active)
+	for _, want := range []string{
+		"job-select", "job-lifecycle-backlog", "job-lifecycle-remove",
+		"job-bulk-actions", "job-bulk-backlog", "job-bulk-remove", "selected",
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("active job list missing lifecycle control %q\n%s", want, html)
+		}
+	}
+	if strings.Contains(html, "job-lifecycle-restore") {
+		t.Errorf("active bin should not offer Restore\n%s", html)
+	}
+
+	// Backlog bin: rows expose Restore and the bulk Restore bar.
+	backlog := &JobList{bin: jobStateBacklog, Client: &mockClient{jobs: []JobSummary{{ID: 7, Title: "Eng", Company: "Acme"}}}}
+	html = renderHTML(t, backlog)
+	for _, want := range []string{"job-lifecycle-restore", "job-bulk-restore"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("backlog job list missing %q\n%s", want, html)
+		}
+	}
+	if strings.Contains(html, "job-lifecycle-backlog") {
+		t.Errorf("backlog bin should not offer Backlog action\n%s", html)
+	}
+}
+
+func TestJobListNeverMutatesLifecycleOnRender(t *testing.T) {
+	m := &mockClient{jobs: []JobSummary{{ID: 7, Title: "Eng", Company: "Acme"}}}
+	c := &JobList{Client: m}
+	_ = renderHTML(t, c)
+	if m.lifecycleCalls != 0 {
+		t.Fatalf("SetJobLifecycle called on render: %d, want 0", m.lifecycleCalls)
+	}
+}
+
+func TestJobListDoSetLifecycleSingleRemovesRow(t *testing.T) {
+	m := &mockClient{lifecycleResult: []JobSummary{{ID: 7, LifecycleState: jobStateBacklog}}}
+	c := &JobList{
+		Client: m,
+		jobs:   []JobSummary{{ID: 7, Title: "Eng"}, {ID: 9, Title: "Dev"}},
+	}
+	c.normalizeDefaults()
+
+	c.doSetLifecycle(context.Background(), []int{7}, jobStateBacklog)
+
+	if m.lifecycleCalls != 1 || m.gotLifecycle != jobStateBacklog {
+		t.Fatalf("SetJobLifecycle calls=%d state=%q, want 1 backlog", m.lifecycleCalls, m.gotLifecycle)
+	}
+	if len(m.gotLifecycleIDs) != 1 || m.gotLifecycleIDs[0] != 7 {
+		t.Fatalf("lifecycle ids = %v, want [7]", m.gotLifecycleIDs)
+	}
+	// The transitioned row leaves the active view; the other stays.
+	if len(c.jobs) != 1 || c.jobs[0].ID != 9 {
+		t.Fatalf("rows after transition = %+v, want only id 9", c.jobs)
+	}
+	if c.lifecycleBusy || c.lifecycleErr != "" {
+		t.Fatalf("unexpected lifecycle state: busy=%v err=%q", c.lifecycleBusy, c.lifecycleErr)
+	}
+}
+
+func TestJobListDoSetLifecycleBulk(t *testing.T) {
+	m := &mockClient{lifecycleResult: []JobSummary{
+		{ID: 7, LifecycleState: jobStateRemoved}, {ID: 9, LifecycleState: jobStateRemoved},
+	}}
+	c := &JobList{
+		Client:   m,
+		jobs:     []JobSummary{{ID: 7}, {ID: 9}, {ID: 11}},
+		selected: map[int]bool{7: true, 9: true},
+	}
+	c.normalizeDefaults()
+
+	ids := c.selectedIDs()
+	c.doSetLifecycle(context.Background(), ids, jobStateRemoved)
+
+	if m.lifecycleCalls != 1 || len(m.gotLifecycleIDs) != 2 {
+		t.Fatalf("bulk lifecycle ids = %v calls=%d, want 2 ids", m.gotLifecycleIDs, m.lifecycleCalls)
+	}
+	// Both selected rows leave the view; selection is cleared; id 11 remains.
+	if len(c.jobs) != 1 || c.jobs[0].ID != 11 {
+		t.Fatalf("rows after bulk = %+v, want only id 11", c.jobs)
+	}
+	if c.selectedCount() != 0 {
+		t.Fatalf("selection not cleared after bulk, count=%d", c.selectedCount())
+	}
+}
+
+func TestJobListDoSetLifecycleRestore(t *testing.T) {
+	m := &mockClient{lifecycleResult: []JobSummary{{ID: 7, LifecycleState: jobStateActive}}}
+	c := &JobList{
+		bin:    jobStateRemoved,
+		Client: m,
+		jobs:   []JobSummary{{ID: 7, Title: "Eng"}},
+	}
+	c.normalizeDefaults()
+
+	c.doSetLifecycle(context.Background(), []int{7}, jobStateActive)
+
+	if m.gotLifecycle != jobStateActive {
+		t.Fatalf("restore state = %q, want active", m.gotLifecycle)
+	}
+	// Restored row leaves the Removed bin view.
+	if len(c.jobs) != 0 {
+		t.Fatalf("rows after restore = %+v, want empty", c.jobs)
+	}
+}
+
+func TestJobListDoSetLifecycleError(t *testing.T) {
+	m := &mockClient{lifecycleErr: &APIError{Status: http.StatusInternalServerError}}
+	c := &JobList{Client: m, jobs: []JobSummary{{ID: 7}}}
+	c.normalizeDefaults()
+
+	c.doSetLifecycle(context.Background(), []int{7}, jobStateBacklog)
+
+	if c.lifecycleErr == "" {
+		t.Fatalf("expected a lifecycle error message")
+	}
+	// On error the row stays in the view.
+	if len(c.jobs) != 1 {
+		t.Fatalf("rows after failed transition = %+v, want unchanged", c.jobs)
+	}
+}
+
+func TestJobListToggleSelect(t *testing.T) {
+	c := &JobList{}
+	c.applyToggleSelect(7)
+	if !c.isSelected(7) || c.selectedCount() != 1 {
+		t.Fatalf("expected id 7 selected, count 1")
+	}
+	c.applyToggleSelect(7)
+	if c.isSelected(7) || c.selectedCount() != 0 {
+		t.Fatalf("expected id 7 deselected, count 0")
+	}
+}
+
 func TestJobListUnauthorized(t *testing.T) {
 	c := &JobList{Client: &mockClient{jobsErr: &APIError{Status: http.StatusUnauthorized}}}
 	html := renderHTML(t, c)
@@ -772,6 +925,77 @@ func TestJobDetailApplyError(t *testing.T) {
 	}
 	if c.applyState != applyError || c.applyErr == "" {
 		t.Errorf("expected applyError state with message, got state=%d err=%q", c.applyState, c.applyErr)
+	}
+}
+
+func TestJobDetailRendersLifecycleControls(t *testing.T) {
+	// Active job: Backlog + Remove.
+	active := &JobDetailView{JobID: 7, Client: &mockClient{job: JobDetail{
+		ID: 7, Title: "X", Company: "Y", LifecycleState: jobStateActive,
+	}}}
+	html := renderHTML(t, active)
+	for _, want := range []string{"Intake", "job-lifecycle-backlog", "job-lifecycle-remove"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("active job detail missing lifecycle control %q\n%s", want, html)
+		}
+	}
+
+	// Removed job: Restore.
+	removed := &JobDetailView{JobID: 7, Client: &mockClient{job: JobDetail{
+		ID: 7, Title: "X", Company: "Y", LifecycleState: jobStateRemoved,
+	}}}
+	html = renderHTML(t, removed)
+	if !strings.Contains(html, "job-lifecycle-restore") {
+		t.Errorf("removed job detail missing Restore control\n%s", html)
+	}
+}
+
+func TestJobDetailNeverMutatesLifecycleOnRender(t *testing.T) {
+	m := &mockClient{job: JobDetail{ID: 7, Title: "X", Company: "Y"}}
+	c := &JobDetailView{JobID: 7, Client: m}
+	renderHTML(t, c)
+	if m.lifecycleCalls != 0 {
+		t.Fatalf("SetJobLifecycle ran on render: %d, want 0", m.lifecycleCalls)
+	}
+}
+
+func TestJobDetailDoSetLifecycle(t *testing.T) {
+	m := &mockClient{
+		job:             JobDetail{ID: 7, Title: "X", Company: "Y", LifecycleState: jobStateActive},
+		lifecycleResult: []JobSummary{{ID: 7, LifecycleState: jobStateBacklog}},
+	}
+	c := &JobDetailView{JobID: 7, Client: m, job: m.job}
+
+	c.doSetLifecycle(context.Background(), jobStateBacklog)
+
+	if m.lifecycleCalls != 1 || m.gotLifecycle != jobStateBacklog {
+		t.Fatalf("SetJobLifecycle calls=%d state=%q, want 1 backlog", m.lifecycleCalls, m.gotLifecycle)
+	}
+	if len(m.gotLifecycleIDs) != 1 || m.gotLifecycleIDs[0] != 7 {
+		t.Fatalf("lifecycle ids = %v, want [7]", m.gotLifecycleIDs)
+	}
+	if c.job.LifecycleState != jobStateBacklog {
+		t.Fatalf("detail lifecycle state = %q, want backlog", c.job.LifecycleState)
+	}
+	if c.lifecycleBusy || c.lifecycleErr != "" {
+		t.Fatalf("unexpected lifecycle state: busy=%v err=%q", c.lifecycleBusy, c.lifecycleErr)
+	}
+}
+
+func TestJobDetailDoSetLifecycleError(t *testing.T) {
+	m := &mockClient{
+		job:          JobDetail{ID: 7, LifecycleState: jobStateActive},
+		lifecycleErr: &APIError{Status: http.StatusInternalServerError},
+	}
+	c := &JobDetailView{JobID: 7, Client: m, job: m.job}
+
+	c.doSetLifecycle(context.Background(), jobStateRemoved)
+
+	if c.lifecycleErr == "" {
+		t.Fatalf("expected a lifecycle error message")
+	}
+	if c.job.LifecycleState != jobStateActive {
+		t.Fatalf("lifecycle state changed on error: %q", c.job.LifecycleState)
 	}
 }
 

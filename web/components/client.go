@@ -35,6 +35,14 @@ type RailsClient interface {
 	// (POST /api/job_posts/:id/score). It never submits an application.
 	ScoreJobPost(ctx context.Context, id int) (JobSummary, error)
 
+	// SetJobLifecycle transitions one or more JobPosts between the lifecycle
+	// bins (active/backlog/removed). A single id uses the member endpoint
+	// (PATCH /api/job_posts/:id/lifecycle); multiple ids use the bulk
+	// collection endpoint (PATCH /api/job_posts/lifecycle) in one transaction.
+	// "removed" is a soft-delete owned by Rails; this never destroys a row and
+	// never submits an application. Returns the updated rows.
+	SetJobLifecycle(ctx context.Context, ids []int, state string) ([]JobSummary, error)
+
 	// Job fetches a single scored job with its detail fields and resolved
 	// route (GET /api/job_posts/:id).
 	Job(ctx context.Context, id int) (JobDetail, error)
@@ -326,6 +334,7 @@ type JobDetail struct {
 	TriageStatus         string              `json:"triage_status"`
 	TriageScore          *int                `json:"triage_score"`
 	TriageReasons        []string            `json:"triage_reasons"`
+	LifecycleState       string              `json:"lifecycle_state"`
 	Summary              string              `json:"summary"`
 	RelevantRequirements []string            `json:"relevant_requirements"`
 	MissingRequirements  []string            `json:"missing_requirements"`
@@ -618,6 +627,28 @@ func (c *httpRailsClient) ScoreJobPost(ctx context.Context, id int) (JobSummary,
 		return JobSummary{}, err
 	}
 	return out.JobPost, nil
+}
+
+func (c *httpRailsClient) SetJobLifecycle(ctx context.Context, ids []int, state string) ([]JobSummary, error) {
+	if len(ids) == 1 {
+		body := map[string]any{"lifecycle_state": state}
+		var out struct {
+			JobPost JobSummary `json:"job_post"`
+		}
+		path := fmt.Sprintf("/api/job_posts/%d/lifecycle", ids[0])
+		if err := c.sendJSON(ctx, http.MethodPatch, path, body, &out); err != nil {
+			return nil, err
+		}
+		return []JobSummary{out.JobPost}, nil
+	}
+	body := map[string]any{"ids": ids, "lifecycle_state": state}
+	var out struct {
+		JobPosts []JobSummary `json:"job_posts"`
+	}
+	if err := c.sendJSON(ctx, http.MethodPatch, "/api/job_posts/lifecycle", body, &out); err != nil {
+		return nil, err
+	}
+	return out.JobPosts, nil
 }
 
 func (c *httpRailsClient) Job(ctx context.Context, id int) (JobDetail, error) {

@@ -85,6 +85,14 @@ type JobList struct {
 
 	scoreStates map[int]scoreRequestState
 	scoreErrs   map[int]string
+
+	// selected tracks the ids checked for a bulk lifecycle action. It is keyed
+	// by job id; only ids set true are included in a bulk transition.
+	selected map[int]bool
+	// lifecycleState is the shared in-flight state for lifecycle mutations
+	// (per-row or bulk): "" idle, "busy" while a transition is in flight.
+	lifecycleBusy bool
+	lifecycleErr  string
 }
 
 func (j *JobList) OnMount(ctx app.Context)     { j.ensureClient(); j.load(ctx) }
@@ -175,6 +183,7 @@ func (j *JobList) Render() app.UI {
 				return app.P().Class("job-list-empty").Text(j.emptyText())
 			}
 			return app.Div().Class("job-list-results").Body(
+				j.renderBulkActions(),
 				app.Ul().Class("job-list-items").Body(
 					app.Range(j.jobs).Slice(func(i int) app.UI {
 						job := j.jobs[i]
@@ -338,6 +347,12 @@ func pageIndicatorLabel(page PageMeta) string {
 func (j *JobList) renderJobRow(job JobSummary) app.UI {
 	return app.Li().Class("job-list-item").Body(
 		app.Div().Class("job-list-row").Body(
+			app.Input().
+				Class("job-select").
+				Type("checkbox").
+				Checked(j.isSelected(job.ID)).
+				Attr("aria-label", "Select "+job.Title).
+				OnChange(j.toggleSelect(job.ID)),
 			app.A().
 				Class("job-list-link").
 				Href("/jobs/"+strconv.Itoa(job.ID)).
@@ -358,8 +373,78 @@ func (j *JobList) renderJobRow(job JobSummary) app.UI {
 			app.If(j.view == jobListUnscored, func() app.UI {
 				return j.renderScoreAction(job)
 			}),
+			j.renderLifecycleActions(job.ID),
 		),
 	)
+}
+
+// renderLifecycleActions renders the per-row intake controls for a job. In the
+// Active bin a row exposes Backlog + Remove; in the Backlog/Removed bins it
+// exposes Restore (back to active). Each is an explicit click; no lifecycle
+// mutation fires on render.
+func (j *JobList) renderLifecycleActions(id int) app.UI {
+	return app.Div().Class("job-lifecycle-actions").Body(
+		app.If(j.bin != jobStateActive, func() app.UI {
+			return app.Button().
+				Class("job-lifecycle-restore").
+				Disabled(j.lifecycleBusy).
+				OnClick(j.setLifecycle([]int{id}, jobStateActive)).
+				Text("Restore")
+		}).ElseIf(true, func() app.UI {
+			return app.Div().Body(
+				app.Button().
+					Class("job-lifecycle-backlog").
+					Disabled(j.lifecycleBusy).
+					OnClick(j.setLifecycle([]int{id}, jobStateBacklog)).
+					Text("Backlog"),
+				app.Button().
+					Class("job-lifecycle-remove").
+					Disabled(j.lifecycleBusy).
+					OnClick(j.setLifecycle([]int{id}, jobStateRemoved)).
+					Text("Remove"),
+			)
+		}),
+	)
+}
+
+// renderBulkActions renders the multi-select bulk controls: in the Active bin
+// Backlog + Remove for the checked rows, and in the Backlog/Removed bins a
+// Restore. Disabled when nothing is selected or a transition is in flight.
+func (j *JobList) renderBulkActions() app.UI {
+	count := j.selectedCount()
+	return app.Div().Class("job-bulk-actions").Body(
+		app.Span().Class("job-bulk-count").Text(bulkSelectionLabel(count)),
+		app.If(j.bin != jobStateActive, func() app.UI {
+			return app.Button().
+				Class("job-bulk-restore").
+				Disabled(count == 0 || j.lifecycleBusy).
+				OnClick(j.bulkLifecycle(jobStateActive)).
+				Text("Restore selected")
+		}).ElseIf(true, func() app.UI {
+			return app.Div().Body(
+				app.Button().
+					Class("job-bulk-backlog").
+					Disabled(count == 0 || j.lifecycleBusy).
+					OnClick(j.bulkLifecycle(jobStateBacklog)).
+					Text("Backlog selected"),
+				app.Button().
+					Class("job-bulk-remove").
+					Disabled(count == 0 || j.lifecycleBusy).
+					OnClick(j.bulkLifecycle(jobStateRemoved)).
+					Text("Remove selected"),
+			)
+		}),
+		app.If(j.lifecycleErr != "", func() app.UI {
+			return app.P().Class("job-lifecycle-error").Text(j.lifecycleErr)
+		}),
+	)
+}
+
+func bulkSelectionLabel(n int) string {
+	if n == 1 {
+		return "1 selected"
+	}
+	return strconv.Itoa(n) + " selected"
 }
 
 func (j *JobList) renderScoreAction(job JobSummary) app.UI {
@@ -495,6 +580,125 @@ func (j *JobList) applyNextPage() bool {
 	return true
 }
 
+// --- lifecycle (backlog/remove/restore) actions ---
+
+func (j *JobList) isSelected(id int) bool {
+	return j.selected[id]
+}
+
+func (j *JobList) selectedCount() int {
+	n := 0
+	for _, on := range j.selected {
+		if on {
+			n++
+		}
+	}
+	return n
+}
+
+// selectedIDs returns the currently-checked ids that are still present in the
+// loaded rows, in row order, so a bulk action targets exactly the visible
+// selection.
+func (j *JobList) selectedIDs() []int {
+	var ids []int
+	for i := range j.jobs {
+		if j.selected[j.jobs[i].ID] {
+			ids = append(ids, j.jobs[i].ID)
+		}
+	}
+	return ids
+}
+
+func (j *JobList) toggleSelect(id int) app.EventHandler {
+	return func(ctx app.Context, _ app.Event) {
+		j.applyToggleSelect(id)
+		ctx.Update()
+	}
+}
+
+// applyToggleSelect flips a row's selection. Split from the handler so the
+// selection transition is unit-testable without the engine.
+func (j *JobList) applyToggleSelect(id int) {
+	if j.selected == nil {
+		j.selected = map[int]bool{}
+	}
+	j.selected[id] = !j.selected[id]
+}
+
+// setLifecycle returns a click handler that transitions the given ids to the
+// target lifecycle state. Used for both the per-row (single id) and bulk
+// (selected ids) controls.
+func (j *JobList) setLifecycle(ids []int, state string) app.EventHandler {
+	return func(ctx app.Context, _ app.Event) {
+		if j.lifecycleBusy || len(ids) == 0 {
+			return
+		}
+		j.lifecycleBusy = true
+		j.lifecycleErr = ""
+		ctx.Update()
+		reqCtx := ctx.Context
+		ctx.Async(func() {
+			updated, err := j.Client.SetJobLifecycle(reqCtx, ids, state)
+			ctx.Dispatch(func(ctx app.Context) {
+				j.applyLifecycleResult(ids, state, updated, err)
+				ctx.Update()
+			})
+		})
+	}
+}
+
+func (j *JobList) bulkLifecycle(state string) app.EventHandler {
+	return func(ctx app.Context, _ app.Event) {
+		j.setLifecycle(j.selectedIDs(), state)(ctx, app.Event{})
+	}
+}
+
+// doSetLifecycle performs the lifecycle call and applies the result
+// synchronously. It is the body invoked inside the async click handler; tests
+// drive it directly to exercise the path without the go-app engine.
+func (j *JobList) doSetLifecycle(ctx context.Context, ids []int, state string) {
+	if len(ids) == 0 {
+		return
+	}
+	j.lifecycleBusy = true
+	updated, err := j.Client.SetJobLifecycle(ctx, ids, state)
+	j.applyLifecycleResult(ids, state, updated, err)
+}
+
+// applyLifecycleResult records the outcome of a lifecycle transition. On
+// success the transitioned rows leave the current bin view (their target bin
+// differs from the bin being shown) and their selection is cleared. Split out
+// from the app.Context plumbing so the state transition is unit-testable
+// without the go-app engine.
+func (j *JobList) applyLifecycleResult(ids []int, state string, _ []JobSummary, err error) {
+	j.lifecycleBusy = false
+	if err != nil {
+		if IsUnauthorized(err) {
+			j.lifecycleErr = sessionExpiredMessage
+		} else {
+			j.lifecycleErr = "Could not update the job. Please try again."
+		}
+		return
+	}
+	j.lifecycleErr = ""
+	gone := map[int]bool{}
+	for _, id := range ids {
+		gone[id] = true
+		delete(j.selected, id)
+	}
+	// A transition moves a row to a different bin, so it leaves the current
+	// view. (state == j.bin can't happen for these controls, but guard anyway.)
+	if state != j.bin {
+		filtered := j.jobs[:0]
+		for i := range j.jobs {
+			if !gone[j.jobs[i].ID] {
+				filtered = append(filtered, j.jobs[i])
+			}
+		}
+		j.jobs = filtered
+	}
+}
+
 func (j *JobList) scoreJob(id int) app.EventHandler {
 	return func(ctx app.Context, _ app.Event) {
 		if j.scoreState(id) == scoreRequesting {
@@ -615,6 +819,9 @@ type JobDetailView struct {
 
 	statusSaving bool
 	statusErr    string
+
+	lifecycleBusy bool
+	lifecycleErr  string
 }
 
 // applyStatus tracks the explicit "start application" action, separate from the
@@ -792,6 +999,7 @@ func (d *JobDetailView) Render() app.UI {
 				}),
 				renderRoute(job.Route),
 				d.renderPipelineStatus(job.Application),
+				d.renderLifecycle(job.LifecycleState),
 				d.renderApply(),
 				app.A().
 					Class("job-contacts-link").
@@ -887,6 +1095,92 @@ func (d *JobDetailView) applyJobStatusResult(application ApplicationTracker, err
 	}
 	d.job.Application = &application
 	d.statusErr = ""
+}
+
+// renderLifecycle renders the job-detail intake controls. When the job is
+// active it offers Backlog + Remove; when it is in the Backlog/Removed bin it
+// offers Restore (back to active). Each is an explicit click; the screen never
+// mutates lifecycle state on mount/render.
+func (d *JobDetailView) renderLifecycle(state string) app.UI {
+	if state == "" {
+		state = jobStateActive
+	}
+	return app.Div().Class("job-lifecycle").Body(
+		app.H2().Text("Intake"),
+		app.If(state != jobStateActive, func() app.UI {
+			return app.Button().
+				Class("job-lifecycle-restore").
+				Disabled(d.lifecycleBusy).
+				OnClick(d.setLifecycle(jobStateActive)).
+				Text("Restore to active")
+		}).ElseIf(true, func() app.UI {
+			return app.Div().Class("job-lifecycle-buttons").Body(
+				app.Button().
+					Class("job-lifecycle-backlog").
+					Disabled(d.lifecycleBusy).
+					OnClick(d.setLifecycle(jobStateBacklog)).
+					Text("Move to backlog"),
+				app.Button().
+					Class("job-lifecycle-remove").
+					Disabled(d.lifecycleBusy).
+					OnClick(d.setLifecycle(jobStateRemoved)).
+					Text("Remove"),
+			)
+		}),
+		app.If(d.lifecycleErr != "", func() app.UI {
+			return app.P().Class("job-lifecycle-error").Text(d.lifecycleErr)
+		}),
+	)
+}
+
+func (d *JobDetailView) setLifecycle(state string) app.EventHandler {
+	return func(ctx app.Context, _ app.Event) {
+		if d.lifecycleBusy {
+			return
+		}
+		d.lifecycleBusy = true
+		d.lifecycleErr = ""
+		ctx.Update()
+		reqCtx := ctx.Context
+		id := d.JobID
+		ctx.Async(func() {
+			updated, err := d.Client.SetJobLifecycle(reqCtx, []int{id}, state)
+			ctx.Dispatch(func(ctx app.Context) {
+				d.applyLifecycleResult(state, updated, err)
+				ctx.Update()
+			})
+		})
+	}
+}
+
+// doSetLifecycle performs the lifecycle call and applies the result
+// synchronously. Tests drive it directly to exercise the path without the
+// go-app engine.
+func (d *JobDetailView) doSetLifecycle(ctx context.Context, state string) {
+	d.lifecycleBusy = true
+	updated, err := d.Client.SetJobLifecycle(ctx, []int{d.JobID}, state)
+	d.applyLifecycleResult(state, updated, err)
+}
+
+// applyLifecycleResult records the outcome of a detail lifecycle transition,
+// updating the local job's lifecycle_state on success so the controls reflect
+// the new bin (Restore vs Backlog/Remove). Split out for engine-free tests.
+func (d *JobDetailView) applyLifecycleResult(state string, updated []JobSummary, err error) {
+	d.lifecycleBusy = false
+	if err != nil {
+		if IsUnauthorized(err) {
+			d.lifecycleErr = sessionExpiredMessage
+		} else {
+			d.lifecycleErr = "Could not update the job. Please try again."
+		}
+		return
+	}
+	d.lifecycleErr = ""
+	if len(updated) > 0 {
+		d.job.LifecycleState = updated[0].LifecycleState
+	} else {
+		d.job.LifecycleState = state
+	}
 }
 
 // renderApply shows the explicit "start application" control: it prepares a

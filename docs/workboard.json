@@ -1463,7 +1463,7 @@
       "id": "INTAKE-08",
       "title": "Jobs UI: per-row and bulk backlog/remove/restore actions",
       "description": "Add intake actions to the Jobs screen and job detail: per-row (and detail) Backlog / Remove controls, multi-select bulk Backlog/Remove, and Restore from the Backlog and Removed bins, calling PATCH /api/job_posts/:id/lifecycle and bulk PATCH /api/job_posts/lifecycle via a new RailsClient.SetJobLifecycle (single + bulk) method. Use the do*/apply* split so the action body is unit-testable without the engine, and assert no lifecycle mutation fires on mount/render. After a successful transition the row leaves the current bin view (or appears in the target bin). Add SetJobLifecycle to the shared mockClient with call counters for the on-render safety assertions.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "INTAKE",
       "depends_on": [

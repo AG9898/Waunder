@@ -172,6 +172,15 @@ Be honest about the current state — most of the suite is still to be written.
   session-expired, 422 → invalid-input, generic → transient). The `createdMessage` (title/company
   vs id fallback, pending/empty status → "being scored") and `entryButtonLabel` helpers are
   table-tested.
+- **web/** — `components/jobs_test.go` (INTAKE-08 intake actions): render tests assert the Jobs
+  feed exposes per-row select checkboxes, per-row Backlog/Remove (Active bin) and Restore
+  (Backlog/Removed bins), and the multi-select bulk bar (Backlog/Remove selected, or Restore
+  selected); the job detail exposes the matching intake block keyed off `lifecycle_state`. The
+  explicit `doSetLifecycle` path (single, bulk via `selectedIDs`, and restore) calls the mocked
+  `SetJobLifecycle` (single id → member route, multiple → bulk) and the transitioned rows leave the
+  current bin view while selection clears; `applyToggleSelect` and the error mapping (401 →
+  session-expired, generic) are unit-tested. Two safety tests lock the constraint: a full render
+  lifecycle makes **zero** `SetJobLifecycle` calls on both `JobList` and `JobDetailView`.
 
 ### Planned (from the plan's Testing Plan)
 
