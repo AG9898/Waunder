@@ -1,42 +1,69 @@
 module InboundEmailParsers
   # Parses Glassdoor "Jobs for You" job-alert emails.
   #
-  # Real Glassdoor alerts (including ones the owner manually forwards from Gmail)
-  # repeat a posting block of the form:
+  # Glassdoor alerts come in two real templates, plus manual forwards of each:
   #
-  #   DataAnnotation 4.1 ★                         <- "Company <rating> ★"
-  #   AI Training Specialist – Quantitative        <- title
-  #   Hamilton                                     <- location
-  #   $55 - $60 (Employer Est.)                    <- salary (optional)
-  #   Easy Apply                                   <- apply flag (optional)
-  #   5d                                           <- posting age (optional)
-  #   <https://www.glassdoor.ca/partner/jobListing.htm?...&jobListingId=123...>
+  # 1. RATED block — companies that carry a Glassdoor star rating. Preceded by
+  #    an `avatar` line + a company-logo image, then:
+  #      Underhill Geomatics 4.3 ★                  <- "Company <rating> ★"
+  #      CAD Technician - Burnaby Office            <- title
+  #      Burnaby                                    <- location
+  #      $30 - $37 (Employer Est.)                  <- salary (optional)
+  #      Easy Apply                                 <- apply flag (optional)
+  #      10d                                        <- posting age (optional)
+  #      [https://www.glassdoor.ca/partner/jobListing.htm?...&jobListingId=123]
   #
-  # The job link is the deterministic end-of-block anchor. It is matched on the
-  # `job-listing` / `partner/jobListing` path on ANY Glassdoor TLD (`.com`,
-  # `.ca`, `.co.uk`, …) — NOT the `/Job/jobs.htm` search link in the header,
-  # which would otherwise be mistaken for a posting. Each block is read by
-  # walking backwards from the link to the nearest "Company <rating> ★" line so
-  # the manual-forward wrapper (filler chars, `[image:]` alts, promo/header
-  # lines) can sit between blocks without corrupting extraction.
+  # 2. UNRATED block — companies with no Glassdoor rating. No avatar/logo and
+  #    NO "★" line; the company is just the first line, positionally:
+  #      Flash Pharmacy                             <- company
+  #      AI Developer                               <- title
+  #      Vancouver                                  <- location
+  #      $70K (Employer Est.)                       <- salary (optional)
+  #      Easy Apply / 9h ...                        <- apply flag / age
+  #      [https://www.glassdoor.ca/partner/jobListing.htm?...&jobListingId=123]
+  #
+  # The job link is the deterministic end-of-block anchor (matched on the
+  # `job-listing` / `partner/jobListing` path on ANY Glassdoor TLD). RATED
+  # blocks anchor on the "Company <rating> ★" line and read forward, so the
+  # email preamble before the first rating line is ignored. UNRATED blocks have
+  # no anchor, so they are read from the LAST few content lines before the link
+  # (after dropping logo/avatar/pixel images, apply-flag/age META, and the
+  # salary) — this bounds the first unrated block against the email preamble.
+  # The legacy "title / Company — Location" forward layout is still handled.
   class Glassdoor < Base
-    # A Glassdoor application/listing link on any Glassdoor TLD. Excludes the
-    # `/Job/jobs.htm` search link used in the alert header.
-    JOB_URL = %r{https?://(?:[\w.-]+\.)?glassdoor\.[a-z.]+/(?:job-listing|partner/jobListing)[^\s)>"']*}i
+    # A Glassdoor application/listing link on any Glassdoor TLD. The trailing
+    # `\]` exclusion keeps a native `[https://…]`-bracketed link from absorbing
+    # the closing bracket. Excludes the `/Job/jobs.htm` header search link.
+    JOB_URL = %r{https?://(?:[\w.-]+\.)?glassdoor\.[a-z.]+/(?:job-listing|partner/jobListing)[^\s)>\]"']*}i
+    # The related-jobs "create alert" redirect links in the footer also live on
+    # the `/job-listing/` path but are NOT postings — skip them.
+    REDIRECT = %r{/job-listing/api/}i
     # The stable numeric listing id carried in the partner-redirect link.
     LISTING_ID = /jobListingId=(\d+)/i
-    # A "Company <rating> ★" line — the block-start anchor (★ is U+2605).
+    # A "Company <rating> ★" line — the rated-block anchor (★ is U+2605).
     COMPANY_RATING = /\A(?<company>.+?)\s+\d(?:\.\d+)?\s*★\s*\z/u
     # A salary/compensation line (e.g. "$55 - $60 (Employer Est.)").
     SALARY = /\$\s*[\d.,]+\s*[KkMm]?/
     # Apply-flag / age / boilerplate lines that are never the location.
     META = Regexp.union(
       /\Aeasy apply\z/i,
+      /\Ajust posted\z/i,
       /\A\d+\+?\s*(?:d|h|m|days?|hours?|months?)\b/i,
       /\A(?:new|promoted|actively hiring)\b/i
     )
+    # A line that is entirely a bracketed URL — Glassdoor's logo/avatar/icon and
+    # brand-view tracking-pixel images. Dropped unless it carries a job link.
+    IMAGE_OR_PIXEL = %r{\A\[https?://[^\]]*\]\z}i
     # Zero-width / bidi filler characters Gmail/Glassdoor pad the body with.
     FILLER = /[͏​-‏  ‪-‮﻿]/
+
+    # Non-breaking / fixed-width spaces Glassdoor uses between fields (e.g.
+    # the company↔rating gap). Normalized to a plain space so \s-based
+    # patterns (COMPANY_RATING, SALARY, META) match. U+00A0/2007/2009/202F.
+    NBSP = /[    ]/
+
+    # The legacy "Company — Location" pair on a single line (em/en dash/hyphen).
+    COMPANY_LOCATION = /\A(?<company>.+?)\s+[—–-]\s+(?<location>.+)\z/
 
     def self.source_name
       "glassdoor"
@@ -53,6 +80,7 @@ module InboundEmailParsers
       lines.each_index.filter_map do |index|
         url = lines[index][JOB_URL]
         next unless url
+        next if url.match?(REDIRECT)
 
         block = block_for(lines, index, previous_url_index)
         previous_url_index = index
@@ -64,31 +92,35 @@ module InboundEmailParsers
 
     private
 
-    # Lines with whitespace stripped, filler removed, and empty / image-alt
-    # lines dropped — but block order preserved.
+    # Lines with whitespace stripped, filler removed, and empty / image / avatar
+    # lines dropped — but block order preserved. Bracketed-URL image and
+    # tracking-pixel lines are dropped unless the line itself carries a job link.
     def cleaned_lines
       body.split("\n").filter_map do |raw|
-        line = raw.sub(/\A>\s?/, "").gsub(FILLER, "").strip
-        next if line.empty? || line.start_with?("[image:")
+        line = raw.sub(/\A>\s?/, "").gsub(FILLER, "").gsub(NBSP, " ").strip
+        next if line.empty? || line == "avatar" || line.start_with?("[image:")
+        next if line.match?(IMAGE_OR_PIXEL) && !line[JOB_URL]
 
         line
       end
     end
 
     # Assemble one posting from the lines preceding the link, bounded by the
-    # previous block's link so blocks never bleed together. Prefers the real
-    # "Jobs for You" layout (anchored on a "Company <rating> ★" line); falls
-    # back to the simpler "title / Company — Location" layout for canonical
-    # job-listing alerts that carry no rating line.
+    # previous block's link so blocks never bleed together. RATED blocks anchor
+    # on the "Company <rating> ★" line; UNRATED/legacy blocks are read
+    # positionally from the trailing content lines.
     def block_for(lines, url_index, previous_url_index)
       fields = lines[(previous_url_index + 1)...url_index].reject { |l| l[JOB_URL] }
       return nil if fields.empty?
 
       rating_index = fields.rindex { |l| l.match?(COMPANY_RATING) }
-      rating_index ? rated_block(fields, rating_index) : legacy_block(fields)
+      return rated_block(fields, rating_index) if rating_index
+
+      unrated_block(fields)
     end
 
-    # "Company <rating> ★" / title / location / salary layout.
+    # "Company <rating> ★" / title / location / salary layout — read forward
+    # from the rating line, so any email preamble before it is ignored.
     def rated_block(fields, rating_index)
       company = fields[rating_index][COMPANY_RATING, 1]
       rest = fields[(rating_index + 1)..]
@@ -100,11 +132,30 @@ module InboundEmailParsers
       { company: company, title: title, location: location, salary: salary }
     end
 
-    # Legacy "title / Company — Location" layout (the two lines before the link).
-    COMPANY_LOCATION = /\A(?<company>.+?)\s+[—–-]\s+(?<location>.+)\z/
-    def legacy_block(fields)
-      return nil if fields.size < 2
+    # No rating line: pull out the salary, drop apply-flag/age META, then read
+    # the block positionally from the LAST content lines (so the email preamble
+    # ahead of the first posting cannot leak into it). Falls back to the legacy
+    # "title / Company — Location" two-line layout when no third (location) line
+    # and no salary are present.
+    def unrated_block(fields)
+      core = fields.reject { |l| l.match?(META) }
+      salary_index = core.index { |l| l.match?(SALARY) }
+      salary = salary_index && core.delete_at(salary_index)
+      return nil if core.empty?
 
+      if salary.nil? && core.size == 2 && core.last.match?(COMPANY_LOCATION)
+        return legacy_block(core)
+      end
+
+      core = core.last(3)
+      title = core[1]
+      return nil if title.blank?
+
+      { company: core[0], title: title, location: core[2], salary: salary }
+    end
+
+    # Legacy "title / Company — Location" layout (the two lines before the link).
+    def legacy_block(fields)
       title = fields[-2]
       company_location = fields[-1].match(COMPANY_LOCATION)
       company = company_location ? company_location[:company] : fields[-1]

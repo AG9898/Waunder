@@ -226,6 +226,50 @@ RSpec.describe InboundEmailParser do
       expect(second.compensation).to eq("$107K - $144K (Employer Est.)")
     end
 
+    it "parses a native Glassdoor digest (rated + unrated blocks, nbsp rating, footer links)" do
+      nbsp = " "
+      text = +""
+      text << "Wesgroup Properties is hiring\n"
+      text << "Glassdoor [https://www.glassdoor.com/assets/email/brandRefresh/logo.png]\n\n"
+      text << "Job alert: Technician\n\n"
+      text << "Your job listings for June 22, 2026Technician\n"
+      text << "[https://www.glassdoor.com/assets/email/brandRefresh/icons/location-icon.png]Vancouver,\nBC\n\n"
+      # UNRATED first block — the email preamble above must not leak into it.
+      text << "Flash Pharmacy\n\nAI Developer\n\nVancouver\n\n$70K (Employer Est.)\n\n"
+      text << "[https://www.glassdoor.com/assets/email/brandRefresh/icons/easy-apply-icon.png]\n\nEasy Apply\n\n9h\n\n"
+      text << "[https://www.glassdoor.ca/partner/jobListing.htm?pos=101&jobListingId=1010176128342&cb=1]\n\n"
+      # RATED block — avatar/logo images and an nbsp between company and rating.
+      text << "avatar\n[https://media.glassdoor.com/sql/123/logo.png]\n\n"
+      text << "Underhill Geomatics#{nbsp}4.3 ★\n\nCAD Technician - Burnaby Office\n\nBurnaby\n\n$30 - $37 (Employer Est.)\n\n"
+      text << "[https://www.glassdoor.com/assets/email/brandRefresh/icons/easy-apply-icon.png]\n\nEasy Apply\n\n10d\n\n"
+      text << "[https://www.glassdoor.ca/partner/jobListing.htm?pos=102&jobListingId=1010166876507]\n"
+      text << "[https://www.glassdoor.ca/brand-views?o=brandview-pixel&p=xyz]\n\n"
+      # Footer related-jobs "create alert" redirect link MUST be ignored.
+      text << "research engineer Create\n"
+      text << "[https://www.glassdoor.ca/job-listing/api/rjtRedirect?loc=Vancouver,\nBC&keywords=research engineer]\n"
+
+      email = inbound_email(from: "noreply@glassdoor.com", text:)
+
+      result = described_class.new(email).call
+
+      expect(result.fallback?).to be(false)
+      expect(result.parser.source_name).to eq("glassdoor")
+      expect(result.job_posts.size).to eq(2)
+
+      flash = result.job_posts.find { |p| p.company.name == "Flash Pharmacy" }
+      expect(flash.title).to eq("AI Developer")
+      expect(flash.location).to eq("Vancouver")
+      expect(flash.compensation).to eq("$70K (Employer Est.)")
+      expect(flash.posting_url).to eq("https://www.glassdoor.ca/job-listing/index.htm?jl=1010176128342")
+
+      cad = result.job_posts.find { |p| p.title == "CAD Technician - Burnaby Office" }
+      expect(cad.company.name).to eq("Underhill Geomatics")
+      expect(cad.location).to eq("Burnaby")
+      expect(cad.compensation).to eq("$30 - $37 (Employer Est.)")
+
+      expect(result.job_posts.map(&:title)).to all(satisfy { |t| t !~ /easy apply/i && t !~ /\A\$/ })
+    end
+
     it "ignores the Glassdoor header search link and does not treat it as a posting" do
       text = <<~TEXT
         From: Glassdoor Jobs <noreply@glassdoor.com>

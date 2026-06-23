@@ -827,3 +827,25 @@ the user got auto-signed-out "after a while" — not a server-side TTL (the `Mes
 never expires). Fix: set both `max_age:` and `expires:` to `AUTH_COOKIE_MAX_AGE` (90 days) — both,
 because some mobile browsers honor one over the other. The cookie stays `httponly` + signed +
 `secure` (prod), so a long lifetime doesn't weaken this single-user app. No worker/bearer change.
+
+### 2026-06-23 — Native Glassdoor digests have rated AND unrated blocks; old parser produced garbage
+The REAL auto-delivered Glassdoor alerts (`noreply@glassdoor.com`, subjects like "X at Y and N more
+jobs in <city>… Apply Now.") use a native template the old parser silently mis-read: it MATCHED the
+sender + extracted *something*, so it never fell back to the LLM, but produced garbage (title="Easy
+Apply" / the salary, company="5d"/"9h"/"Just posted") — ~106 such rows in prod, most already scored
+on junk. Two block shapes per digest: (1) RATED — preceded by `avatar` + a company-logo image, then
+`Company<NBSP>rating ★` / title / location / salary / `Easy Apply` / age; (2) UNRATED (no Glassdoor
+rating) — no avatar/★, positional `Company / title / location / salary / Easy Apply / age`. The
+end-of-block anchor is the `[https://…/partner/jobListing.htm?…jobListingId=<id>]` link (now
+BRACKETED `[...]`, not `<...>` — JOB_URL gained a `\]` exclusion). Gotchas baked into the rewrite
+(`InboundEmailParsers::Glassdoor`): the company↔rating gap is a NON-BREAKING space (U+00A0) that `\s`
+won't match → `cleaned_lines` normalizes U+00A0/2007/2009/202F to a plain space (`NBSP`); logo/avatar/
+icon/brand-view-pixel lines are whole-line bracketed URLs (`[https://…]`) dropped via `IMAGE_OR_PIXEL`
+unless they carry a job link; the footer "related jobs" `…/job-listing/api/rjtRedirect?…` links match
+the job-path but are NOT postings (skipped via `REDIRECT`); rated blocks anchor on the ★ line and read
+forward so the email preamble is ignored, while unrated blocks read the LAST 3 content lines before
+the link so the preamble can't leak into the first block. `JobPostMaterializer` dedups by
+`posting_url` and returns existing rows UNCHANGED, so fixing already-ingested bad rows requires an
+explicit upsert/correct + re-score pass, not just re-running `ParseInboundEmailJob` (which would dedup
+against the garbage). Verified deterministically against 6 real production digest bodies (64 postings,
+0 LLM calls). Re-probe `resend emails receiving get <id>` for new template variants.
