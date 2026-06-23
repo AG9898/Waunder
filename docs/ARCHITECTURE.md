@@ -73,8 +73,9 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 - Renders the client screens (go-app routes in `main.go`): the ingestion-history landing (`/`,
   `components.DigestView` — recently-ingested postings grouped into batches, one alert/digest
   email per batch, by date and newest first; each batch is a collapsible block whose postings
-  link to their detail; fed by `GET /api/ingestion_batches`), the scored job feed (`/jobs`,
-  `components.JobList`), the manual job
+  link to their detail; fed by `GET /api/ingestion_batches`), the job feed (`/jobs`,
+  `components.JobList` — scored and unscored tabs, with explicit score requests for unscored
+  rows), the manual job
   entry form (`/jobs/new`, `components.ManualEntry` — a URL and/or pasted posting text plus
   optional title/company hints, posting to `POST /api/job_posts`; on success it surfaces the
   created post with a `/jobs/:id` link to follow it into the feed once Rails scores it), a single
@@ -96,18 +97,22 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 - Talks to Rails only through a small `components.RailsClient` interface (the live
   implementation, `httpRailsClient`, uses stdlib `net/http`, which maps to browser `fetch` in
   the WASM build). The interface is the test seam: render/component tests inject a mock and run
-  with no backend. The read shapes the client expects are `GET /api/job_posts` (feed),
+  with no backend. The read shapes the client expects are `GET /api/job_posts` (scored feed),
+  `GET /api/job_posts?status=unscored` (filtered/deferred/pending/skipped/failed feed),
   `GET /api/job_posts/:id` (detail), `GET /api/digest` (digest), and
   `GET /api/ingestion_batches` (ingestion history — postings grouped into source+arrival-time
   batches by `IngestionBatchBuilder`, derived without any persisted batch link or migration).
   Rails now serves all of these
   (READ-01): session-guarded, read-only, exposing only client-safe fields. The feed returns
-  compact rows (`id`, `title`, `company`, `match_score`, `scoring_status`, `summary`) ranked by
-  `match_score DESC NULLS LAST` then recency; detail adds the scored arrays/notes
+  compact rows (`id`, `title`, `company`, `match_score`, `scoring_status`, triage metadata,
+  `summary`) ranked by `match_score DESC NULLS LAST`, `triage_score DESC NULLS LAST`, then
+  recency; detail adds the scored arrays/notes
   (`relevant_requirements`, `missing_requirements`, `red_flags`, `resume_alignment_notes`,
   `application_strategy`) plus the resolved `route` (`route_type`, `recommended_route`,
   `application_url`); the digest reuses `DailyDigestBuilder#posts` for the recently scored,
-  top-ranked set. None of these reads ever trigger scoring or the LLM, and an unknown id returns
+  top-ranked set. These reads never trigger scoring or the LLM; explicit scoring is only
+  requested via `POST /api/job_posts/:id/score`, which enqueues `ScoreJobPostJob` for an
+  unscored job and records a manual triage override. An unknown id returns
   the standard `{error: {code: "not_found", ...}}` shape. The draft review screen additionally
   reads `GET /api/applications/:id` (the generated `ApplicationDraft`: `resume_emphasis_notes`,
   `cover_letter`, `structured_answers`, worker-shaped editable `autofill_payload`,
@@ -219,7 +224,10 @@ The full topology and the rationale for the `/api` proxy routing decision live i
    `RESEND_API_KEY`), then: parse alert (deterministic known-sender parsers, forward-aware via the
    in-body `From:` header) → if no postings, LLM fallback extraction (`InboundEmailLlmExtractor`)
    → normalize each into a `JobPost` (shared `JobPostMaterializer`, deduped by `posting_url`) →
-   resolve application route → enqueue `ScoreJobPostJob` (LLM score via OpenRouter) → generate draft.
+   resolve application route → run `JobPostTriage` title/location gating. Eligible inbound posts
+   are automatically enqueued for `ScoreJobPostJob` until `JOB_TRIAGE_AUTO_SCORE_DAILY_LIMIT`
+   is reached; rejected posts are marked `scoring_status: "filtered"`, and over-budget eligible
+   posts are marked `scoring_status: "deferred"` for later manual scoring from the PWA.
 4. A daily web-push digest is sent to subscribed PWA installs. `DailyDigestJob` (scheduled
    via `config/recurring.yml`, `every day at 8am`) builds the payload from recently scored
    JobPosts with `DailyDigestBuilder` and dispatches it with `WebPushDispatcher`, which signs

@@ -866,3 +866,11 @@ trivially testable (postings are always in the rendered HTML; no OnClick handler
 `GET /api/digest` + `DailyDigestBuilder` are UNCHANGED — that builder still backs the once-a-day Web
 Push notification (a separate concern from the on-screen landing). `Render()` keeps the "digest" tab
 id and `.digest*` CSS classes; only the screen heading changed to "Recent ingestions".
+
+### 2026-06-23 — Inbound scoring is gated by deterministic triage
+Bulk inbound jobs now run through `JobPostTriage` before any OpenRouter scoring: target title
+signals plus Vancouver/Calgary/remote location priority decide whether a post is `eligible` or
+`rejected`, and `JOB_TRIAGE_AUTO_SCORE_DAILY_LIMIT` caps eligible auto-scoring per day. Preserve the
+distinction between `scoring_status: "filtered"` (triage rejected), `"deferred"` (eligible but
+budget-held), and `"pending"` (explicitly queued); manual entries and `POST /api/job_posts/:id/score`
+bypass the inbound budget.

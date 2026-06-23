@@ -22,6 +22,14 @@ type mockClient struct {
 	jobsErr   error
 	jobsCalls int
 
+	unscoredJobs      []JobSummary
+	unscoredJobsErr   error
+	unscoredJobsCalls int
+	scoreJob          JobSummary
+	scoreJobErr       error
+	gotScoreJobID     int
+	scoreJobCalls     int
+
 	job    JobDetail
 	jobErr error
 	gotID  int
@@ -103,6 +111,17 @@ func (m *mockClient) Login(_ context.Context, passphrase string) error {
 func (m *mockClient) Jobs(context.Context) ([]JobSummary, error) {
 	m.jobsCalls++
 	return m.jobs, m.jobsErr
+}
+
+func (m *mockClient) UnscoredJobs(context.Context) ([]JobSummary, error) {
+	m.unscoredJobsCalls++
+	return m.unscoredJobs, m.unscoredJobsErr
+}
+
+func (m *mockClient) ScoreJobPost(_ context.Context, id int) (JobSummary, error) {
+	m.gotScoreJobID = id
+	m.scoreJobCalls++
+	return m.scoreJob, m.scoreJobErr
 }
 
 func (m *mockClient) Job(_ context.Context, id int) (JobDetail, error) {
@@ -244,6 +263,8 @@ func TestMatchScoreLabel(t *testing.T) {
 		{"scored value", intPtr(82), "scored", "82%"},
 		{"pending", nil, "pending", "Scoring…"},
 		{"empty status", nil, "", "Scoring…"},
+		{"filtered", nil, "filtered", "Filtered"},
+		{"deferred", nil, "deferred", "Queued later"},
 		{"skipped", nil, "skipped", "Not scored"},
 		{"failed", nil, "failed", "Scoring failed"},
 		{"unknown nil", nil, "weird", "Not scored"},
@@ -303,10 +324,61 @@ func TestJobListRendersScoredFields(t *testing.T) {
 	}}
 	html := renderHTML(t, c)
 
-	for _, want := range []string{"Staff Engineer", "Acme", "88%", "Backend Dev", "Globex", "Scoring…", "/jobs/7", "/jobs/9"} {
+	for _, want := range []string{"Scored", "Unscored", "Staff Engineer", "Acme", "88%", "Backend Dev", "Globex", "Scoring…", "/jobs/7", "/jobs/9"} {
 		if !strings.Contains(html, want) {
 			t.Errorf("job list HTML missing %q\n%s", want, html)
 		}
+	}
+}
+
+func TestJobListRendersUnscoredFieldsAndScoreButtons(t *testing.T) {
+	c := &JobList{
+		view: jobListUnscored,
+		Client: &mockClient{
+			unscoredJobs: []JobSummary{
+				{ID: 7, Title: "CAD Technician", Company: "DraftCo", ScoringStatus: "filtered", TriageStatus: "rejected"},
+				{ID: 9, Title: "Backend Developer", Company: "CapCo", ScoringStatus: "deferred", TriageStatus: "eligible"},
+			},
+		},
+	}
+	html := renderHTML(t, c)
+
+	for _, want := range []string{"CAD Technician", "Filtered", "Backend Developer", "Queued later", "Score", "/jobs/7"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("unscored job list HTML missing %q\n%s", want, html)
+		}
+	}
+}
+
+func TestJobListDoScoreJob(t *testing.T) {
+	m := &mockClient{scoreJob: JobSummary{ID: 7, Title: "Backend Developer", Company: "CapCo", ScoringStatus: "pending"}}
+	c := &JobList{
+		view:   jobListUnscored,
+		Client: m,
+		jobs:   []JobSummary{{ID: 7, Title: "Backend Developer", Company: "CapCo", ScoringStatus: "filtered"}},
+	}
+
+	c.doScoreJob(context.Background(), 7)
+
+	if m.scoreJobCalls != 1 || m.gotScoreJobID != 7 {
+		t.Fatalf("ScoreJobPost calls = %d id = %d, want 1 id 7", m.scoreJobCalls, m.gotScoreJobID)
+	}
+	if c.jobs[0].ScoringStatus != "pending" {
+		t.Fatalf("job status = %q, want pending", c.jobs[0].ScoringStatus)
+	}
+	if c.scoreState(7) != scoreIdle || c.scoreErr(7) != "" {
+		t.Fatalf("score state = %d err = %q, want idle with no error", c.scoreState(7), c.scoreErr(7))
+	}
+}
+
+func TestJobListNeverScoresOnRender(t *testing.T) {
+	m := &mockClient{unscoredJobs: []JobSummary{{ID: 7, Title: "Backend Developer", Company: "CapCo", ScoringStatus: "filtered"}}}
+	c := &JobList{view: jobListUnscored, Client: m}
+
+	_ = renderHTML(t, c)
+
+	if m.scoreJobCalls != 0 {
+		t.Fatalf("ScoreJobPost called on render: %d", m.scoreJobCalls)
 	}
 }
 
@@ -415,7 +487,7 @@ func TestJobListRendersSourceOrigin(t *testing.T) {
 func TestJobListEmpty(t *testing.T) {
 	c := &JobList{Client: &mockClient{jobs: nil}}
 	html := renderHTML(t, c)
-	if !strings.Contains(html, "No jobs yet.") {
+	if !strings.Contains(html, "No scored jobs yet.") {
 		t.Errorf("expected empty state, got:\n%s", html)
 	}
 }

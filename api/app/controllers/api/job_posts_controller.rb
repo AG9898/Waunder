@@ -5,8 +5,8 @@ module Api
 
     # Scored job feed for the PWA. Read-only; never triggers scoring or the LLM.
     def index
-      job_posts = JobPost.includes(:company).order(
-        Arel.sql("match_score DESC NULLS LAST"), created_at: :desc
+      job_posts = scoped_job_posts.includes(:company).order(
+        Arel.sql("match_score DESC NULLS LAST"), Arel.sql("triage_score DESC NULLS LAST"), created_at: :desc
       )
 
       render json: {
@@ -55,6 +55,13 @@ module Api
       }, status: :created
     end
 
+    def score
+      job_post = JobPost.includes(:company).find(params[:id])
+      enqueue_manual_score(job_post)
+
+      render json: { job_post: serialize_summary(job_post.reload) }, status: :accepted
+    end
+
     def application_status
       job_post = JobPost.includes(:company).find(params[:id])
       application = tracked_application_for(job_post)
@@ -64,6 +71,29 @@ module Api
     end
 
     private
+
+    def scoped_job_posts
+      case params[:status].to_s
+      when "unscored"
+        JobPost.where.not(scoring_status: JobScorer::STATUS_SCORED)
+      else
+        JobPost.where(scoring_status: JobScorer::STATUS_SCORED)
+      end
+    end
+
+    def enqueue_manual_score(job_post)
+      return if job_post.scoring_status == JobScorer::STATUS_SCORED
+      return if job_post.scoring_status == JobPostTriage::SCORE_STATUS_PENDING
+
+      reasons = Array(job_post.triage_reasons)
+      job_post.update!(
+        scoring_status: JobPostTriage::SCORE_STATUS_PENDING,
+        triage_status: JobPostTriage::STATUS_MANUAL_OVERRIDE,
+        triage_reasons: (reasons + [ "manual_score_requested" ]).uniq,
+        triaged_at: Time.current
+      )
+      ScoreJobPostJob.perform_later(job_post)
+    end
 
     def job_post_params
       source = params[:job_post].presence || params
@@ -80,6 +110,9 @@ module Api
         source: job_post.source,
         match_score: job_post.match_score,
         scoring_status: job_post.scoring_status,
+        triage_status: job_post.triage_status,
+        triage_score: job_post.triage_score,
+        triage_reasons: job_post.triage_reasons,
         summary: job_post.summary
       }
     end
@@ -97,6 +130,9 @@ module Api
         compensation: job_post.compensation,
         match_score: job_post.match_score,
         scoring_status: job_post.scoring_status,
+        triage_status: job_post.triage_status,
+        triage_score: job_post.triage_score,
+        triage_reasons: job_post.triage_reasons,
         summary: job_post.summary,
         relevant_requirements: job_post.relevant_requirements,
         missing_requirements: job_post.missing_requirements,

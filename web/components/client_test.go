@@ -76,6 +76,53 @@ func TestClientUnauthorizedMapsToAPIError(t *testing.T) {
 	}
 }
 
+func TestClientUnscoredJobsUsesQuery(t *testing.T) {
+	var gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.String()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"job_posts":[{"id":2,"title":"Backend","company":"CapCo","scoring_status":"filtered","triage_status":"rejected","triage_reasons":["location_outside_priority_markets"]}]}`))
+	}))
+	defer srv.Close()
+	c := &httpRailsClient{http: srv.Client(), base: srv.URL}
+
+	jobs, err := c.UnscoredJobs(context.Background())
+
+	if err != nil {
+		t.Fatalf("UnscoredJobs: %v", err)
+	}
+	if gotPath != "/api/job_posts?status=unscored" {
+		t.Fatalf("path = %q, want /api/job_posts?status=unscored", gotPath)
+	}
+	if len(jobs) != 1 || jobs[0].ScoringStatus != "filtered" || jobs[0].TriageStatus != "rejected" {
+		t.Fatalf("unexpected jobs: %+v", jobs)
+	}
+}
+
+func TestClientScoreJobPost(t *testing.T) {
+	var gotPath, gotMethod string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotMethod = r.Method
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"job_post":{"id":2,"title":"Backend","company":"CapCo","scoring_status":"pending"}}`))
+	}))
+	defer srv.Close()
+	c := &httpRailsClient{http: srv.Client(), base: srv.URL}
+
+	job, err := c.ScoreJobPost(context.Background(), 2)
+
+	if err != nil {
+		t.Fatalf("ScoreJobPost: %v", err)
+	}
+	if gotMethod != http.MethodPost || gotPath != "/api/job_posts/2/score" {
+		t.Fatalf("request = %s %s, want POST /api/job_posts/2/score", gotMethod, gotPath)
+	}
+	if job.ID != 2 || job.ScoringStatus != "pending" {
+		t.Fatalf("unexpected job: %+v", job)
+	}
+}
+
 func TestClientJobDecodesFullDetail(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasSuffix(r.URL.Path, "/api/job_posts/7") {

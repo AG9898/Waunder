@@ -144,6 +144,13 @@ dispatch.
   preference order **direct ATS > company careers > job-board external apply > LinkedIn/Indeed/
   Glassdoor apply > manual**, with a `route_confidence`. It performs no network or LLM calls; the
   LLM is the fallback only when no host pattern matches (`route_type == "unknown"`).
+- Bulk inbound JobPosts must pass deterministic `JobPostTriage`
+  (`app/services/job_post_triage.rb`) before automatic scoring. The triage rules are title/location
+  only: target developer/software/AI/ML/platform/data-adjacent titles and prioritize Vancouver,
+  Calgary, then remote; unknown or broad Canada/BC/Alberta location is allowed but lower priority.
+  Rejected inbound posts are kept as `scoring_status: "filtered"`, and eligible posts beyond
+  `JOB_TRIAGE_AUTO_SCORE_DAILY_LIMIT` are kept as `scoring_status: "deferred"`. Manual job entries
+  and explicit `POST /api/job_posts/:id/score` requests bypass the inbound budget.
 - The OpenRouter LLM gateway is reached only through `OpenrouterClient`
   (`app/services/openrouter_client.rb`) — never inlined in controllers or jobs. It reads
   `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` (default `google/gemma-4-31b-it:free`), requests

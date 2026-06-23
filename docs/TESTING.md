@@ -61,10 +61,12 @@ Be honest about the current state — most of the suite is still to be written.
 - **api/** — `spec/requests/api/job_posts_spec.rb`: request specs for authenticated manual
   `POST /api/job_posts`, covering deterministic JobPost creation, route resolution, scoring-job
   enqueueing, unauthenticated refusal, and invalid-input JSON errors; plus the read endpoints
-  `GET /api/job_posts` (scored feed ranked by match score, auth gating) and
+  `GET /api/job_posts` (scored feed ranked by match score, auth gating),
+  `GET /api/job_posts?status=unscored` (filtered/deferred feed with triage metadata), and
   `GET /api/job_posts/:id` (scored detail, resolved route, current tracker state, auth gating),
-  plus `PATCH /api/job_posts/:id/application_status` for tracker application create/reuse and
-  status updates.
+  plus `POST /api/job_posts/:id/score` for explicit score requests and
+  `PATCH /api/job_posts/:id/application_status` for tracker application create/reuse and status
+  updates.
 - **api/** — `spec/requests/api/digest_spec.rb`: request specs for `GET /api/digest`, covering the
   latest digest of recently scored JobPosts (no scoring/LLM on read), the empty-jobs case, and 401
   auth gating.
@@ -223,7 +225,8 @@ Keep this table up to date — add a row when adding a new test file.
 | `api/spec/models/resume_document_spec.rb` | API (Rails) | resume document profile/title validation, parsed_structure default, encrypted-at-rest ciphertext check for raw_text/parsed_structure |
 | `api/spec/requests/api/auth_spec.rb` | API (Rails) | shared-secret session success/failure, protected endpoint gating, health bypass, worker bearer guard |
 | `api/spec/requests/api/applications_spec.rb` | API (Rails) | `POST /api/applications/:id/submit` approved clean-payload dispatch, audit event recording, approval-required/unsupported/unsafe refusal paths, and 401 auth gating with no enqueue on refusal; `GET /api/applications/:id` draft + job context + worker-shaped autofill preview, read-only (no audit/enqueue), not-found JSON shape, and auth gating; `PATCH /api/applications/:id/draft` reviewed autofill-answer persistence, safety warnings, malformed edit rejection, draft-required rejection, and auth |
-| `api/spec/requests/api/job_posts_spec.rb` | API (Rails) | `POST /api/job_posts` authenticated manual URL/text ingestion, route resolution, scoring enqueue, 401 auth gating, and invalid-input JSON error shape; `GET /api/job_posts` scored feed ranking + auth; `GET /api/job_posts/:id` scored detail with resolved route, not-found JSON shape, and auth |
+| `api/spec/requests/api/job_posts_spec.rb` | API (Rails) | `POST /api/job_posts` authenticated manual URL/text ingestion, route resolution, scoring enqueue, 401 auth gating, and invalid-input JSON error shape; `GET /api/job_posts` scored feed ranking + auth; `GET /api/job_posts?status=unscored` filtered/deferred feed with triage metadata; `POST /api/job_posts/:id/score` explicit scoring enqueue/manual override; `GET /api/job_posts/:id` scored detail with resolved route, not-found JSON shape, and auth |
+| `api/spec/services/job_post_triage_spec.rb` | API (Rails) | deterministic inbound title/location triage for developer/software/AI-adjacent roles, Vancouver/Calgary/remote prioritization, rejection reasons, remote-status inference, and env-driven daily budget parsing |
 | `api/spec/requests/api/digest_spec.rb` | API (Rails) | `GET /api/digest` latest digest of recently scored JobPosts (no scoring/LLM on read), empty-jobs case, and 401 auth gating |
 | `api/spec/requests/api/ingestion_batches_spec.rb` | API (Rails) | `GET /api/ingestion_batches` ingestion history grouped into source+arrival-time batches newest-first (no scoring/LLM on read), empty case, and 401 auth gating |
 | `api/spec/services/ingestion_batch_builder_spec.rb` | API (Rails) | `IngestionBatchBuilder` clustering: same-source within-gap grouping, gap-break into new batches, cross-source separation, window cutoff, empty case, and synthetic batch id |
@@ -233,7 +236,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `api/spec/requests/api/health_spec.rb` | API (Rails) | `GET /api/health` — 200 status, JSON shape, database connectivity |
 | `api/spec/requests/webhooks/resend_spec.rb` | API (Rails) | Resend inbound webhook Svix verification, raw inbound-email persistence, parse-job enqueueing, provider-only auth, and PII-safe logging |
 | `api/spec/services/inbound_email_parser_spec.rb` | API (Rails) | Deterministic known-sender (LinkedIn/Indeed/Glassdoor) parsing into normalized JobPosts, company reuse, and LLM-fallback flagging |
-| `api/spec/jobs/parse_inbound_email_job_spec.rb` | API (Rails) | ParseInboundEmailJob wiring to the parser service for known-sender and fallback paths |
+| `api/spec/jobs/parse_inbound_email_job_spec.rb` | API (Rails) | ParseInboundEmailJob wiring to the parser service for known-sender and fallback paths, including deterministic triage filtering and daily scoring-budget deferral |
 | `api/spec/services/application_route_resolver_spec.rb` | API (Rails) | Deterministic ATS route-type detection from URL fixtures, recommended-route preference ranking, confidence, unknown→manual LLM fallback, and ApplicationRoute persistence/idempotency |
 | `api/spec/services/openrouter_client_spec.rb` | API (Rails) | OpenRouter client: missing-key typed error, env model default/override, structured-JSON parse, prose/code-fence parse fallback, retry/exhaustion, and PII-safe logging via injected fake transport (no live calls) |
 | `api/spec/jobs/score_job_post_job_spec.rb` | API (Rails) | JobScorer/ScoreJobPostJob: scoring-field population from mocked LLM JSON, match_score clamping, string-list coercion, fallback-posting scoring, graceful skip with no API key, failed-on-error, PII-safe logging (mocked client) |
@@ -242,10 +245,10 @@ Keep this table up to date — add a row when adding a new test file.
 | `workers/src/worker.test.ts` | Worker orchestration | config loading, bearer-auth task fetch/report calls, clean idle without `API_INTERNAL_URL`, one-cycle poll orchestration, and unsupported-ATS safe failure |
 | `workers/src/ats/handlers.test.ts` | Worker ATS handlers | Playwright fixture coverage for Greenhouse/Lever/Ashby registration, approved field fill/submit, unknown required field pauses, and sensitive-field pauses |
 | `web/components/pwa_test.go` | Web (go-app PWA) | iOS/iPadOS detection + version parsing, iOS 16.4+ Web Push threshold, and the install/notification-permission gate decision |
-| `web/components/jobs_test.go` | Web (go-app PWA) | Job list / job detail / ingestion-batch render tests (scored fields, batch grouping + collapsible postings, tracker status controls, empty/error/401 states) via a mocked `RailsClient` and `NewTestEngine`; explicit no-apply/no-status-update-on-render assertions; `MatchScoreLabel`/`RouteLabel`/`jobIDFromPath` helpers |
+| `web/components/jobs_test.go` | Web (go-app PWA) | Job list / job detail / ingestion-batch render tests (scored/unscored tabs, explicit score request button, scored fields, batch grouping + collapsible postings, tracker status controls, empty/error/401 states) via a mocked `RailsClient` and `NewTestEngine`; explicit no-score/no-apply/no-status-update-on-render assertions; `MatchScoreLabel`/`RouteLabel`/`jobIDFromPath` helpers |
 | `web/components/applications_test.go` | Web (go-app PWA) | Applications tracker render tests, empty/error/401 states, explicit no-status-update-on-render assertion, and direct status-update state tests |
 | `web/components/login_test.go` | Web (go-app PWA) | Login form render and `loginErrorStatus`/`loginButtonText` status mapping (401 → "Incorrect passphrase") |
-| `web/components/client_test.go` | Web (go-app PWA) | `httpRailsClient` against `httptest`: `/api`-namespaced paths, scored-field/route/tracker JSON decode, application/job tracker PATCH payloads, draft PATCH payload shape, Rails error-code parsing, session-cookie carry, 401 → `APIError` |
+| `web/components/client_test.go` | Web (go-app PWA) | `httpRailsClient` against `httptest`: `/api`-namespaced paths, scored/unscored job query decode, explicit score request path, scored-field/route/tracker JSON decode, application/job tracker PATCH payloads, draft PATCH payload shape, Rails error-code parsing, session-cookie carry, 401 → `APIError` |
 | `web/components/profile_test.go` | Web (go-app PWA) | Profile/resume render (editable fields, contact presence flags with no PII leak, resume metadata/empty) and `doSave` write path (reseed/error/401) via a mocked `RailsClient` |
 | `web/components/push_test.go` | Web (go-app PWA) | Push toggle subscribe/unsubscribe flow via a mocked `PushSubscriber` (public VAPID key fetched then persisted; browser cancel before Rails), state-mapping helpers, and no-auto-subscribe-on-render |
 | `web/components/contacts_test.go` | Web (go-app PWA) | Contacts/outreach render (candidate fields, empty/error/401), explicit `doGenerate` draft path, no-auto-generate-on-mount and no-send-affordance safety tests, and `applyGenerateResult`/`contactRole`/`generateButtonLabel`/`contactsJobIDFromPath` helpers, via a mocked `RailsClient` |

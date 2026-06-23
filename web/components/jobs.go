@@ -21,9 +21,22 @@ const (
 
 const sessionExpiredMessage = "Your session expired. Please sign in again."
 
-// JobList renders the scored job feed (GET /api/job_posts). Each row links to
-// the job detail screen. Scored fields are owned by Rails; this screen only
-// renders them.
+const (
+	jobListScored   = "scored"
+	jobListUnscored = "unscored"
+)
+
+type scoreRequestState int
+
+const (
+	scoreIdle scoreRequestState = iota
+	scoreRequesting
+	scoreRequestError
+)
+
+// JobList renders the job feed. The scored tab uses GET /api/job_posts; the
+// unscored tab uses GET /api/job_posts?status=unscored and lets the owner
+// explicitly request scoring for filtered/deferred jobs.
 type JobList struct {
 	app.Compo
 
@@ -34,6 +47,10 @@ type JobList struct {
 	state loadState
 	jobs  []JobSummary
 	err   string
+
+	view        string
+	scoreStates map[int]scoreRequestState
+	scoreErrs   map[int]string
 }
 
 func (j *JobList) OnMount(ctx app.Context)     { j.ensureClient(); j.load(ctx) }
@@ -46,51 +63,206 @@ func (j *JobList) ensureClient() {
 }
 
 func (j *JobList) load(ctx app.Context) {
+	if j.view == "" {
+		j.view = jobListScored
+	}
 	j.state = loadLoading
 	ctx.Update()
 	reqCtx := ctx.Context
+	view := j.view
 	ctx.Async(func() {
-		jobs, err := j.Client.Jobs(reqCtx)
+		jobs, err := j.fetchJobs(reqCtx, view)
 		ctx.Dispatch(func(ctx app.Context) {
 			applyResult(ctx, &j.state, &j.err, err, func() { j.jobs = jobs })
 		})
 	})
 }
 
+func (j *JobList) fetchJobs(ctx context.Context, view string) ([]JobSummary, error) {
+	if view == jobListUnscored {
+		return j.Client.UnscoredJobs(ctx)
+	}
+	return j.Client.Jobs(ctx)
+}
+
 func (j *JobList) Render() app.UI {
 	return app.Div().Class("job-list").Body(
 		renderAppTabs("jobs"),
 		app.H1().Text("Jobs"),
+		j.renderViewSelector(),
 		renderLoad(j.state, j.err, func() app.UI {
 			if len(j.jobs) == 0 {
-				return app.P().Class("job-list-empty").Text("No jobs yet.")
+				return app.P().Class("job-list-empty").Text(j.emptyText())
 			}
 			return app.Ul().Class("job-list-items").Body(
 				app.Range(j.jobs).Slice(func(i int) app.UI {
 					job := j.jobs[i]
-					return app.Li().Class("job-list-item").Body(
-						app.A().
-							Class("job-list-link").
-							Href("/jobs/"+strconv.Itoa(job.ID)).
-							Body(
-								app.Span().Class("job-title").Text(job.Title),
-								app.Span().Class("job-company").Text(job.Company),
-								app.If(SourceLabel(job.Source) != "", func() app.UI {
-									return app.Span().Class("job-source").Body(
-										sourceIcon(job.Source),
-										app.Text(SourceLabel(job.Source)),
-									)
-								}),
-								app.Span().
-									Class("job-score").
-									Class("job-score--"+MatchScoreBand(job.MatchScore, job.ScoringStatus)).
-									Text(MatchScoreLabel(job.MatchScore, job.ScoringStatus)),
-							),
-					)
+					return j.renderJobRow(job)
 				}),
 			)
 		}),
 	)
+}
+
+func (j *JobList) renderViewSelector() app.UI {
+	if j.view == "" {
+		j.view = jobListScored
+	}
+	return app.Nav().Class("applications-view-selector job-list-view-selector").Attr("role", "tablist").Body(
+		app.Button().
+			Class("view-selector-option").
+			Class(viewSelectorClass(j.view, jobListScored)).
+			Attr("role", "tab").
+			OnClick(j.showView(jobListScored)).
+			Text("Scored"),
+		app.Button().
+			Class("view-selector-option").
+			Class(viewSelectorClass(j.view, jobListUnscored)).
+			Attr("role", "tab").
+			OnClick(j.showView(jobListUnscored)).
+			Text("Unscored"),
+	)
+}
+
+func (j *JobList) renderJobRow(job JobSummary) app.UI {
+	return app.Li().Class("job-list-item").Body(
+		app.Div().Class("job-list-row").Body(
+			app.A().
+				Class("job-list-link").
+				Href("/jobs/"+strconv.Itoa(job.ID)).
+				Body(
+					app.Span().Class("job-title").Text(job.Title),
+					app.Span().Class("job-company").Text(job.Company),
+					app.If(SourceLabel(job.Source) != "", func() app.UI {
+						return app.Span().Class("job-source").Body(
+							sourceIcon(job.Source),
+							app.Text(SourceLabel(job.Source)),
+						)
+					}),
+					app.Span().
+						Class("job-score").
+						Class("job-score--"+MatchScoreBand(job.MatchScore, job.ScoringStatus)).
+						Text(MatchScoreLabel(job.MatchScore, job.ScoringStatus)),
+				),
+			app.If(j.view == jobListUnscored, func() app.UI {
+				return j.renderScoreAction(job)
+			}),
+		),
+	)
+}
+
+func (j *JobList) renderScoreAction(job JobSummary) app.UI {
+	state := j.scoreState(job.ID)
+	return app.Div().Class("job-list-score-action").Body(
+		app.Button().
+			Class("job-list-score-button").
+			Disabled(state == scoreRequesting || job.ScoringStatus == "pending").
+			OnClick(j.scoreJob(job.ID)).
+			Text(scoreButtonLabel(state, job.ScoringStatus)),
+		app.If(j.scoreErr(job.ID) != "", func() app.UI {
+			return app.P().Class("job-list-score-error").Text(j.scoreErr(job.ID))
+		}),
+	)
+}
+
+func (j *JobList) showView(view string) app.EventHandler {
+	return func(ctx app.Context, _ app.Event) {
+		if j.view == view {
+			return
+		}
+		j.view = view
+		j.jobs = nil
+		j.err = ""
+		j.load(ctx)
+	}
+}
+
+func (j *JobList) scoreJob(id int) app.EventHandler {
+	return func(ctx app.Context, _ app.Event) {
+		if j.scoreState(id) == scoreRequesting {
+			return
+		}
+		j.setScoreState(id, scoreRequesting, "")
+		ctx.Update()
+		reqCtx := ctx.Context
+		ctx.Async(func() {
+			job, err := j.Client.ScoreJobPost(reqCtx, id)
+			ctx.Dispatch(func(ctx app.Context) {
+				j.applyScoreResult(id, job, err)
+				ctx.Update()
+			})
+		})
+	}
+}
+
+func (j *JobList) doScoreJob(ctx context.Context, id int) {
+	j.setScoreState(id, scoreRequesting, "")
+	job, err := j.Client.ScoreJobPost(ctx, id)
+	j.applyScoreResult(id, job, err)
+}
+
+func (j *JobList) applyScoreResult(id int, job JobSummary, err error) {
+	if err != nil {
+		msg := "Could not request scoring."
+		if IsUnauthorized(err) {
+			msg = sessionExpiredMessage
+		}
+		j.setScoreState(id, scoreRequestError, msg)
+		return
+	}
+	for i := range j.jobs {
+		if j.jobs[i].ID == id {
+			j.jobs[i] = job
+			break
+		}
+	}
+	j.setScoreState(id, scoreIdle, "")
+}
+
+func (j *JobList) scoreState(id int) scoreRequestState {
+	if j.scoreStates == nil {
+		return scoreIdle
+	}
+	return j.scoreStates[id]
+}
+
+func (j *JobList) scoreErr(id int) string {
+	if j.scoreErrs == nil {
+		return ""
+	}
+	return j.scoreErrs[id]
+}
+
+func (j *JobList) setScoreState(id int, state scoreRequestState, err string) {
+	if j.scoreStates == nil {
+		j.scoreStates = map[int]scoreRequestState{}
+	}
+	if j.scoreErrs == nil {
+		j.scoreErrs = map[int]string{}
+	}
+	j.scoreStates[id] = state
+	if err == "" {
+		delete(j.scoreErrs, id)
+	} else {
+		j.scoreErrs[id] = err
+	}
+}
+
+func (j *JobList) emptyText() string {
+	if j.view == jobListUnscored {
+		return "No unscored jobs."
+	}
+	return "No scored jobs yet."
+}
+
+func scoreButtonLabel(state scoreRequestState, scoringStatus string) string {
+	if state == scoreRequesting {
+		return "Scoring..."
+	}
+	if scoringStatus == "pending" {
+		return "Queued"
+	}
+	return "Score"
 }
 
 // JobDetailView renders the full scored view of a single job: summary, match

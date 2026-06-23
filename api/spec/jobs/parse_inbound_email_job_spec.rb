@@ -1,6 +1,12 @@
 require "rails_helper"
 
 RSpec.describe ParseInboundEmailJob, type: :job do
+  include ActiveJob::TestHelper
+
+  before do
+    clear_enqueued_jobs
+  end
+
   def inbound_email(data:, parse_result: nil)
     payload = { "type" => "email.received", "data" => data }
     payload["parse_result"] = parse_result if parse_result
@@ -13,12 +19,12 @@ RSpec.describe ParseInboundEmailJob, type: :job do
     )
   end
 
-  it "parses a known-sender email into JobPost rows and enqueues scoring" do
+  it "parses a known-sender email into JobPost rows and enqueues scoring when triage passes" do
     email = inbound_email(data: {
       "from" => "jobs@linkedin.com",
       "subject" => "Job alert",
       "text" => "Senior Backend Engineer\n" \
-        "Acme Corp · San Francisco, CA\n" \
+        "Acme Corp · Vancouver, BC\n" \
         "https://www.linkedin.com/jobs/view/3812345678/\n"
     })
 
@@ -26,6 +32,58 @@ RSpec.describe ParseInboundEmailJob, type: :job do
       .to change(JobPost, :count).by(1)
       .and have_enqueued_job(ScoreJobPostJob)
     expect(email.reload.raw_payload.dig("parse_result", "needs_llm_fallback")).to be(false)
+    expect(JobPost.last.triage_status).to eq("eligible")
+    expect(JobPost.last.triage_reasons).to include("location_vancouver_priority")
+  end
+
+  it "filters known-sender postings that miss target title/location rules without scoring" do
+    email = inbound_email(data: {
+      "from" => "jobs@linkedin.com",
+      "subject" => "Job alert",
+      "text" => "CAD Technician\n" \
+        "DraftCo · Burnaby, BC\n" \
+        "https://www.linkedin.com/jobs/view/3812345678/\n"
+    })
+
+    expect { described_class.perform_now(email) }.to change(JobPost, :count).by(1)
+    expect(ActiveJob::Base.queue_adapter.enqueued_jobs).to be_empty
+
+    post = JobPost.last
+    expect(post.scoring_status).to eq("filtered")
+    expect(post.triage_status).to eq("rejected")
+    expect(post.triage_reasons).to include("title_missing_target_role", "title_matches_exclusion")
+  end
+
+  it "defers eligible inbound postings beyond the daily automatic scoring limit" do
+    original = ENV[JobPostTriage::AUTO_SCORE_DAILY_LIMIT_ENV]
+    ENV[JobPostTriage::AUTO_SCORE_DAILY_LIMIT_ENV] = "1"
+    company = Company.create!(name: "Budgeted")
+    JobPost.create!(
+      company: company,
+      title: "Software Engineer",
+      source: "linkedin",
+      scoring_status: "scored",
+      triage_status: "eligible",
+      triage_score: 95,
+      triage_reasons: [ "title_matches_target_roles", "location_vancouver_priority" ],
+      created_at: Time.current
+    )
+    email = inbound_email(data: {
+      "from" => "jobs@linkedin.com",
+      "subject" => "Job alert",
+      "text" => "Backend Developer\n" \
+        "CapCo · Calgary, AB\n" \
+        "https://www.linkedin.com/jobs/view/3812345679/\n"
+    })
+
+    expect { described_class.perform_now(email) }.to change(JobPost, :count).by(1)
+    expect(ActiveJob::Base.queue_adapter.enqueued_jobs).to be_empty
+
+    post = JobPost.order(:created_at).last
+    expect(post.scoring_status).to eq("deferred")
+    expect(post.triage_status).to eq("eligible")
+  ensure
+    original.nil? ? ENV.delete(JobPostTriage::AUTO_SCORE_DAILY_LIMIT_ENV) : ENV[JobPostTriage::AUTO_SCORE_DAILY_LIMIT_ENV] = original
   end
 
   it "hydrates a metadata-only email from the Resend receiving API before parsing" do

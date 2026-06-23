@@ -104,13 +104,15 @@ RSpec.describe "Api job posts", type: :request do
   end
 
   describe "GET /api/job_posts" do
-    it "returns the scored feed ranked by match score" do
+    it "returns the scored feed ranked by match score by default" do
       sign_in!
       company = Company.create!(name: "Acme")
       JobPost.create!(company: company, title: "Lower", match_score: 40,
         scoring_status: "scored", summary: "lower match")
       JobPost.create!(company: company, title: "Higher", match_score: 90,
         scoring_status: "scored", summary: "higher match")
+      JobPost.create!(company: company, title: "Filtered", scoring_status: "filtered",
+        triage_status: "rejected", triage_score: 20)
 
       get "/api/job_posts"
 
@@ -124,8 +126,26 @@ RSpec.describe "Api job posts", type: :request do
         "company" => "Acme",
         "match_score" => 90,
         "scoring_status" => "scored",
+        "triage_status" => "unreviewed",
         "summary" => "higher match"
       )
+    end
+
+    it "returns unscored jobs when requested" do
+      sign_in!
+      company = Company.create!(name: "Acme")
+      JobPost.create!(company: company, title: "Scored", match_score: 90, scoring_status: "scored")
+      filtered = JobPost.create!(company: company, title: "CAD Technician", scoring_status: "filtered",
+        triage_status: "rejected", triage_score: 10, triage_reasons: [ "title_missing_target_role" ])
+      deferred = JobPost.create!(company: company, title: "Backend Developer", scoring_status: "deferred",
+        triage_status: "eligible", triage_score: 90, triage_reasons: [ "location_calgary_priority" ])
+
+      get "/api/job_posts", params: { status: "unscored" }
+
+      expect(response).to have_http_status(:ok)
+      body = JSON.parse(response.body)
+      expect(body["job_posts"].map { |jp| jp["id"] }).to contain_exactly(filtered.id, deferred.id)
+      expect(body["job_posts"].first).to include("triage_reasons")
     end
 
     it "requires authentication" do
@@ -135,6 +155,43 @@ RSpec.describe "Api job posts", type: :request do
       expect(JSON.parse(response.body)).to eq(
         "error" => { "code" => "unauthorized", "message" => "Unauthorized" }
       )
+    end
+  end
+
+  describe "POST /api/job_posts/:id/score" do
+    it "enqueues scoring for a filtered job and records a manual override" do
+      sign_in!
+      company = Company.create!(name: "Acme")
+      job_post = JobPost.create!(
+        company: company,
+        title: "Backend Developer",
+        scoring_status: "filtered",
+        triage_status: "rejected",
+        triage_score: 45,
+        triage_reasons: [ "location_outside_priority_markets" ]
+      )
+
+      expect do
+        post "/api/job_posts/#{job_post.id}/score"
+      end.to have_enqueued_job(ScoreJobPostJob).with(job_post)
+
+      expect(response).to have_http_status(:accepted)
+      job_post.reload
+      expect(job_post.scoring_status).to eq("pending")
+      expect(job_post.triage_status).to eq("manual_override")
+      expect(job_post.triage_reasons).to include("manual_score_requested")
+    end
+
+    it "does not enqueue duplicate scoring for an already pending job" do
+      sign_in!
+      company = Company.create!(name: "Acme")
+      job_post = JobPost.create!(company: company, title: "Backend Developer", scoring_status: "pending")
+
+      expect do
+        post "/api/job_posts/#{job_post.id}/score"
+      end.not_to have_enqueued_job(ScoreJobPostJob)
+
+      expect(response).to have_http_status(:accepted)
     end
   end
 

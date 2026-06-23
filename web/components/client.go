@@ -27,6 +27,14 @@ type RailsClient interface {
 	// Jobs fetches the scored job feed (GET /api/job_posts).
 	Jobs(ctx context.Context) ([]JobSummary, error)
 
+	// UnscoredJobs fetches jobs intentionally not yet scored
+	// (GET /api/job_posts?status=unscored).
+	UnscoredJobs(ctx context.Context) ([]JobSummary, error)
+
+	// ScoreJobPost explicitly requests scoring for an unscored job
+	// (POST /api/job_posts/:id/score). It never submits an application.
+	ScoreJobPost(ctx context.Context, id int) (JobSummary, error)
+
 	// Job fetches a single scored job with its detail fields and resolved
 	// route (GET /api/job_posts/:id).
 	Job(ctx context.Context, id int) (JobDetail, error)
@@ -227,13 +235,16 @@ type PushSubscriptionKeys struct {
 // JobSummary is the compact job-feed row: enough to render the list and link
 // to detail. Mirrors the scored fields Rails owns on JobPost.
 type JobSummary struct {
-	ID            int    `json:"id"`
-	Title         string `json:"title"`
-	Company       string `json:"company"`
-	Source        string `json:"source"`
-	MatchScore    *int   `json:"match_score"`
-	ScoringStatus string `json:"scoring_status"`
-	Summary       string `json:"summary"`
+	ID            int      `json:"id"`
+	Title         string   `json:"title"`
+	Company       string   `json:"company"`
+	Source        string   `json:"source"`
+	MatchScore    *int     `json:"match_score"`
+	ScoringStatus string   `json:"scoring_status"`
+	TriageStatus  string   `json:"triage_status"`
+	TriageScore   *int     `json:"triage_score"`
+	TriageReasons []string `json:"triage_reasons"`
+	Summary       string   `json:"summary"`
 }
 
 // JobDetail carries the full scored view of one job: the LLM summary and
@@ -249,6 +260,9 @@ type JobDetail struct {
 	Compensation         string              `json:"compensation"`
 	MatchScore           *int                `json:"match_score"`
 	ScoringStatus        string              `json:"scoring_status"`
+	TriageStatus         string              `json:"triage_status"`
+	TriageScore          *int                `json:"triage_score"`
+	TriageReasons        []string            `json:"triage_reasons"`
 	Summary              string              `json:"summary"`
 	RelevantRequirements []string            `json:"relevant_requirements"`
 	MissingRequirements  []string            `json:"missing_requirements"`
@@ -403,6 +417,10 @@ func MatchScoreLabel(score *int, scoringStatus string) string {
 		switch scoringStatus {
 		case "pending", "":
 			return "Scoring…"
+		case "filtered":
+			return "Filtered"
+		case "deferred":
+			return "Queued later"
 		case "skipped":
 			return "Not scored"
 		case "failed":
@@ -512,13 +530,37 @@ func (c *httpRailsClient) Login(ctx context.Context, passphrase string) error {
 }
 
 func (c *httpRailsClient) Jobs(ctx context.Context) ([]JobSummary, error) {
+	return c.jobs(ctx, "/api/job_posts")
+}
+
+func (c *httpRailsClient) UnscoredJobs(ctx context.Context) ([]JobSummary, error) {
+	return c.jobs(ctx, "/api/job_posts?status=unscored")
+}
+
+func (c *httpRailsClient) jobs(ctx context.Context, path string) ([]JobSummary, error) {
 	var out struct {
 		JobPosts []JobSummary `json:"job_posts"`
 	}
-	if err := c.get(ctx, "/api/job_posts", &out); err != nil {
+	if err := c.get(ctx, path, &out); err != nil {
 		return nil, err
 	}
 	return out.JobPosts, nil
+}
+
+func (c *httpRailsClient) ScoreJobPost(ctx context.Context, id int) (JobSummary, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		fmt.Sprintf("%s/api/job_posts/%d/score", c.base, id), nil)
+	if err != nil {
+		return JobSummary{}, err
+	}
+	req.Header.Set("Accept", "application/json")
+	var out struct {
+		JobPost JobSummary `json:"job_post"`
+	}
+	if err := c.do(req, &out); err != nil {
+		return JobSummary{}, err
+	}
+	return out.JobPost, nil
 }
 
 func (c *httpRailsClient) Job(ctx context.Context, id int) (JobDetail, error) {

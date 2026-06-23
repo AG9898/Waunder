@@ -326,6 +326,13 @@ button { font-family: inherit; }
 .digest-item,
 .job-list-item { margin: 0; }
 
+.job-list-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: stretch;
+  gap: var(--space-3);
+}
+
 .digest-link,
 .job-list-link {
   display: grid;
@@ -428,6 +435,42 @@ button { font-family: inherit; }
 .job-score--pending {
   background: var(--color-surface-sunken, var(--color-bg));
   color: var(--color-ink-soft);
+}
+
+.job-list-score-action {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.job-list-score-button {
+  appearance: none;
+  min-width: 88px;
+  padding: 9px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
+.job-list-score-button:disabled {
+  cursor: default;
+  opacity: .65;
+}
+
+.job-list-score-error {
+  margin: 0;
+  max-width: 220px;
+  font-size: var(--text-xs);
+  color: var(--color-danger-ink);
+  text-align: right;
 }
 
 /* --------------------------------------------------------------------------
@@ -1521,6 +1564,20 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
   .profile-save { align-self: flex-start; }
 
   /* roomier list rows on wide screens */
+  .job-list-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .job-list-score-action {
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-end;
+  }
+
+  .job-list-score-error {
+    max-width: 160px;
+  }
+
   .digest-link,
   .job-list-link { padding: var(--space-5) var(--space-6); }
 }

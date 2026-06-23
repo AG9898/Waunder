@@ -26,11 +26,12 @@ Waunder is a mobile-first, single-user personal job application assistant for it
 
 ### Phase 1 — MVP (end-to-end pipeline)
 
-Phase 1 delivers the full plan scenario: forward a job-alert email → Resend inbound webhook → Rails ingests, normalizes, and resolves the application route → LLM scores the job → a daily web-push digest is delivered → the owner reviews in the PWA → Waunder generates a tailored application draft / autofill payload → the owner approves → the Playwright worker fills/submits on a supported ATS → Rails reports final status.
+Phase 1 delivers the full plan scenario: forward a job-alert email → Resend inbound webhook → Rails ingests, normalizes, pre-triages, and resolves the application route → eligible jobs are LLM-scored within the daily budget → a daily web-push digest is delivered → the owner reviews in the PWA → Waunder generates a tailored application draft / autofill payload → the owner approves → the Playwright worker fills/submits on a supported ATS → Rails reports final status.
 
 - **Job discovery** via forwarded job-alert emails through Resend inbound webhooks (RESOLVED-13); inbound alerts parsed into normalized job records. An authenticated manual job/link entry endpoint is also available as a fallback, accepting a URL and/or pasted posting text and sending the resulting job through route resolution and scoring (RESOLVED-16).
 - **Application route resolution** separating where a job was discovered from where it should be submitted. Stores source URL, canonical posting URL, application URL, route type, recommended route, and route confidence. Route types: `company_careers`, `greenhouse`, `lever`, `ashby`, `workday`, `linkedin_easy_apply`, `indeed_apply`, `glassdoor_apply`, `unknown`. Preference order: Direct ATS/company application URL > company careers page > job-board external apply URL > LinkedIn Easy Apply / Indeed Apply / Glassdoor Apply > manual apply only.
-- **LLM scoring and summaries** via OpenRouter (structured JSON where supported): job summary, match score, relevant requirements, missing/weak requirements, resume alignment notes, suggested application strategy, and red flags.
+- **Deterministic inbound triage before LLM scoring**: bulk email-ingested jobs are title/location gated before OpenRouter. Target roles include developer, software engineer, AI/ML engineer, platform/infrastructure/devops, and adjacent data roles; Vancouver is highest location priority, then Calgary, then remote. Unknown or broad Canada/BC/Alberta locations are allowed at lower priority because some alert templates omit city detail. Filtered/deferred jobs stay visible in the PWA and can be explicitly scored by the owner.
+- **LLM scoring and summaries** via OpenRouter (structured JSON where supported): job summary, match score, relevant requirements, missing/weak requirements, resume alignment notes, suggested application strategy, and red flags. Automatic inbound scoring is capped by `JOB_TRIAGE_AUTO_SCORE_DAILY_LIMIT`; manual job entries and explicit score requests bypass the cap.
 - **Application assistance**: tailored resume emphasis notes, cover letter / message drafts where relevant, structured application answers, and reviewable/editable autofill payloads for known form systems.
 - **Application tracking**: every job can be tracked through a user-facing pipeline status and
   optional stage independent of the worker automation status. The owner can mark jobs as
@@ -65,7 +66,7 @@ Phase 1 delivers the full plan scenario: forward a job-alert email → Resend in
 
 ## Success Criteria
 
-- A forwarded job-alert email reliably becomes a normalized, scored job record.
+- A forwarded job-alert email reliably becomes a normalized job record; eligible postings are scored automatically within the daily triage budget, and filtered/deferred postings remain available for manual score requests.
 - The daily push digest is delivered to the installed PWA via Web Push (VAPID).
 - The owner can review a scored job and a generated application draft, and must approve before any submit occurs.
 - The owner can see tracked applications in the PWA, manually change pipeline status/stage, and
@@ -83,7 +84,7 @@ Phase 1 delivers the full plan scenario: forward a job-alert email → Resend in
 - **Single-user privacy**: sensitive resume/profile fields are encrypted at rest using Rails encryption; no PII appears in logs.
 - **iOS web push**: requires iOS 16.4+ and the PWA added to the home screen; the notification flow must detect this and guide the owner through install before requesting push permission.
 - **Worker safety**: the automation worker must never auto-submit legal, demographic, salary, disability, sponsorship, or identity-sensitive answers unless the owner explicitly provided and approved those answers.
-- **Cost and reliability**: deterministic scripts are preferred over LLM calls wherever input formats are predictable (ATS route detection, known-sender email parsing, route ranking, supported-form fill logic); LLM is the fallback for novel or unstructured input.
+- **Cost and reliability**: deterministic scripts are preferred over LLM calls wherever input formats are predictable (ATS route detection, known-sender email parsing, title/location triage, route ranking, supported-form fill logic); LLM is the fallback for novel or unstructured input and is budgeted for bulk inbound scoring.
 - **Routing**: employer / ATS application routes are preferred over job-board account automation whenever they can be found.
 
 ---

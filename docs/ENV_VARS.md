@@ -32,6 +32,7 @@ If any other doc mentions a variable, it should link here rather than restate it
 | `WORKER_SERVICE_TOKEN` | Yes | none | Static bearer token the `worker` presents to authenticate its task-pull/report calls to Rails (RESOLVED-14). Set identically on `api` and `worker`. | `api` + `worker` runtime (secret) |
 | `OPENROUTER_API_KEY` | Conditional | none | OpenRouter LLM gateway API key; required for scoring, summaries, and drafts. | `api` runtime (secret) |
 | `OPENROUTER_MODEL` | No | `openai/gpt-oss-120b:free` | Model id used for **all** LLM calls (scoring, summaries, drafts) — single model, no per-task tiers (RESOLVED-17). Free-tier default (replaces `google/gemma-4-31b-it:free`, which became persistently 429 rate-limited); configurable to any OpenRouter model id. | `api` runtime |
+| `JOB_TRIAGE_AUTO_SCORE_DAILY_LIMIT` | No | `20` | Maximum number of inbound, triage-eligible JobPosts Rails automatically sends to OpenRouter scoring per day. Manual entries and explicit score requests bypass this budget; set `0` to keep all inbound jobs unscored until manually requested. | `api` runtime |
 | `RESEND_WEBHOOK_SECRET` | Conditional | none | Svix signing secret that validates Resend inbound (`email.received`) webhook signatures at `POST /webhooks/resend/inbound`; required for email ingestion (RESOLVED-13). | `api` runtime (secret) |
 | `RESEND_API_KEY` | Conditional | none | Resend account API key used by `ResendInboundClient` to fetch the **body** of a received email (`GET /emails/receiving/{email_id}`). The `email.received` webhook delivers only metadata — no text/html — so without this key `ParseInboundEmailJob` has no body to parse and every alert dead-ends. | `api` runtime (secret) |
 | `RESEND_INBOUND_DOMAIN` | Conditional | none | The Resend-verified receiving domain that forwarded job alerts are sent to (reference/config; e.g. `adenguo.com`). | `api` runtime |
@@ -103,6 +104,7 @@ There is no staging environment — only Local dev and Production (Railway).
 | `WORKER_SERVICE_TOKEN` | Required | Required |
 | `OPENROUTER_API_KEY` | Conditional | Conditional |
 | `OPENROUTER_MODEL` | Optional | Optional |
+| `JOB_TRIAGE_AUTO_SCORE_DAILY_LIMIT` | Optional | Optional |
 | `RESEND_WEBHOOK_SECRET` | Conditional | Conditional |
 | `RESEND_API_KEY` | Conditional | Conditional |
 | `RESEND_INBOUND_DOMAIN` | Conditional | Conditional |
