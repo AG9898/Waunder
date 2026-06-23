@@ -220,8 +220,10 @@ dispatch.
 
 - Single-user private app. Auth is a shared-secret session cookie plus a worker bearer token
   (RESOLVED-14). The owner POSTs the `APP_SHARED_SECRET` passphrase to `POST /api/session`,
-  receiving a signed, HTTP-only session cookie (signed with `SESSION_SECRET`). `Api::BaseController`
-  enforces the session via a `before_action` on every `/api` endpoint **except** health.
+  receiving a signed, HTTP-only session cookie (signed with `SESSION_SECRET`). The cookie is
+  persistent with a 90-day `max-age`/`expires` (`Api::BaseController::AUTH_COOKIE_MAX_AGE`) so an
+  installed mobile PWA stays signed in across app eviction/restarts — not a browser-session cookie.
+  `Api::BaseController` enforces the session via a `before_action` on every `/api` endpoint **except** health.
 - The worker authenticates with a static `WORKER_SERVICE_TOKEN` bearer (`Authorization: Bearer`)
   on its task-pull/report endpoints (`GET /api/worker_tasks` and
   `POST /api/worker_tasks/:id/report`) — never the human session cookie. Worker-only

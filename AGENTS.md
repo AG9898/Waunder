@@ -818,3 +818,12 @@ from a Go MAP, so attribute ORDER is nondeterministic across process runs (you c
 substring like `class="..." href="..."` is therefore flaky (~30% here) — assert each attribute
 substring separately. Filtering/sorting for the table AND the main Jobs feed is documented as
 planned but NOT implemented (PRD.md, STYLE_GUIDE.md).
+
+### 2026-06-23 — Session cookie was browser-session-scoped; now 90-day persistent
+The owner session cookie (`waunder_session`, signed `{"session"=>"owner"}` via `SESSION_SECRET`)
+was set in `Api::BaseController#create_session_cookie!` with NO `expires`/`max_age`, making it a
+browser-session cookie. On mobile the OS evicts the backgrounded PWA and drops session cookies, so
+the user got auto-signed-out "after a while" — not a server-side TTL (the `MessageVerifier` cookie
+never expires). Fix: set both `max_age:` and `expires:` to `AUTH_COOKIE_MAX_AGE` (90 days) — both,
+because some mobile browsers honor one over the other. The cookie stays `httponly` + signed +
+`secure` (prod), so a long lifetime doesn't weaken this single-user app. No worker/bearer change.

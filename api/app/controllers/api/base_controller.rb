@@ -4,6 +4,7 @@ module Api
   class BaseController < ApplicationController
     AUTH_COOKIE_NAME = "waunder_session".freeze
     AUTH_COOKIE_VALUE = { "session" => "owner" }.freeze
+    AUTH_COOKIE_MAX_AGE = 90.days.to_i
 
     before_action :authenticate_session!
 
@@ -37,6 +38,8 @@ module Api
         httponly: true,
         same_site: :lax,
         secure: Rails.env.production?,
+        max_age: AUTH_COOKIE_MAX_AGE,
+        expires: AUTH_COOKIE_MAX_AGE.seconds.from_now,
       )
     end
 

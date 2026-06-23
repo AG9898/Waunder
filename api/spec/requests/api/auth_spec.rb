@@ -34,6 +34,14 @@ RSpec.describe "Api auth", type: :request do
       expect(cookie.downcase).to include("httponly")
     end
 
+    it "persists the session cookie with a 90-day lifetime" do
+      post "/api/session", params: { passphrase: "correct-passphrase" }
+
+      cookie = response.headers["Set-Cookie"].downcase
+      expect(cookie).to include("max-age=#{90.days.to_i}")
+      expect(cookie).to include("expires=")
+    end
+
     it "returns the auth error shape for the wrong passphrase" do
       post "/api/session", params: { passphrase: "wrong-passphrase" }
 
