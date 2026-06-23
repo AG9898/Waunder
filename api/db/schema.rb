@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_23_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_23_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -149,6 +149,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_23_130000) do
     t.check_constraint "jsonb_typeof(raw_payload) = 'object'::text", name: "inbound_emails_raw_payload_json_object"
   end
 
+  create_table "job_post_audit_events", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "event_type", default: "lifecycle_changed", null: false
+    t.bigint "job_post_id", null: false
+    t.jsonb "metadata", default: {}, null: false
+    t.datetime "updated_at", null: false
+    t.index ["event_type"], name: "index_job_post_audit_events_on_event_type"
+    t.index ["job_post_id"], name: "index_job_post_audit_events_on_job_post_id"
+    t.check_constraint "jsonb_typeof(metadata) = 'object'::text", name: "job_post_audit_events_metadata_json_object"
+  end
+
   create_table "job_posts", force: :cascade do |t|
     t.text "application_strategy"
     t.bigint "company_id", null: false
@@ -255,6 +266,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_23_130000) do
   add_foreign_key "applications", "job_posts"
   add_foreign_key "audit_events", "applications"
   add_foreign_key "contact_candidates", "job_posts"
+  add_foreign_key "job_post_audit_events", "job_posts"
   add_foreign_key "job_posts", "companies"
   add_foreign_key "outreach_drafts", "contact_candidates"
   add_foreign_key "resume_documents", "profiles"

@@ -425,4 +425,134 @@ RSpec.describe "Api job posts", type: :request do
       expect(existing.reload.pipeline_status).to eq("rejected")
     end
   end
+
+  describe "PATCH /api/job_posts/:id/lifecycle" do
+    it "transitions an active job to backlog and writes an audit event" do
+      sign_in!
+      company = Company.create!(name: "Acme")
+      job_post = JobPost.create!(company: company, title: "Staff Engineer", lifecycle_state: "active")
+
+      expect do
+        patch "/api/job_posts/#{job_post.id}/lifecycle", params: { lifecycle_state: "backlog" }
+      end.to change(JobPostAuditEvent, :count).by(1)
+
+      expect(response).to have_http_status(:ok)
+      expect(JSON.parse(response.body).dig("job_post", "lifecycle_state")).to eq("backlog")
+      expect(job_post.reload.lifecycle_state).to eq("backlog")
+
+      event = JobPostAuditEvent.last
+      expect(event.job_post).to eq(job_post)
+      expect(event.event_type).to eq("lifecycle_changed")
+      expect(event.metadata).to eq("from" => "active", "to" => "backlog")
+    end
+
+    it "soft-deletes via removed and is restorable back to active" do
+      sign_in!
+      company = Company.create!(name: "Acme")
+      job_post = JobPost.create!(company: company, title: "Staff Engineer",
+        posting_url: "https://example.com/job", lifecycle_state: "active")
+
+      expect do
+        patch "/api/job_posts/#{job_post.id}/lifecycle", params: { lifecycle_state: "removed" }
+      end.not_to change(JobPost, :count)
+
+      expect(job_post.reload.lifecycle_state).to eq("removed")
+      # Row persists so posting_url dedup still suppresses repeat alerts.
+      expect(JobPost.exists?(posting_url: "https://example.com/job")).to be(true)
+      expect(JobPost.active.where(id: job_post.id)).to be_empty
+
+      patch "/api/job_posts/#{job_post.id}/lifecycle", params: { lifecycle_state: "active" }
+
+      expect(job_post.reload.lifecycle_state).to eq("active")
+      expect(JobPostAuditEvent.count).to eq(2)
+    end
+
+    it "does not write an audit event for a no-op transition" do
+      sign_in!
+      company = Company.create!(name: "Acme")
+      job_post = JobPost.create!(company: company, title: "Staff Engineer", lifecycle_state: "backlog")
+
+      expect do
+        patch "/api/job_posts/#{job_post.id}/lifecycle", params: { lifecycle_state: "backlog" }
+      end.not_to change(JobPostAuditEvent, :count)
+
+      expect(response).to have_http_status(:ok)
+    end
+
+    it "rejects an invalid lifecycle_state with the standard error shape" do
+      sign_in!
+      company = Company.create!(name: "Acme")
+      job_post = JobPost.create!(company: company, title: "Staff Engineer")
+
+      patch "/api/job_posts/#{job_post.id}/lifecycle", params: { lifecycle_state: "archived" }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(JSON.parse(response.body).dig("error", "code")).to eq("invalid_input")
+      expect(job_post.reload.lifecycle_state).to eq("active")
+    end
+
+    it "returns the standard not_found shape for an unknown id" do
+      sign_in!
+
+      patch "/api/job_posts/999999/lifecycle", params: { lifecycle_state: "backlog" }
+
+      expect(response).to have_http_status(:not_found)
+      expect(JSON.parse(response.body)).to eq(
+        "error" => { "code" => "not_found", "message" => "JobPost not found" }
+      )
+    end
+
+    it "requires authentication" do
+      patch "/api/job_posts/1/lifecycle", params: { lifecycle_state: "backlog" }
+
+      expect(response).to have_http_status(:unauthorized)
+    end
+  end
+
+  describe "PATCH /api/job_posts/lifecycle" do
+    it "applies one lifecycle_state to many ids transactionally with audit events" do
+      sign_in!
+      company = Company.create!(name: "Acme")
+      first = JobPost.create!(company: company, title: "One", lifecycle_state: "active")
+      second = JobPost.create!(company: company, title: "Two", lifecycle_state: "active")
+
+      expect do
+        patch "/api/job_posts/lifecycle", params: { ids: [ first.id, second.id ], lifecycle_state: "removed" }
+      end.to change(JobPostAuditEvent, :count).by(2)
+
+      expect(response).to have_http_status(:ok)
+      states = JSON.parse(response.body)["job_posts"].map { |jp| jp["lifecycle_state"] }
+      expect(states).to all(eq("removed"))
+      expect(first.reload.lifecycle_state).to eq("removed")
+      expect(second.reload.lifecycle_state).to eq("removed")
+    end
+
+    it "returns not_found and changes nothing when any id is unknown" do
+      sign_in!
+      company = Company.create!(name: "Acme")
+      job_post = JobPost.create!(company: company, title: "One", lifecycle_state: "active")
+
+      expect do
+        patch "/api/job_posts/lifecycle", params: { ids: [ job_post.id, 999999 ], lifecycle_state: "backlog" }
+      end.not_to change(JobPostAuditEvent, :count)
+
+      expect(response).to have_http_status(:not_found)
+      expect(job_post.reload.lifecycle_state).to eq("active")
+    end
+
+    it "rejects an empty id list" do
+      sign_in!
+
+      patch "/api/job_posts/lifecycle", params: { ids: [], lifecycle_state: "backlog" }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(JSON.parse(response.body).dig("error", "code")).to eq("invalid_input")
+    end
+
+    it "requires authentication" do
+      patch "/api/job_posts/lifecycle", params: { ids: [ 1 ], lifecycle_state: "backlog" }
+
+      expect(response).to have_http_status(:unauthorized)
+    end
+  end
 end

@@ -121,8 +121,9 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   requested via `POST /api/job_posts/:id/score`, which enqueues `ScoreJobPostJob` for an
   unscored job and records a manual triage override. The owner's manual intake decision is a
   separate axis (INTAKE-01): `PATCH /api/job_posts/:id/lifecycle` (body `{lifecycle_state:
-  active|backlog|removed}`) parks a job in the backlog or soft-removes it, writing an
-  `audit_event`; `removed` is a soft-delete (the row is retained so `JobPostMaterializer`'s
+  active|backlog|removed}`) parks a job in the backlog or soft-removes it, writing a
+  `JobPostAuditEvent` (`event_type: "lifecycle_changed"`, `metadata: {from, to}`); a no-op
+  transition writes nothing; `removed` is a soft-delete (the row is retained so `JobPostMaterializer`'s
   `posting_url` dedup keeps suppressing repeat alerts) hidden from every feed/table but restorable
   from the Removed bin. `lifecycle_state` is orthogonal to `scoring_status`/`triage_status`
   (scoring-pipeline + auto-gate) and to `Application#pipeline_status` (the post-apply tracker). A

@@ -125,7 +125,7 @@ dispatch.
   under `/webhooks/*` (e.g. `/webhooks/resend/inbound`).
 - Domain models cover the resources in the plan: `Profile`, `ResumeDocument`, `JobPost`,
   `ApplicationRoute`, `Company`, `ContactCandidate`, `Application`, `ApplicationDraft`,
-  `OutreachDraft`, `PushSubscription`, `AuditEvent`.
+  `OutreachDraft`, `PushSubscription`, `AuditEvent`, `JobPostAuditEvent`.
 - Background work is implemented as ActiveJob jobs in `app/jobs/`, run on `solid_queue`.
 - LLM calls (OpenRouter) and all external-service calls (Resend, web push) are isolated in
   service / client objects — **never inlined in controllers**.
@@ -163,7 +163,12 @@ dispatch.
   `posting_url` dedup guard) survives and the posting can be restored. Triage auto-parks rejected
   posts in `backlog` and caps the daily Active set to `JOB_INTAKE_DAILY_ACTIVE_LIMIT` (top eligible by
   triage rank); `ExpireStaleJobPostsJob` auto-backlogs `active` posts older than
-  `JOB_INTAKE_STALE_AFTER_DAYS`. Every lifecycle transition (single or bulk) writes an `audit_event`.
+  `JOB_INTAKE_STALE_AFTER_DAYS`. Every effective lifecycle transition (single or bulk, via
+  `PATCH /api/job_posts/:id/lifecycle` and `PATCH /api/job_posts/lifecycle`) writes a
+  `JobPostAuditEvent` (`lifecycle_changed`, `metadata: {from, to}`) — a dedicated audit table
+  separate from the application-scoped `AuditEvent`; no-op transitions write nothing. Bulk applies
+  one state to all listed ids in a single transaction and returns `not_found` (changing nothing)
+  if any id is unknown.
 - List-read pagination contract (INTAKE-01): paginated list endpoints (`GET /api/job_posts`,
   `GET /api/ingestion_batches`) page **server-side** at 30 rows/page using a 1-based `page` param and
   return the standard envelope `{<collection>: [...], page: {number, size, total, has_next}}`. Page

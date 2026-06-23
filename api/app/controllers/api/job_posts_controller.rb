@@ -94,7 +94,61 @@ module Api
       render json: { application: serialize_application(application.reload) }
     end
 
+    # PATCH /api/job_posts/:id/lifecycle
+    # Transition a single JobPost between active/backlog/removed. "removed" is a
+    # soft-delete: the row persists so JobPostMaterializer's posting_url dedup
+    # keeps suppressing repeat alerts. Restorable by setting state back to active.
+    def lifecycle
+      target = lifecycle_target
+      return render_invalid_lifecycle unless target
+
+      job_post = ::JobPost.includes(:company).find(params[:id])
+      apply_lifecycle!(job_post, target)
+
+      render json: { job_post: serialize_summary(job_post.reload) }
+    end
+
+    # PATCH /api/job_posts/lifecycle
+    # Apply one lifecycle_state to many ids in a single transaction.
+    def bulk_lifecycle
+      target = lifecycle_target
+      return render_invalid_lifecycle unless target
+
+      ids = Array(params[:ids]).map(&:to_i).reject(&:zero?).uniq
+      return render_invalid_lifecycle("ids must be a non-empty list") if ids.empty?
+
+      job_posts = ::JobPost.includes(:company).where(id: ids).to_a
+      missing = ids - job_posts.map(&:id)
+      return render_not_found if missing.any?
+
+      ::JobPost.transaction do
+        job_posts.each { |job_post| apply_lifecycle!(job_post, target) }
+      end
+
+      render json: {
+        job_posts: job_posts.map { |job_post| serialize_summary(job_post.reload) }
+      }
+    end
+
     private
+
+    def lifecycle_target
+      source = params[:job_post].presence || params
+      value = source[:lifecycle_state].to_s
+      JobPost::LIFECYCLE_STATES.include?(value) ? value : nil
+    end
+
+    # Update the lifecycle_state and record an audit event of the change.
+    def apply_lifecycle!(job_post, target)
+      previous = job_post.lifecycle_state
+      return if previous == target
+
+      job_post.update!(lifecycle_state: target)
+      job_post.audit_events.create!(
+        event_type: "lifecycle_changed",
+        metadata: { "from" => previous, "to" => target }
+      )
+    end
 
     def filtered_job_posts
       relation = status_scoped(JobPost.all)
@@ -322,6 +376,12 @@ module Api
     def render_invalid_status(message)
       render json: {
         error: { code: "invalid_status", message: message }
+      }, status: :unprocessable_content
+    end
+
+    def render_invalid_lifecycle(message = "lifecycle_state must be one of: #{JobPost::LIFECYCLE_STATES.join(', ')}")
+      render json: {
+        error: { code: "invalid_input", message: message }
       }, status: :unprocessable_content
     end
   end

@@ -181,9 +181,10 @@ Be honest about the current state — most of the suite is still to be written.
   pagination envelope (`page.number`/`size`/`total`/`has_next`); `state=active` default excludes
   backlog/removed.
 - `api/` request specs for `PATCH /api/job_posts/:id/lifecycle` and bulk
-  `PATCH /api/job_posts/lifecycle`: active↔backlog↔removed transitions, each writing an
-  `audit_event`; `removed` rows hidden from all feeds; soft-delete preserves the `posting_url` dedup
-  guard (re-ingesting a removed posting does not re-surface it); auth gating.
+  `PATCH /api/job_posts/lifecycle`: active↔backlog↔removed transitions, each writing a
+  `JobPostAuditEvent` (no-op transitions write nothing); `removed` rows hidden from active feeds;
+  soft-delete preserves the `posting_url` dedup guard (the row survives); bulk transactional update
+  with `not_found` (no changes) on any unknown id; invalid-value and unknown-id error shapes; auth gating.
 - `api/` specs for `JobPostTriage` auto-backlog of rejected posts and the
   `JOB_INTAKE_DAILY_ACTIVE_LIMIT` daily active cap, and a job spec for `ExpireStaleJobPostsJob`
   auto-backlogging stale active posts past `JOB_INTAKE_STALE_AFTER_DAYS`.

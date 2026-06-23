@@ -21,6 +21,8 @@ Rails.application.routes.draw do
     resources :job_posts, only: %i[index show create] do
       post :score, on: :member
       patch :application_status, on: :member
+      patch :lifecycle, on: :member
+      patch :lifecycle, on: :collection, action: :bulk_lifecycle
       resources :contact_candidates, only: %i[index create]
     end
     resources :contact_candidates, only: [] do

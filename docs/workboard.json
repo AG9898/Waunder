@@ -1298,7 +1298,7 @@
       "id": "INTAKE-03",
       "title": "Lifecycle transition endpoints with soft-delete and audit",
       "description": "Add PATCH /api/job_posts/:id/lifecycle (body {lifecycle_state: active|backlog|removed}) and a bulk collection variant PATCH /api/job_posts/lifecycle (body {ids:[...], lifecycle_state}). Each transition validates the target value, updates the JobPost(s), and writes an audit_event recording the change. 'removed' is a soft-delete only: never destroy the row, so JobPostMaterializer's posting_url dedup still suppresses repeat alerts; removed (and backlog) rows are excluded from active feeds/tables and restorable by setting lifecycle_state back to active. Reuse the existing AuditEvent pattern; reference ::Application style model loading where relevant. Bulk endpoint applies the same value to all listed ids in one transaction.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "INTAKE",
       "depends_on": [
