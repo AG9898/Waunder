@@ -141,8 +141,9 @@ Be honest about the current state — most of the suite is still to be written.
   error, and 401 states) plus the login form, driven by a mocked `RailsClient`. Render tests use
   the go-app `NewTestEngine` (which fires `OnPreRender`, so data screens load in both `OnMount`
   and `OnPreRender`). The `httpRailsClient` is exercised against an `httptest` server to assert
-  the `/api`-namespaced paths, JSON decode of scored fields/route/tracker state, session-cookie carry between
-  requests, and 401 → `APIError`/`IsUnauthorized` mapping. Pure helpers (`MatchScoreLabel`,
+  the `/api`-namespaced paths, the `Jobs(JobFeedParams)` filter/sort/state/page query building and
+  `{job_posts, page}` envelope decode, JSON decode of scored fields/route/tracker state,
+  session-cookie carry between requests, and 401 → `APIError`/`IsUnauthorized` mapping. Pure helpers (`MatchScoreLabel`,
   `RouteLabel`, `jobIDFromPath`, `loginErrorStatus`) are table-tested.
 - **web/** — `components/profile_test.go`, `components/push_test.go`: render and unit tests for the
   profile/resume screen and the embedded push toggle (WEB-04). Profile tests assert the editable
@@ -265,10 +266,10 @@ Keep this table up to date — add a row when adding a new test file.
 | `workers/src/worker.test.ts` | Worker orchestration | config loading, bearer-auth task fetch/report calls, clean idle without `API_INTERNAL_URL`, one-cycle poll orchestration, and unsupported-ATS safe failure |
 | `workers/src/ats/handlers.test.ts` | Worker ATS handlers | Playwright fixture coverage for Greenhouse/Lever/Ashby registration, approved field fill/submit, unknown required field pauses, and sensitive-field pauses |
 | `web/components/pwa_test.go` | Web (go-app PWA) | iOS/iPadOS detection + version parsing, iOS 16.4+ Web Push threshold, and the install/notification-permission gate decision |
-| `web/components/jobs_test.go` | Web (go-app PWA) | Job list / job detail / ingestion-batch render tests (scored/unscored tabs, explicit score request button, scored fields, batch grouping + collapsible postings, tracker status controls, empty/error/401 states) via a mocked `RailsClient` and `NewTestEngine`; explicit no-score/no-apply/no-status-update-on-render assertions; `MatchScoreLabel`/`RouteLabel`/`jobIDFromPath` helpers |
+| `web/components/jobs_test.go` | Web (go-app PWA) | Job list / job detail / ingestion-batch render tests (scored/unscored tabs, lifecycle bin tabs, filter/sort controls + Prev/Next pagination, default scored+active+oldest params, explicit score request button, scored fields, batch grouping + collapsible postings, tracker status controls, empty/error/401 states) via a mocked `RailsClient` and `NewTestEngine`; engine-free `apply*`/`feedParams`/paging state transitions; explicit no-score/no-apply/no-status-update/no-extra-fetch-on-render assertions; `MatchScoreLabel`/`RouteLabel`/`jobIDFromPath` helpers |
 | `web/components/applications_test.go` | Web (go-app PWA) | Applications tracker render tests, empty/error/401 states, explicit no-status-update-on-render assertion, and direct status-update state tests |
 | `web/components/login_test.go` | Web (go-app PWA) | Login form render and `loginErrorStatus`/`loginButtonText` status mapping (401 → "Incorrect passphrase") |
-| `web/components/client_test.go` | Web (go-app PWA) | `httpRailsClient` against `httptest`: `/api`-namespaced paths, scored/unscored job query decode, explicit score request path, scored-field/route/tracker JSON decode, application/job tracker PATCH payloads, draft PATCH payload shape, Rails error-code parsing, session-cookie carry, 401 → `APIError` |
+| `web/components/client_test.go` | Web (go-app PWA) | `httpRailsClient` against `httptest`: `/api`-namespaced paths, `Jobs(JobFeedParams)` filter/sort/state/page query building (and default-param omission) + `{job_posts, page}` envelope decode, explicit score request path, scored-field/route/tracker JSON decode, application/job tracker PATCH payloads, draft PATCH payload shape, Rails error-code parsing, session-cookie carry, 401 → `APIError` |
 | `web/components/profile_test.go` | Web (go-app PWA) | Profile/resume render (editable fields, contact presence flags with no PII leak, resume metadata/empty) and `doSave` write path (reseed/error/401) via a mocked `RailsClient` |
 | `web/components/push_test.go` | Web (go-app PWA) | Push toggle subscribe/unsubscribe flow via a mocked `PushSubscriber` (public VAPID key fetched then persisted; browser cancel before Rails), state-mapping helpers, and no-auto-subscribe-on-render |
 | `web/components/contacts_test.go` | Web (go-app PWA) | Contacts/outreach render (candidate fields, empty/error/401), explicit `doGenerate` draft path, no-auto-generate-on-mount and no-send-affordance safety tests, and `applyGenerateResult`/`contactRole`/`generateButtonLabel`/`contactsJobIDFromPath` helpers, via a mocked `RailsClient` |

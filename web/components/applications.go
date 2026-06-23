@@ -221,9 +221,9 @@ func (v *ApplicationsView) loadJobs(ctx app.Context) {
 	ctx.Update()
 	reqCtx := ctx.Context
 	ctx.Async(func() {
-		jobs, err := v.Client.Jobs(reqCtx)
+		page, err := v.Client.Jobs(reqCtx, JobFeedParams{})
 		ctx.Dispatch(func(ctx app.Context) {
-			v.applyJobsResult(jobs, err)
+			v.applyJobsResult(page.Jobs, err)
 			ctx.Update()
 		})
 	})
@@ -237,8 +237,8 @@ func (v *ApplicationsView) doShowTable(ctx context.Context) {
 		return
 	}
 	v.jobsState = loadLoading
-	jobs, err := v.Client.Jobs(ctx)
-	v.applyJobsResult(jobs, err)
+	page, err := v.Client.Jobs(ctx, JobFeedParams{})
+	v.applyJobsResult(page.Jobs, err)
 }
 
 func (v *ApplicationsView) applyJobsResult(jobs []JobSummary, err error) {

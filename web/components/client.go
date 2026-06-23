@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -24,12 +25,11 @@ type RailsClient interface {
 	// the signed, HTTP-only session cookie; subsequent calls carry it.
 	Login(ctx context.Context, passphrase string) error
 
-	// Jobs fetches the scored job feed (GET /api/job_posts).
-	Jobs(ctx context.Context) ([]JobSummary, error)
-
-	// UnscoredJobs fetches jobs intentionally not yet scored
-	// (GET /api/job_posts?status=unscored).
-	UnscoredJobs(ctx context.Context) ([]JobSummary, error)
+	// Jobs fetches a page of the job feed (GET /api/job_posts). The params carry
+	// the server-side filter/sort/lifecycle-state selection and 1-based page; the
+	// returned JobPage carries the rows plus the page envelope so the UI can
+	// drive Prev/Next. All filtering, sorting, and paging happen in Rails.
+	Jobs(ctx context.Context, params JobFeedParams) (JobPage, error)
 
 	// ScoreJobPost explicitly requests scoring for an unscored job
 	// (POST /api/job_posts/:id/score). It never submits an application.
@@ -235,16 +235,79 @@ type PushSubscriptionKeys struct {
 // JobSummary is the compact job-feed row: enough to render the list and link
 // to detail. Mirrors the scored fields Rails owns on JobPost.
 type JobSummary struct {
-	ID            int      `json:"id"`
-	Title         string   `json:"title"`
-	Company       string   `json:"company"`
-	Source        string   `json:"source"`
-	MatchScore    *int     `json:"match_score"`
-	ScoringStatus string   `json:"scoring_status"`
-	TriageStatus  string   `json:"triage_status"`
-	TriageScore   *int     `json:"triage_score"`
-	TriageReasons []string `json:"triage_reasons"`
-	Summary       string   `json:"summary"`
+	ID             int      `json:"id"`
+	Title          string   `json:"title"`
+	Company        string   `json:"company"`
+	Source         string   `json:"source"`
+	MatchScore     *int     `json:"match_score"`
+	ScoringStatus  string   `json:"scoring_status"`
+	TriageStatus   string   `json:"triage_status"`
+	TriageScore    *int     `json:"triage_score"`
+	TriageReasons  []string `json:"triage_reasons"`
+	LifecycleState string   `json:"lifecycle_state"`
+	Summary        string   `json:"summary"`
+}
+
+// JobFeedParams is the owner-selected feed query carried to GET /api/job_posts.
+// Empty fields are omitted so Rails applies its defaults (status=scored,
+// state=active, sort=oldest, page=1). All filtering/sorting/paging is server-
+// side; the web layer only serializes these into query params.
+type JobFeedParams struct {
+	// Status is "scored" (default) or "unscored".
+	Status string
+	// State is the lifecycle bin: "active" (default), "backlog", or "removed".
+	State string
+	// Sort is "oldest" (default) or "score".
+	Sort string
+	// ScoreBand filters to "high", "mid", "low", or "unscored"; empty = all.
+	ScoreBand string
+	// Source filters to one ingestion source (e.g. "linkedin"); empty = all.
+	Source string
+	// Location is a case-insensitive substring match; empty = all.
+	Location string
+	// DateFrom / DateTo bound the created_at range (YYYY-MM-DD); empty = open.
+	DateFrom string
+	DateTo   string
+	// Page is the 1-based page number; <=0 is treated as 1.
+	Page int
+}
+
+// query renders the params into URL query values, omitting empty fields so the
+// server applies its defaults.
+func (p JobFeedParams) query() url.Values {
+	q := url.Values{}
+	set := func(key, val string) {
+		if strings.TrimSpace(val) != "" {
+			q.Set(key, val)
+		}
+	}
+	set("status", p.Status)
+	set("state", p.State)
+	set("sort", p.Sort)
+	set("score_band", p.ScoreBand)
+	set("source", p.Source)
+	set("location", p.Location)
+	set("date_from", p.DateFrom)
+	set("date_to", p.DateTo)
+	if p.Page > 1 {
+		q.Set("page", strconv.Itoa(p.Page))
+	}
+	return q
+}
+
+// JobPage is one page of the job feed: the rows plus the server's page envelope
+// (1-based number, size, total matches, and whether a next page exists).
+type JobPage struct {
+	Jobs []JobSummary `json:"job_posts"`
+	Page PageMeta     `json:"page"`
+}
+
+// PageMeta is the pagination envelope Rails returns alongside the feed rows.
+type PageMeta struct {
+	Number  int  `json:"number"`
+	Size    int  `json:"size"`
+	Total   int  `json:"total"`
+	HasNext bool `json:"has_next"`
 }
 
 // JobDetail carries the full scored view of one job: the LLM summary and
@@ -529,22 +592,16 @@ func (c *httpRailsClient) Login(ctx context.Context, passphrase string) error {
 	return c.do(req, nil)
 }
 
-func (c *httpRailsClient) Jobs(ctx context.Context) ([]JobSummary, error) {
-	return c.jobs(ctx, "/api/job_posts")
-}
-
-func (c *httpRailsClient) UnscoredJobs(ctx context.Context) ([]JobSummary, error) {
-	return c.jobs(ctx, "/api/job_posts?status=unscored")
-}
-
-func (c *httpRailsClient) jobs(ctx context.Context, path string) ([]JobSummary, error) {
-	var out struct {
-		JobPosts []JobSummary `json:"job_posts"`
+func (c *httpRailsClient) Jobs(ctx context.Context, params JobFeedParams) (JobPage, error) {
+	path := "/api/job_posts"
+	if q := params.query().Encode(); q != "" {
+		path += "?" + q
 	}
-	if err := c.get(ctx, path, &out); err != nil {
-		return nil, err
+	var page JobPage
+	if err := c.get(ctx, path, &page); err != nil {
+		return JobPage{}, err
 	}
-	return out.JobPosts, nil
+	return page, nil
 }
 
 func (c *httpRailsClient) ScoreJobPost(ctx context.Context, id int) (JobSummary, error) {

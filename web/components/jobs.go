@@ -26,6 +26,22 @@ const (
 	jobListUnscored = "unscored"
 )
 
+// Lifecycle bins the feed can show. These mirror the Rails JobPost lifecycle
+// states; "active" is the default working set.
+const (
+	jobStateActive  = "active"
+	jobStateBacklog = "backlog"
+	jobStateRemoved = "removed"
+)
+
+// Sort modes for the feed: oldest-first (default) or highest-score-first.
+const (
+	jobSortOldest = "oldest"
+	jobSortScore  = "score"
+)
+
+const jobsPageSize = 30
+
 type scoreRequestState int
 
 const (
@@ -34,9 +50,13 @@ const (
 	scoreRequestError
 )
 
-// JobList renders the job feed. The scored tab uses GET /api/job_posts; the
-// unscored tab uses GET /api/job_posts?status=unscored and lets the owner
-// explicitly request scoring for filtered/deferred jobs.
+// JobList renders the job feed backed by GET /api/job_posts. It exposes the
+// server-side controls Rails supports: a scored/unscored status toggle,
+// lifecycle bin tabs (Active default / Backlog / Removed), filter controls
+// (score band, source, location, ingestion-date range), a sort toggle (oldest
+// default vs highest-score), and Prev/Next pagination reading the page
+// envelope. All fetching is on explicit user action — the only implicit fetch
+// is the initial load on mount/pre-render.
 type JobList struct {
 	app.Compo
 
@@ -46,9 +66,23 @@ type JobList struct {
 
 	state loadState
 	jobs  []JobSummary
+	page  PageMeta
 	err   string
 
-	view        string
+	// view is the scored/unscored status toggle.
+	view string
+	// state bin (active/backlog/removed), sort mode, and the filter selections
+	// that feed JobFeedParams. The current 1-based page is tracked separately so
+	// Prev/Next can advance it without resetting the filters.
+	bin       string
+	sort      string
+	scoreBand string
+	source    string
+	location  string
+	dateFrom  string
+	dateTo    string
+	pageNum   int
+
 	scoreStates map[int]scoreRequestState
 	scoreErrs   map[int]string
 }
@@ -62,52 +96,98 @@ func (j *JobList) ensureClient() {
 	}
 }
 
-func (j *JobList) load(ctx app.Context) {
-	if j.view == "" {
-		j.view = jobListScored
+// feedParams builds the server query from the current selections, normalizing
+// defaults so an unset component still requests scored + active + oldest, page 1.
+func (j *JobList) feedParams() JobFeedParams {
+	view := j.view
+	if view == "" {
+		view = jobListScored
 	}
+	bin := j.bin
+	if bin == "" {
+		bin = jobStateActive
+	}
+	sort := j.sort
+	if sort == "" {
+		sort = jobSortOldest
+	}
+	page := j.pageNum
+	if page < 1 {
+		page = 1
+	}
+	return JobFeedParams{
+		Status:    view,
+		State:     bin,
+		Sort:      sort,
+		ScoreBand: j.scoreBand,
+		Source:    j.source,
+		Location:  j.location,
+		DateFrom:  j.dateFrom,
+		DateTo:    j.dateTo,
+		Page:      page,
+	}
+}
+
+func (j *JobList) load(ctx app.Context) {
+	j.normalizeDefaults()
 	j.state = loadLoading
 	ctx.Update()
 	reqCtx := ctx.Context
-	view := j.view
+	params := j.feedParams()
 	ctx.Async(func() {
-		jobs, err := j.fetchJobs(reqCtx, view)
+		page, err := j.Client.Jobs(reqCtx, params)
 		ctx.Dispatch(func(ctx app.Context) {
-			applyResult(ctx, &j.state, &j.err, err, func() { j.jobs = jobs })
+			applyResult(ctx, &j.state, &j.err, err, func() {
+				j.jobs = page.Jobs
+				j.page = page.Page
+			})
 		})
 	})
 }
 
-func (j *JobList) fetchJobs(ctx context.Context, view string) ([]JobSummary, error) {
-	if view == jobListUnscored {
-		return j.Client.UnscoredJobs(ctx)
+// normalizeDefaults seeds the unset selection fields so the component always has
+// a concrete scored + active + oldest, page-1 state.
+func (j *JobList) normalizeDefaults() {
+	if j.view == "" {
+		j.view = jobListScored
 	}
-	return j.Client.Jobs(ctx)
+	if j.bin == "" {
+		j.bin = jobStateActive
+	}
+	if j.sort == "" {
+		j.sort = jobSortOldest
+	}
+	if j.pageNum < 1 {
+		j.pageNum = 1
+	}
 }
 
 func (j *JobList) Render() app.UI {
+	j.normalizeDefaults()
 	return app.Div().Class("job-list").Body(
 		renderAppTabs("jobs"),
 		app.H1().Text("Jobs"),
 		j.renderViewSelector(),
+		j.renderBinTabs(),
+		j.renderFilters(),
 		renderLoad(j.state, j.err, func() app.UI {
 			if len(j.jobs) == 0 {
 				return app.P().Class("job-list-empty").Text(j.emptyText())
 			}
-			return app.Ul().Class("job-list-items").Body(
-				app.Range(j.jobs).Slice(func(i int) app.UI {
-					job := j.jobs[i]
-					return j.renderJobRow(job)
-				}),
+			return app.Div().Class("job-list-results").Body(
+				app.Ul().Class("job-list-items").Body(
+					app.Range(j.jobs).Slice(func(i int) app.UI {
+						job := j.jobs[i]
+						return j.renderJobRow(job)
+					}),
+				),
+				j.renderPagination(),
 			)
 		}),
 	)
 }
 
 func (j *JobList) renderViewSelector() app.UI {
-	if j.view == "" {
-		j.view = jobListScored
-	}
 	return app.Nav().Class("applications-view-selector job-list-view-selector").Attr("role", "tablist").Body(
 		app.Button().
 			Class("view-selector-option").
@@ -122,6 +202,137 @@ func (j *JobList) renderViewSelector() app.UI {
 			OnClick(j.showView(jobListUnscored)).
 			Text("Unscored"),
 	)
+}
+
+// renderBinTabs renders the lifecycle bin selector (Active / Backlog / Removed),
+// sitting alongside the scored/unscored toggle.
+func (j *JobList) renderBinTabs() app.UI {
+	tab := func(state, label string) app.UI {
+		return app.Button().
+			Class("job-bin-tab").
+			Class(viewSelectorClass(j.bin, state)).
+			Attr("role", "tab").
+			OnClick(j.showBin(state)).
+			Text(label)
+	}
+	return app.Nav().Class("job-bin-tabs").Attr("role", "tablist").Body(
+		tab(jobStateActive, "Active"),
+		tab(jobStateBacklog, "Backlog"),
+		tab(jobStateRemoved, "Removed"),
+	)
+}
+
+// renderFilters renders the filter controls (score band, source, location,
+// ingestion-date range) and the oldest/highest-score sort toggle. Each control
+// applies on change/click; no control fetches on initial render.
+func (j *JobList) renderFilters() app.UI {
+	return app.Div().Class("job-filters").Body(
+		app.Label().Class("job-filter").Body(
+			app.Span().Text("Score"),
+			app.Select().
+				Class("job-filter-score-band").
+				OnChange(j.setScoreBand).
+				Body(
+					scoreBandOption("", "All", j.scoreBand),
+					scoreBandOption("high", "High (75+)", j.scoreBand),
+					scoreBandOption("mid", "Mid (50–74)", j.scoreBand),
+					scoreBandOption("low", "Low (<50)", j.scoreBand),
+					scoreBandOption("unscored", "Unscored", j.scoreBand),
+				),
+		),
+		app.Label().Class("job-filter").Body(
+			app.Span().Text("Source"),
+			app.Select().
+				Class("job-filter-source").
+				OnChange(j.setSource).
+				Body(
+					scoreBandOption("", "All", j.source),
+					scoreBandOption("linkedin", "LinkedIn", j.source),
+					scoreBandOption("glassdoor", "Glassdoor", j.source),
+					scoreBandOption("indeed", "Indeed", j.source),
+					scoreBandOption("manual", "Manual entry", j.source),
+					scoreBandOption("inbound_llm", "Email alert", j.source),
+				),
+		),
+		app.Label().Class("job-filter").Body(
+			app.Span().Text("Location"),
+			app.Input().
+				Class("job-filter-location").
+				Type("search").
+				Placeholder("e.g. Vancouver").
+				Value(j.location).
+				OnChange(j.setLocation),
+		),
+		app.Label().Class("job-filter").Body(
+			app.Span().Text("From"),
+			app.Input().
+				Class("job-filter-date-from").
+				Type("date").
+				Value(j.dateFrom).
+				OnChange(j.setDateFrom),
+		),
+		app.Label().Class("job-filter").Body(
+			app.Span().Text("To"),
+			app.Input().
+				Class("job-filter-date-to").
+				Type("date").
+				Value(j.dateTo).
+				OnChange(j.setDateTo),
+		),
+		app.Label().Class("job-filter").Body(
+			app.Span().Text("Sort"),
+			app.Select().
+				Class("job-filter-sort").
+				OnChange(j.setSort).
+				Body(
+					scoreBandOption(jobSortOldest, "Oldest first", j.sort),
+					scoreBandOption(jobSortScore, "Highest score", j.sort),
+				),
+		),
+	)
+}
+
+// renderPagination renders Prev/Next controls and a page indicator reading the
+// server's page envelope. Prev is disabled on page 1; Next is disabled when the
+// envelope reports no further page.
+func (j *JobList) renderPagination() app.UI {
+	return app.Div().Class("job-pagination").Body(
+		app.Button().
+			Class("job-page-prev").
+			Disabled(j.page.Number <= 1).
+			OnClick(j.prevPage).
+			Text("Previous"),
+		app.Span().Class("job-page-indicator").Text(pageIndicatorLabel(j.page)),
+		app.Button().
+			Class("job-page-next").
+			Disabled(!j.page.HasNext).
+			OnClick(j.nextPage).
+			Text("Next"),
+	)
+}
+
+// scoreBandOption builds a <option> with selected set when value matches the
+// current selection. Reused for the score-band, source, and sort selects.
+func scoreBandOption(value, label, current string) app.UI {
+	opt := app.Option().Value(value).Text(label)
+	if value == current {
+		opt = opt.Selected(true)
+	}
+	return opt
+}
+
+// pageIndicatorLabel renders "Page N of M" from the page envelope, falling back
+// to "Page N" when the total is unknown.
+func pageIndicatorLabel(page PageMeta) string {
+	number := page.Number
+	if number < 1 {
+		number = 1
+	}
+	if page.Size > 0 && page.Total > 0 {
+		last := (page.Total + page.Size - 1) / page.Size
+		return "Page " + strconv.Itoa(number) + " of " + strconv.Itoa(last)
+	}
+	return "Page " + strconv.Itoa(number)
 }
 
 func (j *JobList) renderJobRow(job JobSummary) app.UI {
@@ -170,11 +381,118 @@ func (j *JobList) showView(view string) app.EventHandler {
 		if j.view == view {
 			return
 		}
-		j.view = view
-		j.jobs = nil
-		j.err = ""
+		j.applyView(view)
 		j.load(ctx)
 	}
+}
+
+// applyView records a status-toggle change and resets paging. Split from the
+// event handler so the state transition is unit-testable without the engine.
+func (j *JobList) applyView(view string) {
+	j.view = view
+	j.resetFeed()
+}
+
+func (j *JobList) showBin(state string) app.EventHandler {
+	return func(ctx app.Context, _ app.Event) {
+		if j.bin == state {
+			return
+		}
+		j.applyBin(state)
+		j.load(ctx)
+	}
+}
+
+func (j *JobList) applyBin(state string) {
+	j.bin = state
+	j.resetFeed()
+}
+
+// filter setters read the new value from the changed control, store it, reset to
+// page 1, and refetch. Each is split into an apply* helper for engine-free tests.
+func (j *JobList) setScoreBand(ctx app.Context, _ app.Event) {
+	j.applyScoreBand(ctx.JSSrc().Get("value").String())
+	j.load(ctx)
+}
+
+func (j *JobList) applyScoreBand(value string) { j.scoreBand = value; j.resetFeed() }
+
+func (j *JobList) setSource(ctx app.Context, _ app.Event) {
+	j.applySource(ctx.JSSrc().Get("value").String())
+	j.load(ctx)
+}
+
+func (j *JobList) applySource(value string) { j.source = value; j.resetFeed() }
+
+func (j *JobList) setLocation(ctx app.Context, _ app.Event) {
+	j.applyLocation(ctx.JSSrc().Get("value").String())
+	j.load(ctx)
+}
+
+func (j *JobList) applyLocation(value string) { j.location = value; j.resetFeed() }
+
+func (j *JobList) setDateFrom(ctx app.Context, _ app.Event) {
+	j.applyDateFrom(ctx.JSSrc().Get("value").String())
+	j.load(ctx)
+}
+
+func (j *JobList) applyDateFrom(value string) { j.dateFrom = value; j.resetFeed() }
+
+func (j *JobList) setDateTo(ctx app.Context, _ app.Event) {
+	j.applyDateTo(ctx.JSSrc().Get("value").String())
+	j.load(ctx)
+}
+
+func (j *JobList) applyDateTo(value string) { j.dateTo = value; j.resetFeed() }
+
+func (j *JobList) setSort(ctx app.Context, _ app.Event) {
+	j.applySort(ctx.JSSrc().Get("value").String())
+	j.load(ctx)
+}
+
+func (j *JobList) applySort(value string) { j.sort = value; j.resetFeed() }
+
+// resetFeed clears the current rows/error and returns to page 1 — used whenever
+// a filter/bin/sort/status selection changes so the new query starts fresh.
+func (j *JobList) resetFeed() {
+	j.jobs = nil
+	j.err = ""
+	j.pageNum = 1
+}
+
+func (j *JobList) prevPage(ctx app.Context, _ app.Event) {
+	if j.applyPrevPage() {
+		j.load(ctx)
+	}
+}
+
+// applyPrevPage steps back one page when not already on the first, returning
+// true when a refetch is warranted.
+func (j *JobList) applyPrevPage() bool {
+	if j.pageNum <= 1 {
+		return false
+	}
+	j.pageNum--
+	return true
+}
+
+func (j *JobList) nextPage(ctx app.Context, _ app.Event) {
+	if j.applyNextPage() {
+		j.load(ctx)
+	}
+}
+
+// applyNextPage advances one page when the envelope reports a next page exists,
+// returning true when a refetch is warranted.
+func (j *JobList) applyNextPage() bool {
+	if !j.page.HasNext {
+		return false
+	}
+	if j.pageNum < 1 {
+		j.pageNum = 1
+	}
+	j.pageNum++
+	return true
 }
 
 func (j *JobList) scoreJob(id int) app.EventHandler {
@@ -249,6 +567,12 @@ func (j *JobList) setScoreState(id int, state scoreRequestState, err string) {
 }
 
 func (j *JobList) emptyText() string {
+	switch j.bin {
+	case jobStateBacklog:
+		return "No jobs in the backlog."
+	case jobStateRemoved:
+		return "No removed jobs."
+	}
 	if j.view == jobListUnscored {
 		return "No unscored jobs."
 	}

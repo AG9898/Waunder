@@ -54,10 +54,11 @@ func TestClientLoginSendsPassphraseAndCarriesCookie(t *testing.T) {
 		t.Errorf("server got passphrase %q, want %q", gotPass, "hunter2")
 	}
 
-	jobs, err := c.Jobs(context.Background())
+	page, err := c.Jobs(context.Background(), JobFeedParams{})
 	if err != nil {
 		t.Fatalf("Jobs after login: %v", err)
 	}
+	jobs := page.Jobs
 	if len(jobs) != 1 || jobs[0].Title != "Eng" || jobs[0].MatchScore == nil || *jobs[0].MatchScore != 80 {
 		t.Errorf("unexpected jobs decode: %+v", jobs)
 	}
@@ -70,32 +71,76 @@ func TestClientUnauthorizedMapsToAPIError(t *testing.T) {
 	defer srv.Close()
 
 	c := &httpRailsClient{http: srv.Client(), base: srv.URL}
-	_, err := c.Jobs(context.Background())
+	_, err := c.Jobs(context.Background(), JobFeedParams{})
 	if !IsUnauthorized(err) {
 		t.Fatalf("expected unauthorized APIError, got %v", err)
 	}
 }
 
-func TestClientUnscoredJobsUsesQuery(t *testing.T) {
-	var gotPath string
+func TestClientJobsBuildsFilterQueryAndDecodesPage(t *testing.T) {
+	var gotQuery url.Values
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotPath = r.URL.String()
+		gotQuery = r.URL.Query()
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"job_posts":[{"id":2,"title":"Backend","company":"CapCo","scoring_status":"filtered","triage_status":"rejected","triage_reasons":["location_outside_priority_markets"]}]}`))
+		_, _ = w.Write([]byte(`{"job_posts":[{"id":2,"title":"Backend","company":"CapCo","scoring_status":"filtered","lifecycle_state":"backlog"}],"page":{"number":2,"size":30,"total":45,"has_next":false}}`))
 	}))
 	defer srv.Close()
 	c := &httpRailsClient{http: srv.Client(), base: srv.URL}
 
-	jobs, err := c.UnscoredJobs(context.Background())
-
+	page, err := c.Jobs(context.Background(), JobFeedParams{
+		Status:    "unscored",
+		State:     "backlog",
+		Sort:      "score",
+		ScoreBand: "high",
+		Source:    "linkedin",
+		Location:  "Vancouver",
+		DateFrom:  "2026-06-01",
+		DateTo:    "2026-06-23",
+		Page:      2,
+	})
 	if err != nil {
-		t.Fatalf("UnscoredJobs: %v", err)
+		t.Fatalf("Jobs: %v", err)
 	}
-	if gotPath != "/api/job_posts?status=unscored" {
-		t.Fatalf("path = %q, want /api/job_posts?status=unscored", gotPath)
+
+	want := map[string]string{
+		"status":     "unscored",
+		"state":      "backlog",
+		"sort":       "score",
+		"score_band": "high",
+		"source":     "linkedin",
+		"location":   "Vancouver",
+		"date_from":  "2026-06-01",
+		"date_to":    "2026-06-23",
+		"page":       "2",
 	}
-	if len(jobs) != 1 || jobs[0].ScoringStatus != "filtered" || jobs[0].TriageStatus != "rejected" {
-		t.Fatalf("unexpected jobs: %+v", jobs)
+	for k, v := range want {
+		if gotQuery.Get(k) != v {
+			t.Errorf("query %s = %q, want %q (full %v)", k, gotQuery.Get(k), v, gotQuery)
+		}
+	}
+	if len(page.Jobs) != 1 || page.Jobs[0].LifecycleState != "backlog" {
+		t.Fatalf("unexpected jobs decode: %+v", page.Jobs)
+	}
+	if page.Page.Number != 2 || page.Page.Total != 45 || page.Page.HasNext {
+		t.Fatalf("unexpected page envelope: %+v", page.Page)
+	}
+}
+
+func TestClientJobsOmitsDefaultParams(t *testing.T) {
+	var gotRawQuery string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotRawQuery = r.URL.RawQuery
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"job_posts":[],"page":{"number":1,"size":30,"total":0,"has_next":false}}`))
+	}))
+	defer srv.Close()
+	c := &httpRailsClient{http: srv.Client(), base: srv.URL}
+
+	if _, err := c.Jobs(context.Background(), JobFeedParams{Page: 1}); err != nil {
+		t.Fatalf("Jobs: %v", err)
+	}
+	if gotRawQuery != "" {
+		t.Fatalf("expected no query for default params, got %q", gotRawQuery)
 	}
 }
 

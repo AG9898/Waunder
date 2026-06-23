@@ -74,8 +74,10 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   `components.DigestView` — recently-ingested postings grouped into batches, one alert/digest
   email per batch, by date and newest first; each batch is a collapsible block whose postings
   link to their detail; fed by `GET /api/ingestion_batches`), the job feed (`/jobs`,
-  `components.JobList` — scored and unscored tabs, with explicit score requests for unscored
-  rows), the manual job
+  `components.JobList` — scored/unscored status tabs, lifecycle bin tabs (Active default /
+  Backlog / Removed), filter controls (score band, source, location, ingestion-date range), an
+  oldest/highest-score sort toggle, and Prev/Next 30-per-page pagination reading the server page
+  envelope; explicit score requests on unscored rows; INTAKE-07), the manual job
   entry form (`/jobs/new`, `components.ManualEntry` — a URL and/or pasted posting text plus
   optional title/company hints, posting to `POST /api/job_posts`; on success it surfaces the
   created post with a `/jobs/:id` link to follow it into the feed once Rails scores it), a single
@@ -97,8 +99,11 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 - Talks to Rails only through a small `components.RailsClient` interface (the live
   implementation, `httpRailsClient`, uses stdlib `net/http`, which maps to browser `fetch` in
   the WASM build). The interface is the test seam: render/component tests inject a mock and run
-  with no backend. The read shapes the client expects are `GET /api/job_posts` (scored feed),
-  `GET /api/job_posts?status=unscored` (filtered/deferred/pending/skipped/failed feed),
+  with no backend. The read shapes the client expects are `GET /api/job_posts` (the unified feed:
+  `RailsClient.Jobs(ctx, JobFeedParams)` carries the `status`/`state`/`sort`/`score_band`/
+  `source`/`location`/`date_from`/`date_to`/`page` query params and decodes the
+  `{job_posts, page}` envelope into a `JobPage`; the unscored view is just `Status: "unscored"`,
+  so there is no separate `UnscoredJobs` method — INTAKE-07),
   `GET /api/job_posts/:id` (detail), `GET /api/digest` (digest), and
   `GET /api/ingestion_batches` (ingestion history — postings grouped into source+arrival-time
   batches by `IngestionBatchBuilder`, derived without any persisted batch link or migration).

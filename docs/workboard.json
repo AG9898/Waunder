@@ -1431,7 +1431,7 @@
       "id": "INTAKE-07",
       "title": "Jobs feed: filter controls, sort toggle, bin tabs, pagination",
       "description": "Wire the new feed API into the go-app Jobs screen (components.JobList). Add filter controls (score band, source, location/remote, ingestion-date range), a sort toggle (oldest default vs highest-score), bin tabs for lifecycle state (Active default / Backlog / Removed) alongside the existing scored/unscored toggle, and Prev/Next pagination (30/page) reading the page envelope. Extend the RailsClient interface (and httpRailsClient + the shared mockClient) so Jobs() accepts the filter/sort/state/page params and returns the page metadata. Follow the established do*/apply* handler split so state transitions are unit-testable without the engine, and keep all fetching on explicit user action (no lifecycle mutation here).",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "INTAKE",
       "depends_on": [

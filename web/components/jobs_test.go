@@ -19,11 +19,13 @@ type mockClient struct {
 	loginPass string
 
 	jobs      []JobSummary
+	jobsPage  PageMeta
 	jobsErr   error
 	jobsCalls int
-
+	gotParams JobFeedParams
+	// unscoredJobs, when set, is returned instead of jobs when the requested
+	// params carry status=unscored, so the unscored toggle is testable.
 	unscoredJobs      []JobSummary
-	unscoredJobsErr   error
 	unscoredJobsCalls int
 	scoreJob          JobSummary
 	scoreJobErr       error
@@ -108,14 +110,18 @@ func (m *mockClient) Login(_ context.Context, passphrase string) error {
 	return m.loginErr
 }
 
-func (m *mockClient) Jobs(context.Context) ([]JobSummary, error) {
+func (m *mockClient) Jobs(_ context.Context, params JobFeedParams) (JobPage, error) {
 	m.jobsCalls++
-	return m.jobs, m.jobsErr
-}
-
-func (m *mockClient) UnscoredJobs(context.Context) ([]JobSummary, error) {
-	m.unscoredJobsCalls++
-	return m.unscoredJobs, m.unscoredJobsErr
+	m.gotParams = params
+	if m.jobsErr != nil {
+		return JobPage{}, m.jobsErr
+	}
+	rows := m.jobs
+	if params.Status == jobListUnscored {
+		m.unscoredJobsCalls++
+		rows = m.unscoredJobs
+	}
+	return JobPage{Jobs: rows, Page: m.jobsPage}, nil
 }
 
 func (m *mockClient) ScoreJobPost(_ context.Context, id int) (JobSummary, error) {
@@ -481,6 +487,109 @@ func TestJobListRendersSourceOrigin(t *testing.T) {
 		if !strings.Contains(html, want) {
 			t.Errorf("job list HTML missing source origin %q\n%s", want, html)
 		}
+	}
+}
+
+func TestJobListDefaultParams(t *testing.T) {
+	m := &mockClient{jobs: []JobSummary{{ID: 1, Title: "Eng", Company: "Acme"}}}
+	c := &JobList{Client: m}
+	renderHTML(t, c)
+	got := m.gotParams
+	if got.Status != jobListScored || got.State != jobStateActive || got.Sort != jobSortOldest || got.Page != 1 {
+		t.Fatalf("default params = %+v, want scored/active/oldest/page1", got)
+	}
+}
+
+func TestJobListRendersControls(t *testing.T) {
+	m := &mockClient{jobs: []JobSummary{{ID: 1, Title: "Eng", Company: "Acme"}}, jobsPage: PageMeta{Number: 1, Size: 30, Total: 1, HasNext: false}}
+	c := &JobList{Client: m}
+	html := renderHTML(t, c)
+	for _, want := range []string{
+		"job-bin-tabs", "Active", "Backlog", "Removed",
+		"job-filters", "job-filter-score-band", "job-filter-source",
+		"job-filter-location", "job-filter-date-from", "job-filter-date-to",
+		"job-filter-sort", "Oldest first", "Highest score",
+		"job-pagination", "job-page-prev", "job-page-next", "Page 1 of 1",
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("job list HTML missing control %q\n%s", want, html)
+		}
+	}
+}
+
+func TestJobListApplyBinResetsAndRequestsState(t *testing.T) {
+	c := &JobList{pageNum: 3, jobs: []JobSummary{{ID: 1}}}
+	c.normalizeDefaults()
+	c.applyBin(jobStateBacklog)
+	if c.bin != jobStateBacklog {
+		t.Fatalf("bin = %q, want backlog", c.bin)
+	}
+	if c.pageNum != 1 || c.jobs != nil {
+		t.Fatalf("expected feed reset to page 1 with cleared rows, got page %d jobs %v", c.pageNum, c.jobs)
+	}
+	if got := c.feedParams(); got.State != jobStateBacklog || got.Page != 1 {
+		t.Fatalf("feedParams = %+v, want backlog page 1", got)
+	}
+}
+
+func TestJobListApplyFiltersFeedIntoParams(t *testing.T) {
+	c := &JobList{}
+	c.normalizeDefaults()
+	c.applyScoreBand("high")
+	c.applySource("linkedin")
+	c.applyLocation("Vancouver")
+	c.applyDateFrom("2026-06-01")
+	c.applyDateTo("2026-06-23")
+	c.applySort(jobSortScore)
+
+	got := c.feedParams()
+	if got.ScoreBand != "high" || got.Source != "linkedin" || got.Location != "Vancouver" ||
+		got.DateFrom != "2026-06-01" || got.DateTo != "2026-06-23" || got.Sort != jobSortScore {
+		t.Fatalf("feedParams = %+v", got)
+	}
+	if got.Page != 1 {
+		t.Fatalf("changing a filter should reset to page 1, got %d", got.Page)
+	}
+}
+
+func TestJobListPagingRespectsEnvelope(t *testing.T) {
+	c := &JobList{}
+	c.normalizeDefaults()
+	// No next page advertised: Next is a no-op.
+	c.page = PageMeta{Number: 1, HasNext: false}
+	if c.applyNextPage() {
+		t.Fatalf("applyNextPage advanced past the last page")
+	}
+	// Next page advertised: advance.
+	c.page = PageMeta{Number: 1, HasNext: true}
+	if !c.applyNextPage() || c.pageNum != 2 {
+		t.Fatalf("applyNextPage did not advance to page 2, page=%d", c.pageNum)
+	}
+	// Prev from page 1 is a no-op; from page 2 it steps back.
+	if !c.applyPrevPage() || c.pageNum != 1 {
+		t.Fatalf("applyPrevPage did not step back to page 1, page=%d", c.pageNum)
+	}
+	if c.applyPrevPage() {
+		t.Fatalf("applyPrevPage stepped before page 1")
+	}
+}
+
+func TestJobListNeverFetchesOnControlRender(t *testing.T) {
+	m := &mockClient{jobs: []JobSummary{{ID: 1, Title: "Eng", Company: "Acme"}}}
+	c := &JobList{Client: m}
+	renderHTML(t, c)
+	// Exactly one fetch — the initial mount/pre-render load. Rendering the
+	// filter/sort/bin/pagination controls must not trigger extra fetches.
+	if m.jobsCalls != 1 {
+		t.Fatalf("jobs fetched %d times on render, want exactly 1 (initial load)", m.jobsCalls)
+	}
+}
+
+func TestJobListUnscoredBinEmptyText(t *testing.T) {
+	c := &JobList{bin: jobStateBacklog, Client: &mockClient{jobs: nil}}
+	html := renderHTML(t, c)
+	if !strings.Contains(html, "No jobs in the backlog.") {
+		t.Errorf("expected backlog empty state, got:\n%s", html)
 	}
 }
 

@@ -964,6 +964,117 @@ button { font-family: inherit; }
   box-shadow: var(--focus-ring);
 }
 
+/* Jobs feed — lifecycle bin tabs (Active / Backlog / Removed) */
+.job-bin-tabs {
+  display: inline-flex;
+  gap: 2px;
+  margin: 0 0 var(--space-4);
+  padding: 3px;
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-md);
+}
+.job-bin-tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 6px 14px;
+  border-radius: calc(var(--radius-md) - 3px);
+  color: var(--color-ink-soft);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .14s ease, color .14s ease;
+}
+.job-bin-tab:hover { color: var(--color-ink); }
+.job-bin-tab.view-selector-option-active {
+  background: var(--color-surface);
+  color: var(--color-accent-strong);
+  box-shadow: var(--shadow-sm);
+}
+.job-bin-tab:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Jobs feed — filter + sort controls */
+.job-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-5);
+}
+.job-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-ink-soft);
+}
+.job-filter select,
+.job-filter input {
+  appearance: none;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-ink);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 7px 10px;
+  min-width: 8rem;
+}
+.job-filter select:focus-visible,
+.job-filter input:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: var(--focus-ring);
+}
+
+/* Jobs feed — Prev/Next pagination */
+.job-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  margin: var(--space-5) 0 0;
+}
+.job-page-prev,
+.job-page-next {
+  appearance: none;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: 7px 16px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background .14s ease, border-color .14s ease;
+}
+.job-page-prev:hover:not(:disabled),
+.job-page-next:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  background: var(--color-surface-sunken);
+}
+.job-page-prev:disabled,
+.job-page-next:disabled {
+  opacity: .5;
+  cursor: default;
+}
+.job-page-prev:focus-visible,
+.job-page-next:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.job-page-indicator {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-ink-soft);
+}
+
 /* All-jobs table — in-app spreadsheet tracker */
 .jobs-table-wrap {
   width: 100%;
