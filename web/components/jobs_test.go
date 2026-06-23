@@ -28,6 +28,10 @@ type mockClient struct {
 	digest    Digest
 	digestErr error
 
+	batches      []IngestionBatch
+	batchesErr   error
+	batchesCalls int
+
 	createApp      CreateApplicationResult
 	createAppErr   error
 	gotCreateAppID int
@@ -107,6 +111,11 @@ func (m *mockClient) Job(_ context.Context, id int) (JobDetail, error) {
 
 func (m *mockClient) Digest(context.Context) (Digest, error) {
 	return m.digest, m.digestErr
+}
+
+func (m *mockClient) IngestionBatches(context.Context) ([]IngestionBatch, error) {
+	m.batchesCalls++
+	return m.batches, m.batchesErr
 }
 
 func (m *mockClient) CreateApplication(_ context.Context, jobID int) (CreateApplicationResult, error) {
@@ -584,32 +593,50 @@ func TestJobDetailApplyError(t *testing.T) {
 	}
 }
 
-func TestDigestRendersJobs(t *testing.T) {
-	c := &DigestView{Client: &mockClient{digest: Digest{
-		Date: "2026-06-12",
-		Jobs: []JobSummary{
-			{ID: 3, Title: "Platform Eng", Company: "Initech", MatchScore: intPtr(75), ScoringStatus: "scored"},
+func TestDigestRendersBatches(t *testing.T) {
+	c := &DigestView{Client: &mockClient{batches: []IngestionBatch{
+		{
+			ID: "glassdoor-1", Source: "glassdoor", Date: "2026-06-23",
+			IngestedAt: "2026-06-23T08:04:00Z", Count: 2,
+			Jobs: []JobSummary{
+				{ID: 3, Title: "Platform Eng", Company: "Initech", MatchScore: intPtr(75), ScoringStatus: "scored"},
+				{ID: 4, Title: "Backend Dev", Company: "Hooli", MatchScore: intPtr(40), ScoringStatus: "scored"},
+			},
+		},
+		{
+			ID: "linkedin-1", Source: "linkedin", Date: "2026-06-22",
+			IngestedAt: "2026-06-22T07:31:00Z", Count: 1,
+			Jobs: []JobSummary{
+				{ID: 5, Title: "Staff Eng", Company: "Acme", MatchScore: intPtr(90), ScoringStatus: "scored"},
+			},
 		},
 	}}}
 	html := renderHTML(t, c)
 
-	for _, want := range []string{"Daily digest", "2026-06-12", "Platform Eng", "Initech", "75%", "/jobs/3"} {
+	// Source labels + counts on the batch summaries.
+	for _, want := range []string{"Recent ingestions", "Glassdoor", "LinkedIn", "2 jobs", "1 job"} {
 		if !strings.Contains(html, want) {
-			t.Errorf("digest HTML missing %q\n%s", want, html)
+			t.Errorf("batch HTML missing %q\n%s", want, html)
+		}
+	}
+	// Each posting in each batch is rendered and links to its detail.
+	for _, want := range []string{"Platform Eng", "Backend Dev", "Staff Eng", "/jobs/3", "/jobs/4", "/jobs/5"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("batch HTML missing posting %q\n%s", want, html)
 		}
 	}
 }
 
 func TestDigestEmpty(t *testing.T) {
-	c := &DigestView{Client: &mockClient{digest: Digest{Date: "2026-06-12"}}}
+	c := &DigestView{Client: &mockClient{batches: nil}}
 	html := renderHTML(t, c)
-	if !strings.Contains(html, "No new jobs today.") {
-		t.Errorf("expected empty digest state, got:\n%s", html)
+	if !strings.Contains(html, "No ingestions yet.") {
+		t.Errorf("expected empty ingestion state, got:\n%s", html)
 	}
 }
 
 func TestDigestUnauthorizedLinksToLogin(t *testing.T) {
-	c := &DigestView{Client: &mockClient{digestErr: &APIError{Status: http.StatusUnauthorized}}}
+	c := &DigestView{Client: &mockClient{batchesErr: &APIError{Status: http.StatusUnauthorized}}}
 	html := renderHTML(t, c)
 	for _, want := range []string{"session expired", "Sign in", `href="/login"`} {
 		if !strings.Contains(html, want) {

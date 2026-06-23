@@ -3,6 +3,7 @@ package components
 import (
 	"context"
 	"strconv"
+	"time"
 
 	"github.com/maxence-charriere/go-app/v10/pkg/app"
 )
@@ -370,17 +371,21 @@ func applyButtonLabel(s applyStatus) string {
 	return "Apply"
 }
 
-// Digest renders the daily digest landing: the date and the scored jobs
-// surfaced for that day (GET /api/digest). Each job links to its detail.
+// DigestView renders the ingestion-history landing: recently-ingested postings
+// grouped into batches (one alert/digest email per batch), grouped by date and
+// newest first (GET /api/ingestion_batches). Each batch is a collapsible
+// <details> block; expanding it reveals its individual postings, each linking
+// to the job detail. This replaces the old top-5-scored "daily digest" list so
+// the screen reflects every ingestion as it arrives, not just yesterday's best.
 type DigestView struct {
 	app.Compo
 
 	// Client is the Rails client; tests inject a mock.
 	Client RailsClient
 
-	state  loadState
-	digest Digest
-	err    string
+	state   loadState
+	batches []IngestionBatch
+	err     string
 }
 
 func (v *DigestView) OnMount(ctx app.Context)     { v.ensureClient(); v.load(ctx) }
@@ -397,9 +402,9 @@ func (v *DigestView) load(ctx app.Context) {
 	ctx.Update()
 	reqCtx := ctx.Context
 	ctx.Async(func() {
-		digest, err := v.Client.Digest(reqCtx)
+		batches, err := v.Client.IngestionBatches(reqCtx)
 		ctx.Dispatch(func(ctx app.Context) {
-			applyResult(ctx, &v.state, &v.err, err, func() { v.digest = digest })
+			applyResult(ctx, &v.state, &v.err, err, func() { v.batches = batches })
 		})
 	})
 }
@@ -407,42 +412,66 @@ func (v *DigestView) load(ctx app.Context) {
 func (v *DigestView) Render() app.UI {
 	return app.Div().Class("digest").Body(
 		renderAppTabs("digest"),
-		app.H1().Text("Daily digest"),
-		renderLoad(v.state, v.err, func() app.UI {
-			return app.Div().Class("digest-body").Body(
-				app.If(v.digest.Date != "", func() app.UI {
-					return app.P().Class("digest-date").Text(v.digest.Date)
+		app.H1().Text("Recent ingestions"),
+		renderLoad(v.state, v.err, func() app.UI { return v.renderBatches() }),
+	)
+}
+
+// renderBatches groups the (newest-first) batches by date, emitting a date
+// header each time the date changes, then the batch cards for that date.
+func (v *DigestView) renderBatches() app.UI {
+	if len(v.batches) == 0 {
+		return app.P().Class("digest-empty").Text("No ingestions yet.")
+	}
+
+	var lastDate string
+	return app.Div().Class("digest-body").Body(
+		app.Range(v.batches).Slice(func(i int) app.UI {
+			batch := v.batches[i]
+			showHeader := batch.Date != lastDate
+			lastDate = batch.Date
+			return app.Div().Class("digest-batch-group").Body(
+				app.If(showHeader, func() app.UI {
+					return app.P().Class("digest-date").Text(formatBatchDate(batch.Date))
 				}),
-				app.If(len(v.digest.Jobs) == 0, func() app.UI {
-					return app.P().Class("digest-empty").Text("No new jobs today.")
-				}).Else(func() app.UI {
-					return app.Ul().Class("digest-items").Body(
-						app.Range(v.digest.Jobs).Slice(func(i int) app.UI {
-							job := v.digest.Jobs[i]
-							return app.Li().Class("digest-item").Body(
-								app.A().
-									Class("digest-link").
-									Href("/jobs/"+strconv.Itoa(job.ID)).
-									Body(
-										app.Span().Class("job-title").Text(job.Title),
-										app.Span().Class("job-company").Text(job.Company),
-										app.If(SourceLabel(job.Source) != "", func() app.UI {
-											return app.Span().Class("job-source").Body(
-												sourceIcon(job.Source),
-												app.Text(SourceLabel(job.Source)),
-											)
-										}),
-										app.Span().
-											Class("job-score").
-											Class("job-score--"+MatchScoreBand(job.MatchScore, job.ScoringStatus)).
-											Text(MatchScoreLabel(job.MatchScore, job.ScoringStatus)),
-									),
-							)
-						}),
-					)
-				}),
+				renderBatch(batch),
 			)
 		}),
+	)
+}
+
+// renderBatch renders one ingestion batch as a collapsible block: a summary row
+// (source + count + time) the user clicks to reveal the batch's postings.
+func renderBatch(batch IngestionBatch) app.UI {
+	return app.Details().Class("digest-batch").Body(
+		app.Summary().Class("digest-batch-summary").Body(
+			app.Span().Class("job-source").Body(
+				sourceIcon(batch.Source),
+				app.Text(batchSourceLabel(batch.Source)),
+			),
+			app.Span().Class("digest-batch-count").Text(batchCountLabel(batch.Count)),
+			app.If(formatBatchTime(batch.IngestedAt) != "", func() app.UI {
+				return app.Span().Class("digest-batch-time").Text(formatBatchTime(batch.IngestedAt))
+			}),
+		),
+		app.Ul().Class("digest-items").Body(
+			app.Range(batch.Jobs).Slice(func(i int) app.UI {
+				job := batch.Jobs[i]
+				return app.Li().Class("digest-item").Body(
+					app.A().
+						Class("digest-link").
+						Href("/jobs/"+strconv.Itoa(job.ID)).
+						Body(
+							app.Span().Class("job-title").Text(job.Title),
+							app.Span().Class("job-company").Text(job.Company),
+							app.Span().
+								Class("job-score").
+								Class("job-score--"+MatchScoreBand(job.MatchScore, job.ScoringStatus)).
+								Text(MatchScoreLabel(job.MatchScore, job.ScoringStatus)),
+						),
+				)
+			}),
+		),
 	)
 }
 
@@ -463,6 +492,47 @@ func sourceIcon(source string) app.UI {
 		return app.Span().Class("job-source-emoji").Text(e)
 	}
 	return app.Text("")
+}
+
+// batchSourceLabel is the source label for a batch summary, falling back to a
+// neutral word when the source is unknown so the row is never blank.
+func batchSourceLabel(source string) string {
+	if label := SourceLabel(source); label != "" {
+		return label
+	}
+	return "Other"
+}
+
+// batchCountLabel renders the posting count for a batch summary.
+func batchCountLabel(n int) string {
+	if n == 1 {
+		return "1 job"
+	}
+	return strconv.Itoa(n) + " jobs"
+}
+
+// formatBatchDate renders an ISO date (YYYY-MM-DD) as a friendlier "Mon 2"
+// header; on parse failure it returns the raw value rather than nothing.
+func formatBatchDate(iso string) string {
+	t, err := time.Parse("2006-01-02", iso)
+	if err != nil {
+		return iso
+	}
+	return t.Format("Mon, Jan 2")
+}
+
+// formatBatchTime renders an RFC3339 timestamp as a short local time of day
+// ("3:04 PM"); it returns "" when the value is empty or unparseable so the
+// caller can omit the chip.
+func formatBatchTime(ts string) string {
+	if ts == "" {
+		return ""
+	}
+	t, err := time.Parse(time.RFC3339, ts)
+	if err != nil {
+		return ""
+	}
+	return t.Format("3:04 PM")
 }
 
 // applyResult updates the shared load state from an async fetch result. On a

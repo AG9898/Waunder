@@ -17,6 +17,7 @@ Rails.application.routes.draw do
     get "push/vapid_public_key", to: "push_subscriptions#public_key"
     resource :push_subscription, only: %i[create destroy]
     get "digest", to: "digest#show"
+    get "ingestion_batches", to: "ingestion_batches#index"
     resources :job_posts, only: %i[index show create] do
       patch :application_status, on: :member
       resources :contact_candidates, only: %i[index create]

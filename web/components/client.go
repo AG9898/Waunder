@@ -34,6 +34,11 @@ type RailsClient interface {
 	// Digest fetches the daily digest landing payload (GET /api/digest).
 	Digest(ctx context.Context) (Digest, error)
 
+	// IngestionBatches fetches the ingestion history grouped into batches —
+	// one alert/digest email's postings per batch, newest first
+	// (GET /api/ingestion_batches).
+	IngestionBatches(ctx context.Context) ([]IngestionBatch, error)
+
 	// CreateApplication starts (or reuses) an application for a job and kicks
 	// off draft generation in Rails (POST /api/applications). It returns the
 	// application id to navigate to its draft-review screen. It never approves
@@ -267,6 +272,19 @@ type JobRoute struct {
 type Digest struct {
 	Date string       `json:"date"`
 	Jobs []JobSummary `json:"jobs"`
+}
+
+// IngestionBatch is one ingestion event: the postings from a single alert or
+// digest email, grouped by source and arrival time. Derived in Rails
+// (IngestionBatchBuilder); the postings travel with the batch so the UI can
+// drill in without a second request.
+type IngestionBatch struct {
+	ID         string       `json:"id"`
+	Source     string       `json:"source"`
+	IngestedAt string       `json:"ingested_at"`
+	Date       string       `json:"date"`
+	Count      int          `json:"count"`
+	Jobs       []JobSummary `json:"jobs"`
 }
 
 // ApplicationDraft is the generated, reviewable application draft: the
@@ -521,6 +539,16 @@ func (c *httpRailsClient) Digest(ctx context.Context) (Digest, error) {
 		return Digest{}, err
 	}
 	return out.Digest, nil
+}
+
+func (c *httpRailsClient) IngestionBatches(ctx context.Context) ([]IngestionBatch, error) {
+	var out struct {
+		Batches []IngestionBatch `json:"batches"`
+	}
+	if err := c.get(ctx, "/api/ingestion_batches", &out); err != nil {
+		return nil, err
+	}
+	return out.Batches, nil
 }
 
 func (c *httpRailsClient) CreateApplication(ctx context.Context, jobID int) (CreateApplicationResult, error) {

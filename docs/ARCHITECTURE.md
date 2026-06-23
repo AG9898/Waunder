@@ -70,8 +70,11 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 - Reverse-proxies `/api/*` and `/webhooks/resend/inbound` to the Rails `api` service via
   `API_INTERNAL_URL`. When that var is unset, the proxy is disabled and the PWA serves
   standalone (local dev convenience).
-- Renders the client screens (go-app routes in `main.go`): the daily digest landing (`/`,
-  `components.DigestView`), the scored job feed (`/jobs`, `components.JobList`), the manual job
+- Renders the client screens (go-app routes in `main.go`): the ingestion-history landing (`/`,
+  `components.DigestView` — recently-ingested postings grouped into batches, one alert/digest
+  email per batch, by date and newest first; each batch is a collapsible block whose postings
+  link to their detail; fed by `GET /api/ingestion_batches`), the scored job feed (`/jobs`,
+  `components.JobList`), the manual job
   entry form (`/jobs/new`, `components.ManualEntry` — a URL and/or pasted posting text plus
   optional title/company hints, posting to `POST /api/job_posts`; on success it surfaces the
   created post with a `/jobs/:id` link to follow it into the feed once Rails scores it), a single
@@ -94,7 +97,10 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   implementation, `httpRailsClient`, uses stdlib `net/http`, which maps to browser `fetch` in
   the WASM build). The interface is the test seam: render/component tests inject a mock and run
   with no backend. The read shapes the client expects are `GET /api/job_posts` (feed),
-  `GET /api/job_posts/:id` (detail), and `GET /api/digest` (digest). Rails now serves all three
+  `GET /api/job_posts/:id` (detail), `GET /api/digest` (digest), and
+  `GET /api/ingestion_batches` (ingestion history — postings grouped into source+arrival-time
+  batches by `IngestionBatchBuilder`, derived without any persisted batch link or migration).
+  Rails now serves all of these
   (READ-01): session-guarded, read-only, exposing only client-safe fields. The feed returns
   compact rows (`id`, `title`, `company`, `match_score`, `scoring_status`, `summary`) ranked by
   `match_score DESC NULLS LAST` then recency; detail adds the scored arrays/notes

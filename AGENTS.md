@@ -849,3 +849,20 @@ the link so the preamble can't leak into the first block. `JobPostMaterializer` 
 explicit upsert/correct + re-score pass, not just re-running `ParseInboundEmailJob` (which would dedup
 against the garbage). Verified deterministically against 6 real production digest bodies (64 postings,
 0 LLM calls). Re-probe `resend emails receiving get <id>` for new template variants.
+
+### 2026-06-23 — Landing screen is now ingestion batches, not a daily-digest top-5
+The `/` landing (`components.DigestView`) was a top-5-scored-in-24h list, so it only ever showed
+"yesterday's best" and hid everything ingested since. It now renders ingestion HISTORY: recently
+created JobPosts grouped into batches (one alert/digest email per batch) by date, newest first, via
+`GET /api/ingestion_batches` (`IngestionBatchesController` → `IngestionBatchBuilder`). There is NO
+persisted link between a JobPost and its inbound email, so a "batch" is DERIVED deterministically:
+postings sharing a `source` AND created within `IngestionBatchBuilder::GAP` (3 min) are one batch —
+one `ParseInboundEmailJob` materializes a whole digest's postings within seconds, while distinct
+alerts arrive minutes+ apart. No migration, and it surfaces ALL historical posts retroactively. The
+builder returns plain Hashes (synthetic `id` = `source-<first_created_epoch>`) with the postings
+nested, so the UI drills in without a second request and needs no stable server id. Web side uses a
+native `<details>/<summary>` (`app.Details()/app.Summary()`) for the collapsible batch — zero JS,
+trivially testable (postings are always in the rendered HTML; no OnClick handler to invoke). The old
+`GET /api/digest` + `DailyDigestBuilder` are UNCHANGED — that builder still backs the once-a-day Web
+Push notification (a separate concern from the on-screen landing). `Render()` keeps the "digest" tab
+id and `.digest*` CSS classes; only the screen heading changed to "Recent ingestions".
