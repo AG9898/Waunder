@@ -2,6 +2,7 @@ package components
 
 import (
 	"context"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -102,6 +103,12 @@ type JobDetailView struct {
 	Client RailsClient
 	// JobID is the job to render; normally parsed from the route path.
 	JobID int
+	// backHref is where the "back" link returns to. It defaults to the jobs
+	// feed but is set to the expanded ingestion batch when the user arrived
+	// from the digest landing (via the ?from=digest&batch=… query params).
+	backHref string
+	// backLabel is the text of the back link, matching backHref's destination.
+	backLabel string
 
 	state loadState
 	job   JobDetail
@@ -135,15 +142,39 @@ func (d *JobDetailView) start(ctx app.Context) {
 	if id, ok := jobIDFromPath(ctx.Page().URL().Path); ok {
 		d.JobID = id
 	}
+	d.resolveBack(ctx.Page().URL())
 	d.load(ctx)
 }
 
 // OnNav re-fetches when the route changes to a different job id while the
 // component instance is reused.
 func (d *JobDetailView) OnNav(ctx app.Context) {
+	d.resolveBack(ctx.Page().URL())
 	if id, ok := jobIDFromPath(ctx.Page().URL().Path); ok && id != d.JobID {
 		d.JobID = id
 		d.load(ctx)
+	}
+}
+
+// resolveBack sets the back link target from the request URL. When the user
+// arrived from the ingestion landing (?from=digest), back returns to that
+// screen with the originating batch re-expanded (?batch=…); otherwise it
+// falls back to the jobs feed.
+func (d *JobDetailView) resolveBack(u *url.URL) {
+	d.backHref = "/jobs"
+	d.backLabel = "← Jobs"
+	if u == nil {
+		return
+	}
+	q := u.Query()
+	if q.Get("from") != "digest" {
+		return
+	}
+	d.backLabel = "← Ingestions"
+	if batch := q.Get("batch"); batch != "" {
+		d.backHref = "/?batch=" + url.QueryEscape(batch)
+	} else {
+		d.backHref = "/"
 	}
 }
 
@@ -213,9 +244,26 @@ func (d *JobDetailView) applyCreateResult(res CreateApplicationResult, err error
 	return res.ApplicationID, true
 }
 
+// backFallback returns the resolved back href, defaulting to the jobs feed when
+// resolveBack has not run (e.g. a directly-constructed test component).
+func (d *JobDetailView) backFallback() string {
+	if d.backHref == "" {
+		return "/jobs"
+	}
+	return d.backHref
+}
+
+// backFallbackLabel mirrors backFallback for the link text.
+func (d *JobDetailView) backFallbackLabel() string {
+	if d.backLabel == "" {
+		return "← Jobs"
+	}
+	return d.backLabel
+}
+
 func (d *JobDetailView) Render() app.UI {
 	return app.Div().Class("job-detail").Body(
-		app.A().Class("job-detail-back").Href("/jobs").Text("← Jobs"),
+		app.A().Class("job-detail-back").Href(d.backFallback()).Text(d.backFallbackLabel()),
 		renderLoad(d.state, d.err, func() app.UI {
 			job := d.job
 			return app.Div().Class("job-detail-body").Body(
@@ -386,10 +434,29 @@ type DigestView struct {
 	state   loadState
 	batches []IngestionBatch
 	err     string
+	// openBatch is the id of the batch to render expanded on load, set from the
+	// ?batch=… query param so returning from a job detail re-opens its batch.
+	openBatch string
 }
 
-func (v *DigestView) OnMount(ctx app.Context)     { v.ensureClient(); v.load(ctx) }
-func (v *DigestView) OnPreRender(ctx app.Context) { v.ensureClient(); v.load(ctx) }
+func (v *DigestView) OnMount(ctx app.Context) {
+	v.ensureClient()
+	v.openBatch = ctx.Page().URL().Query().Get("batch")
+	v.load(ctx)
+}
+
+func (v *DigestView) OnPreRender(ctx app.Context) {
+	v.ensureClient()
+	v.openBatch = ctx.Page().URL().Query().Get("batch")
+	v.load(ctx)
+}
+
+// OnNav re-reads the open-batch target when navigating back to the landing
+// (e.g. via the job-detail back link) so the originating batch re-expands.
+func (v *DigestView) OnNav(ctx app.Context) {
+	v.openBatch = ctx.Page().URL().Query().Get("batch")
+	ctx.Update()
+}
 
 func (v *DigestView) ensureClient() {
 	if v.Client == nil {
@@ -434,16 +501,24 @@ func (v *DigestView) renderBatches() app.UI {
 				app.If(showHeader, func() app.UI {
 					return app.P().Class("digest-date").Text(formatBatchDate(batch.Date))
 				}),
-				renderBatch(batch),
+				renderBatch(batch, batch.ID == v.openBatch),
 			)
 		}),
 	)
 }
 
 // renderBatch renders one ingestion batch as a collapsible block: a summary row
-// (source + count + time) the user clicks to reveal the batch's postings.
-func renderBatch(batch IngestionBatch) app.UI {
-	return app.Details().Class("digest-batch").Body(
+// (source + count + time) the user clicks to reveal the batch's postings. When
+// open is true the block renders expanded — used to re-open the batch a user
+// returns to from a job detail.
+func renderBatch(batch IngestionBatch, open bool) app.UI {
+	details := app.Details().Class("digest-batch")
+	if open {
+		// Only set the boolean attribute when expanding: go-app renders
+		// .Open(false) as open="false", which a browser still treats as open.
+		details = details.Open(true)
+	}
+	return details.Body(
 		app.Summary().Class("digest-batch-summary").Body(
 			app.Span().Class("job-source").Body(
 				sourceIcon(batch.Source),
@@ -460,7 +535,7 @@ func renderBatch(batch IngestionBatch) app.UI {
 				return app.Li().Class("digest-item").Body(
 					app.A().
 						Class("digest-link").
-						Href("/jobs/"+strconv.Itoa(job.ID)).
+						Href("/jobs/"+strconv.Itoa(job.ID)+"?from=digest&batch="+url.QueryEscape(batch.ID)).
 						Body(
 							app.Span().Class("job-title").Text(job.Title),
 							app.Span().Class("job-company").Text(job.Company),

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -624,6 +625,78 @@ func TestDigestRendersBatches(t *testing.T) {
 		if !strings.Contains(html, want) {
 			t.Errorf("batch HTML missing posting %q\n%s", want, html)
 		}
+	}
+}
+
+func TestDigestLinksCarryBatchProvenance(t *testing.T) {
+	c := &DigestView{Client: &mockClient{batches: []IngestionBatch{
+		{
+			ID: "glassdoor-1", Source: "glassdoor", Date: "2026-06-23", Count: 1,
+			Jobs: []JobSummary{{ID: 3, Title: "Platform Eng", Company: "Initech"}},
+		},
+	}}}
+	html := renderHTML(t, c)
+
+	// Each posting link records that it came from the digest and which batch,
+	// so the job detail's back link can return to the expanded batch.
+	for _, want := range []string{"/jobs/3?from=digest", "batch=glassdoor-1"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("digest link missing provenance %q\n%s", want, html)
+		}
+	}
+}
+
+func TestDigestReopensBatchFromQuery(t *testing.T) {
+	c := &DigestView{batches: []IngestionBatch{
+		{ID: "glassdoor-1", Source: "glassdoor", Date: "2026-06-23", Count: 1,
+			Jobs: []JobSummary{{ID: 3, Title: "Platform Eng"}}},
+		{ID: "linkedin-1", Source: "linkedin", Date: "2026-06-22", Count: 1,
+			Jobs: []JobSummary{{ID: 5, Title: "Staff Eng"}}},
+	}}
+	// Render the batch list directly (the OnMount/OnPreRender lifecycle would
+	// re-read openBatch from the URL, which the test engine leaves empty).
+	c.openBatch = "linkedin-1"
+	var sb strings.Builder
+	app.PrintHTML(&sb, c.renderBatches())
+	html := sb.String()
+
+	// The matching batch is expanded; the other stays collapsed. go-app emits
+	// the boolean `open` attribute only on the open <details>.
+	if got := strings.Count(html, "<details"); got != 2 {
+		t.Fatalf("expected 2 batch blocks, got %d\n%s", got, html)
+	}
+	if strings.Count(html, " open") != 1 {
+		t.Errorf("expected exactly one expanded batch, got:\n%s", html)
+	}
+}
+
+func TestJobDetailBackTarget(t *testing.T) {
+	cases := []struct {
+		name      string
+		raw       string
+		wantHref  string
+		wantLabel string
+	}{
+		{"default", "/jobs/3", "/jobs", "← Jobs"},
+		{"from digest with batch", "/jobs/3?from=digest&batch=glassdoor-1", "/?batch=glassdoor-1", "← Ingestions"},
+		{"from digest no batch", "/jobs/3?from=digest", "/", "← Ingestions"},
+		{"unrelated query", "/jobs/3?foo=bar", "/jobs", "← Jobs"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			u, err := url.Parse(tc.raw)
+			if err != nil {
+				t.Fatalf("parse: %v", err)
+			}
+			d := &JobDetailView{}
+			d.resolveBack(u)
+			if d.backFallback() != tc.wantHref {
+				t.Errorf("href = %q, want %q", d.backFallback(), tc.wantHref)
+			}
+			if d.backFallbackLabel() != tc.wantLabel {
+				t.Errorf("label = %q, want %q", d.backFallbackLabel(), tc.wantLabel)
+			}
+		})
 	}
 }
 
