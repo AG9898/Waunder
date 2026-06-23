@@ -70,6 +70,22 @@ What existing code or docs does this affect?>
 
 ---
 
+### OPEN-06 — Hard-purge cadence for soft-removed JobPosts
+
+**Question:** Should soft-`removed` JobPosts ever be hard-deleted, and on what retention/cadence?
+
+**Context:** RESOLVED-20 makes "remove" a soft-delete so the `posting_url` dedup guard survives and repeat alerts stay suppressed. Removed rows therefore accumulate forever. A periodic hard-purge would reclaim them, but purging a `posting_url` reopens it to re-ingestion from a future alert. For a single-user app the row volume is small, so this is deferred, not urgent.
+
+**Options under consideration:**
+1. **Never purge** — keep all removed rows indefinitely (simplest; preserves dedup forever).
+2. **Purge after a long retention window** — e.g. hard-delete removed rows older than `REMOVED_JOB_RETENTION_DAYS`; accept that a very old removed posting could re-ingest if re-alerted.
+
+**Blocking:** Nothing currently blocked. INTAKE-01 ships soft-delete without a purge job.
+
+**See also:** RESOLVED-20, [`CONVENTIONS.md`](CONVENTIONS.md), [`ENV_VARS.md`](ENV_VARS.md)
+
+---
+
 ## Resolved Decisions
 
 ### RESOLVED-01 — Frontend is a go-app WebAssembly PWA, not a native iOS app
@@ -339,3 +355,15 @@ What existing code or docs does this affect?>
 **Alternatives rejected:** A distinct two-step approve-then-submit UI — more taps for no added safety, since the dispatcher re-validates the ATS/payload at dispatch time and the submit click is itself the explicit approval. Auto-creating an `Application` at scoring/ingest time — would spawn drafts and LLM spend for jobs the user never intends to apply to.
 
 **Affects:** `api/` (`Api::ApplicationsController#create`/`#submit`, routes), `web/` (`components.JobDetailView` Apply button, `RailsClient.CreateApplication`), `LINKEDIN_EASY_APPLY_ENABLED` in [`ENV_VARS.md`](ENV_VARS.md), [`ARCHITECTURE.md`](ARCHITECTURE.md), [`PRD.md`](PRD.md). See also RESOLVED-12, RESOLVED-15.
+
+### RESOLVED-20 — Intake management: soft-delete remove + backlog bin, server-side pagination, oldest-first default
+
+**Status:** Resolved (2026-06-23)
+
+**Decision:** Add a `lifecycle_state` axis to `JobPost` (`active` default / `backlog` / `removed`), orthogonal to `scoring_status`, `triage_status`, and `Application#pipeline_status`. "Remove" is a **soft-delete** (`lifecycle_state = "removed"`): the row is retained and hidden everywhere, so `JobPostMaterializer`'s `posting_url` dedup keeps suppressing repeat alerts, and the posting is restorable from a Removed bin — the UI never hard-`destroy`s a JobPost. "Backlog" parks a job out of the working feed without discarding it. The owner moves jobs between bins from the row/detail and via a bulk multi-select action (`PATCH /api/job_posts/:id/lifecycle` and `PATCH /api/job_posts/lifecycle`), each writing an `audit_event`. The Jobs feed and all-jobs table are server-side filterable (score band, source, location, ingestion-date range, lifecycle state) and paginated at **30 rows/page**; the feed defaults to scored + active + **oldest-ingestion-first** with a score-sort toggle, so the owner drains the backlog from the bottom up. To make intake tractable, `JobPostTriage` auto-parks rejected postings in `backlog` and caps the daily active set to the top `JOB_INTAKE_DAILY_ACTIVE_LIMIT` (default 30) eligible by triage rank; `ExpireStaleJobPostsJob` auto-backlogs active postings unactioned after `JOB_INTAKE_STALE_AFTER_DAYS` (default 120).
+
+**Why:** Inbound digest volume (LinkedIn + Glassdoor) far exceeds what a single owner can apply to, so the owner needs to discard, park, and prioritize intake, and to page through a multi-hundred-row feed. Soft-delete is chosen over hard delete specifically to preserve the `posting_url` dedup guard so a removed posting does not silently reappear from the next alert. Oldest-first default drains the oldest scored backlog first. Auto-backlog + the daily active cap keep the working feed a finite, drainable queue instead of an unbounded pile.
+
+**Alternatives rejected:** Hard-delete on remove — would reopen the posting to re-ingestion and lose audit/restore (the soft-delete keeps the dedup guard; periodic hard-purge is deferred as OPEN-06). Overloading `triage_status`/`pipeline_status` for the keep/park/discard decision — conflates the scoring auto-gate and the post-apply tracker with a pre-application owner decision. Client-side slicing for pagination — does not reduce the payload of a large feed.
+
+**Affects:** `api/` (`JobPost.lifecycle_state` migration, `Api::JobPostsController` index filters/sort/pagination + `#lifecycle` member/collection actions, `JobPostTriage`, `ExpireStaleJobPostsJob`, `config/recurring.yml`, routes), `web/` (`components.JobList`/`ApplicationsView`/`DigestView` filters, bins, bulk actions, paging; `RailsClient` filter params + `SetJobLifecycle`), `JOBS_PAGE_SIZE`/`JOB_INTAKE_DAILY_ACTIVE_LIMIT`/`JOB_INTAKE_STALE_AFTER_DAYS` in [`ENV_VARS.md`](ENV_VARS.md), [`ARCHITECTURE.md`](ARCHITECTURE.md), [`CONVENTIONS.md`](CONVENTIONS.md), [`PRD.md`](PRD.md), [`TESTING.md`](TESTING.md). See also OPEN-06.

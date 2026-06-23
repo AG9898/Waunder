@@ -151,6 +151,24 @@ dispatch.
   Rejected inbound posts are kept as `scoring_status: "filtered"`, and eligible posts beyond
   `JOB_TRIAGE_AUTO_SCORE_DAILY_LIMIT` are kept as `scoring_status: "deferred"`. Manual job entries
   and explicit `POST /api/job_posts/:id/score` requests bypass the inbound budget.
+- A JobPost carries three independent status axes; do not overload one for another. `scoring_status`
+  (pending/scored/filtered/deferred/failed/skipped) is the LLM-scoring pipeline state.
+  `triage_status` (unreviewed/eligible/rejected/manual_override) is the deterministic auto-gate that
+  decides what gets scored. **`lifecycle_state` (active/backlog/removed)** is the owner's manual
+  intake decision: keep / park / discard. `Application#pipeline_status` is the separate
+  post-application tracker. Backlog/remove is a JobPost decision and exists before any `Application`.
+- Intake lifecycle rules (INTAKE-01/02): the Active feed and every list/table default to
+  `lifecycle_state = "active"`; `backlog` and `removed` are opt-in views. `removed` is a **soft-delete** —
+  never `destroy` a JobPost from a request path; set `lifecycle_state = "removed"` so the row (and its
+  `posting_url` dedup guard) survives and the posting can be restored. Triage auto-parks rejected
+  posts in `backlog` and caps the daily Active set to `JOB_INTAKE_DAILY_ACTIVE_LIMIT` (top eligible by
+  triage rank); `ExpireStaleJobPostsJob` auto-backlogs `active` posts older than
+  `JOB_INTAKE_STALE_AFTER_DAYS`. Every lifecycle transition (single or bulk) writes an `audit_event`.
+- List-read pagination contract (INTAKE-01): paginated list endpoints (`GET /api/job_posts`,
+  `GET /api/ingestion_batches`) page **server-side** at 30 rows/page using a 1-based `page` param and
+  return the standard envelope `{<collection>: [...], page: {number, size, total, has_next}}`. Page
+  size is the `JOBS_PAGE_SIZE` constant (default 30). Do not slice client-side — the point is to cap
+  the payload of a multi-hundred-row feed.
 - The OpenRouter LLM gateway is reached only through `OpenrouterClient`
   (`app/services/openrouter_client.rb`) — never inlined in controllers or jobs. It reads
   `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` (default `google/gemma-4-31b-it:free`), requests
@@ -382,6 +400,9 @@ Hard rules. Agents follow these unconditionally.
 - Never put business logic in the Go web server or the Playwright worker — Rails owns it.
 - Never store sensitive resume/profile fields unencrypted.
 - Never auto-send LinkedIn messages — outreach drafts are presented for manual sending only.
+- Never hard-`destroy` a JobPost from a request path — "remove" is a soft-delete
+  (`lifecycle_state = "removed"`) so the `posting_url` dedup guard survives. Hard-purge happens only
+  via the explicit deferred retention sweep (OPEN-XX), never from the UI.
 
 ## Always
 

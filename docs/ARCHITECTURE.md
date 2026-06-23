@@ -104,15 +104,30 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   batches by `IngestionBatchBuilder`, derived without any persisted batch link or migration).
   Rails now serves all of these
   (READ-01): session-guarded, read-only, exposing only client-safe fields. The feed returns
-  compact rows (`id`, `title`, `company`, `match_score`, `scoring_status`, triage metadata,
-  `summary`) ranked by `match_score DESC NULLS LAST`, `triage_score DESC NULLS LAST`, then
-  recency; detail adds the scored arrays/notes
+  compact rows (`id`, `title`, `company`, `match_score`, `scoring_status`, `lifecycle_state`,
+  triage metadata, `summary`). The feed is filterable and paginated (INTAKE-01): query params are
+  `status` (scored default | unscored), `state` (`active` default | `backlog` | `removed`),
+  `sort` (`oldest` default — ingestion ascending — | `score`, i.e. `match_score DESC NULLS LAST`,
+  `triage_score DESC NULLS LAST`, then recency), `score_band` (`high`≥75 | `mid` 50–74 | `low`<50 |
+  `unscored`), `source`, `location`, `date_from`/`date_to` (ingestion-date range), and `page`
+  (1-based, **30 rows/page**). The response wraps the rows in a pagination envelope
+  `{job_posts: [...], page: {number, size, total, has_next}}`. Filters AND-combine; `active` is the
+  default `state`, so backlog/removed are opt-in views. `GET /api/ingestion_batches` is likewise
+  paginated at 30 batches/page with the same envelope. Detail adds the scored arrays/notes
   (`relevant_requirements`, `missing_requirements`, `red_flags`, `resume_alignment_notes`,
   `application_strategy`) plus the resolved `route` (`route_type`, `recommended_route`,
   `application_url`); the digest reuses `DailyDigestBuilder#posts` for the recently scored,
   top-ranked set. These reads never trigger scoring or the LLM; explicit scoring is only
   requested via `POST /api/job_posts/:id/score`, which enqueues `ScoreJobPostJob` for an
-  unscored job and records a manual triage override. An unknown id returns
+  unscored job and records a manual triage override. The owner's manual intake decision is a
+  separate axis (INTAKE-01): `PATCH /api/job_posts/:id/lifecycle` (body `{lifecycle_state:
+  active|backlog|removed}`) parks a job in the backlog or soft-removes it, writing an
+  `audit_event`; `removed` is a soft-delete (the row is retained so `JobPostMaterializer`'s
+  `posting_url` dedup keeps suppressing repeat alerts) hidden from every feed/table but restorable
+  from the Removed bin. `lifecycle_state` is orthogonal to `scoring_status`/`triage_status`
+  (scoring-pipeline + auto-gate) and to `Application#pipeline_status` (the post-apply tracker). A
+  bulk variant `PATCH /api/job_posts/lifecycle` (body `{ids: [...], lifecycle_state}`) moves many
+  at once. An unknown id returns
   the standard `{error: {code: "not_found", ...}}` shape. The draft review screen additionally
   reads `GET /api/applications/:id` (the generated `ApplicationDraft`: `resume_emphasis_notes`,
   `cover_letter`, `structured_answers`, worker-shaped editable `autofill_payload`,
@@ -227,7 +242,14 @@ The full topology and the rationale for the `/api` proxy routing decision live i
    resolve application route → run `JobPostTriage` title/location gating. Eligible inbound posts
    are automatically enqueued for `ScoreJobPostJob` until `JOB_TRIAGE_AUTO_SCORE_DAILY_LIMIT`
    is reached; rejected posts are marked `scoring_status: "filtered"`, and over-budget eligible
-   posts are marked `scoring_status: "deferred"` for later manual scoring from the PWA.
+   posts are marked `scoring_status: "deferred"` for later manual scoring from the PWA. To keep the
+   Active feed drainable under heavy intake (INTAKE-02), triage also sets `lifecycle_state`:
+   triage-rejected posts are auto-parked in `backlog` (kept, not surfaced in the Active feed), and
+   only the top `JOB_INTAKE_DAILY_ACTIVE_LIMIT` eligible posts per day (default 30, by triage rank)
+   stay `active` — the remainder auto-backlog. The owner works the Active feed; the Backlog bin
+   holds everything triage set aside. A scheduled sweep (`ExpireStaleJobPostsJob`,
+   `config/recurring.yml`) auto-backlogs `active` posts older than `JOB_INTAKE_STALE_AFTER_DAYS`
+   (default 120) that the owner never actioned.
 4. A daily web-push digest is sent to subscribed PWA installs. `DailyDigestJob` (scheduled
    via `config/recurring.yml`, `every day at 8am`) builds the payload from recently scored
    JobPosts with `DailyDigestBuilder` and dispatches it with `WebPushDispatcher`, which signs

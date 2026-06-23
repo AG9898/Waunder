@@ -1,7 +1,7 @@
 {
   "$schema": "./workboard.schema.json",
   "schema_version": "1.0.0",
-  "last_updated": "2026-06-17",
+  "last_updated": "2026-06-23",
   "tasks": [
     {
       "id": "INFRA-01",
@@ -1228,6 +1228,300 @@
         "cd web && go test ./...",
         "cd web && go vet ./...",
         "cd web && make wasm"
+      ]
+    },
+    {
+      "id": "INTAKE-01",
+      "title": "Add lifecycle_state axis to JobPost (active/backlog/removed)",
+      "description": "Add a lifecycle_state string column to job_posts via a Rails migration: default 'active', NOT NULL, a check constraint limiting values to active/backlog/removed, and an index. This is the owner's manual intake decision axis, orthogonal to scoring_status, triage_status, and Application#pipeline_status. Add model scopes (active/backlog/removed) and a constant set on JobPost, and ensure the default for existing rows is 'active' so nothing is hidden by the backfill. No controller/UI behavior changes here beyond exposing lifecycle_state where serializers already run; this task is the schema/model foundation the rest of INTAKE depends on.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "INTAKE",
+      "depends_on": [],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Migration adds job_posts.lifecycle_state (string, default 'active', null: false) with a check constraint (active|backlog|removed) and an index",
+        "Existing rows backfill to 'active'",
+        "JobPost exposes lifecycle_state constants and active/backlog/removed scopes",
+        "bundle exec rspec and bin/rubocop pass"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md",
+        "docs/DECISIONS.md"
+      ],
+      "files": [
+        "api/db/migrate",
+        "api/db/schema.rb",
+        "api/app/models/job_post.rb"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "INTAKE-02",
+      "title": "Filter, sort, and paginate the job_posts feed",
+      "description": "Extend GET /api/job_posts (Api::JobPostsController#index) with server-side filtering, sorting, and pagination. Query params: status (scored default | unscored), state (active default | backlog | removed), sort (oldest default = created_at ASC | score = match_score DESC NULLS LAST, triage_score DESC NULLS LAST, then recency), score_band (high>=75 | mid 50-74 | low<50 | unscored), source, location, date_from/date_to (created_at range), and page (1-based). Filters AND-combine and state defaults to active. Page size is the JOBS_PAGE_SIZE constant (default 30, env-overridable). Wrap rows in the envelope {job_posts:[...], page:{number,size,total,has_next}} and add lifecycle_state to the summary serializer. Reads remain read-only (never score or call the LLM).",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "INTAKE",
+      "depends_on": [
+        "INTAKE-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "GET /api/job_posts honors status, state, sort, score_band, source, location, date_from/date_to, and page params with AND-combined filters",
+        "Default response is scored + state=active + oldest-ingestion-first, 30 rows/page",
+        "Response includes the page envelope {number,size,total,has_next} and rows include lifecycle_state",
+        "JOBS_PAGE_SIZE controls page size and defaults to 30",
+        "Request specs cover filters, both sorts, pagination, and active-default exclusion of backlog/removed; rspec and rubocop pass"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md",
+        "docs/ENV_VARS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "api/app/controllers/api/job_posts_controller.rb",
+        "api/config/routes.rb",
+        "api/spec/requests/api/job_posts_spec.rb"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "INTAKE-03",
+      "title": "Lifecycle transition endpoints with soft-delete and audit",
+      "description": "Add PATCH /api/job_posts/:id/lifecycle (body {lifecycle_state: active|backlog|removed}) and a bulk collection variant PATCH /api/job_posts/lifecycle (body {ids:[...], lifecycle_state}). Each transition validates the target value, updates the JobPost(s), and writes an audit_event recording the change. 'removed' is a soft-delete only: never destroy the row, so JobPostMaterializer's posting_url dedup still suppresses repeat alerts; removed (and backlog) rows are excluded from active feeds/tables and restorable by setting lifecycle_state back to active. Reuse the existing AuditEvent pattern; reference ::Application style model loading where relevant. Bulk endpoint applies the same value to all listed ids in one transaction.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "INTAKE",
+      "depends_on": [
+        "INTAKE-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "PATCH /api/job_posts/:id/lifecycle transitions active<->backlog<->removed and writes an audit_event",
+        "Bulk PATCH /api/job_posts/lifecycle applies one lifecycle_state to many ids transactionally",
+        "Removing a job is a soft-delete: the row persists, is hidden from active/backlog feeds, and a re-ingested removed posting does not re-surface (dedup preserved)",
+        "Invalid value and unknown id return the standard error shapes; endpoints are session-gated",
+        "Request specs cover transitions, bulk, soft-delete dedup, and audit events; rspec and rubocop pass"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "api/app/controllers/api/job_posts_controller.rb",
+        "api/config/routes.rb",
+        "api/app/models/job_post.rb",
+        "api/spec/requests/api/job_posts_spec.rb"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "INTAKE-04",
+      "title": "Triage auto-backlog of rejected posts and daily active cap",
+      "description": "Extend JobPostTriage so deterministic intake keeps the Active feed drainable: triage-rejected inbound posts are set to lifecycle_state 'backlog' (kept, not surfaced in the active feed) in addition to their existing scoring_status 'filtered'; and only the top JOB_INTAKE_DAILY_ACTIVE_LIMIT eligible posts per day (default 30, ranked by triage score/order) stay 'active', with the remainder auto-backlogged. Manual entries and explicit POST /api/job_posts/:id/score remain 'active' and bypass the cap. Keep the existing JOB_TRIAGE_AUTO_SCORE_DAILY_LIMIT scoring budget intact and independent of the new active cap.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "INTAKE",
+      "depends_on": [
+        "INTAKE-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Triage-rejected inbound posts are set to lifecycle_state 'backlog' (and remain scoring_status 'filtered')",
+        "At most JOB_INTAKE_DAILY_ACTIVE_LIMIT eligible posts/day stay 'active'; the rest auto-backlog",
+        "JOB_INTAKE_DAILY_ACTIVE_LIMIT defaults to 30 and is env-overridable",
+        "Manual entries and explicit score requests stay active and bypass the cap",
+        "Service specs cover auto-backlog and the daily active cap; rspec and rubocop pass"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md",
+        "docs/ENV_VARS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "api/app/services/job_post_triage.rb",
+        "api/app/jobs/parse_inbound_email_job.rb",
+        "api/spec/services/job_post_triage_spec.rb"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "INTAKE-05",
+      "title": "Auto-backlog stale active posts via a scheduled sweep",
+      "description": "Add ExpireStaleJobPostsJob (solid_queue) that auto-backlogs JobPosts still lifecycle_state 'active' and unactioned (no Application, no manual intake change) older than JOB_INTAKE_STALE_AFTER_DAYS (default 120 days), writing an audit_event per transition. Schedule it under the production key in config/recurring.yml (e.g. daily). The job must be idempotent and safe to run repeatedly, and must never touch backlog/removed rows or rows the owner has acted on.",
+      "status": "todo",
+      "priority": "low",
+      "group_id": "INTAKE",
+      "depends_on": [
+        "INTAKE-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "ExpireStaleJobPostsJob moves active, unactioned posts older than JOB_INTAKE_STALE_AFTER_DAYS to backlog and audits each change",
+        "JOB_INTAKE_STALE_AFTER_DAYS defaults to 120 and is env-overridable",
+        "Job is idempotent and ignores backlog/removed and owner-actioned posts",
+        "Scheduled under the production key in config/recurring.yml",
+        "Job spec covers stale-sweep behavior; rspec and rubocop pass"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/ENV_VARS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "api/app/jobs/expire_stale_job_posts_job.rb",
+        "api/config/recurring.yml",
+        "api/spec/jobs/expire_stale_job_posts_job_spec.rb"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "INTAKE-06",
+      "title": "Paginate the ingestion-batches endpoint",
+      "description": "Add server-side pagination to GET /api/ingestion_batches (Api::IngestionBatchesController) using the same JOBS_PAGE_SIZE (30/page) and the same envelope shape {ingestion_batches:[...], page:{number,size,total,has_next}} introduced for the feed. Page over the derived batch list produced by IngestionBatchBuilder (newest batch first). Keep it read-only and session-gated.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "INTAKE",
+      "depends_on": [
+        "INTAKE-02"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "GET /api/ingestion_batches accepts a 1-based page param and returns 30 batches/page newest-first",
+        "Response uses the shared page envelope {number,size,total,has_next}",
+        "Endpoint stays read-only and session-gated",
+        "Request spec covers pagination; rspec and rubocop pass"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "api/app/controllers/api/ingestion_batches_controller.rb",
+        "api/app/services/ingestion_batch_builder.rb",
+        "api/spec/requests/api/ingestion_batches_spec.rb"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "INTAKE-07",
+      "title": "Jobs feed: filter controls, sort toggle, bin tabs, pagination",
+      "description": "Wire the new feed API into the go-app Jobs screen (components.JobList). Add filter controls (score band, source, location/remote, ingestion-date range), a sort toggle (oldest default vs highest-score), bin tabs for lifecycle state (Active default / Backlog / Removed) alongside the existing scored/unscored toggle, and Prev/Next pagination (30/page) reading the page envelope. Extend the RailsClient interface (and httpRailsClient + the shared mockClient) so Jobs() accepts the filter/sort/state/page params and returns the page metadata. Follow the established do*/apply* handler split so state transitions are unit-testable without the engine, and keep all fetching on explicit user action (no lifecycle mutation here).",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "INTAKE",
+      "depends_on": [
+        "INTAKE-02"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Jobs screen renders filter controls, a sort toggle, lifecycle bin tabs, and Prev/Next pagination",
+        "RailsClient.Jobs() carries filter/sort/state/page params and surfaces page metadata; mockClient updated",
+        "Default view is scored + active + oldest-first, 30/page",
+        "Render/handler tests cover filters, sort, bin tabs, and paging; go test ./... and go vet ./... pass"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "web/components/jobs.go",
+        "web/components/client.go",
+        "web/components/jobs_test.go",
+        "web/components/client_test.go"
+      ],
+      "commands": [
+        "cd web && go test ./...",
+        "cd web && go vet ./..."
+      ]
+    },
+    {
+      "id": "INTAKE-08",
+      "title": "Jobs UI: per-row and bulk backlog/remove/restore actions",
+      "description": "Add intake actions to the Jobs screen and job detail: per-row (and detail) Backlog / Remove controls, multi-select bulk Backlog/Remove, and Restore from the Backlog and Removed bins, calling PATCH /api/job_posts/:id/lifecycle and bulk PATCH /api/job_posts/lifecycle via a new RailsClient.SetJobLifecycle (single + bulk) method. Use the do*/apply* split so the action body is unit-testable without the engine, and assert no lifecycle mutation fires on mount/render. After a successful transition the row leaves the current bin view (or appears in the target bin). Add SetJobLifecycle to the shared mockClient with call counters for the on-render safety assertions.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "INTAKE",
+      "depends_on": [
+        "INTAKE-03",
+        "INTAKE-07"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Job rows/detail expose Backlog, Remove, and (in bins) Restore actions, plus multi-select bulk backlog/remove",
+        "Actions call RailsClient.SetJobLifecycle (single and bulk) and update the view on success",
+        "No lifecycle mutation fires on mount/render (asserted via mock call count == 0 after a full render)",
+        "Render/handler tests cover single, bulk, and restore flows; go test ./... and go vet ./... pass"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "web/components/jobs.go",
+        "web/components/client.go",
+        "web/components/jobs_test.go"
+      ],
+      "commands": [
+        "cd web && go test ./...",
+        "cd web && go vet ./..."
+      ]
+    },
+    {
+      "id": "INTAKE-09",
+      "title": "Paginate ingestion landing and the all-jobs table",
+      "description": "Apply 30/page pagination in the PWA to the ingestion-batches landing (components.DigestView, reading the paginated GET /api/ingestion_batches) and the all-jobs table view in components.ApplicationsView (which reuses the paginated Jobs() endpoint), each with Prev/Next controls reading the page envelope. The all-jobs table should also surface the same lifecycle bin filter so removed/backlog jobs are excluded by default. Reuse the do*/apply* split and the shared mockClient; keep lazy-load behavior for the table (no extra fetch until opened).",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "INTAKE",
+      "depends_on": [
+        "INTAKE-06",
+        "INTAKE-07"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Ingestion-batches landing paginates at 30/page with Prev/Next",
+        "All-jobs table paginates at 30/page and defaults to active lifecycle state",
+        "Table keeps lazy-load (no fetch until opened) and uses the shared mockClient",
+        "Render/handler tests cover landing + table pagination; go test ./... and go vet ./... pass"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "web/components/jobs.go",
+        "web/components/applications.go",
+        "web/components/jobs_test.go",
+        "web/components/applications_test.go"
+      ],
+      "commands": [
+        "cd web && go test ./...",
+        "cd web && go vet ./..."
       ]
     }
   ]

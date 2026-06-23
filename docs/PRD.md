@@ -40,8 +40,19 @@ Phase 1 delivers the full plan scenario: forward a job-alert email → Resend in
   applied/waiting; worker pauses/failures move it to needs review. The Applications screen has a
   view selector: the default pipeline (cards) view, and an all-jobs **table view** — an in-app
   spreadsheet-style tracker listing every job post with a link back to each posting. A stats
-  cluster in the header shows totals (total count for now). *Planned (not yet implemented):
-  filtering and sorting for the all-jobs table, and the same filtering for the main Jobs feed.*
+  cluster in the header shows totals (total count for now).
+- **Intake management** (INTAKE): inbound volume exceeds what one owner can apply to, so the Jobs
+  pages let the owner shed and organize intake. Each job carries a `lifecycle_state` — **active**
+  (default, in the working feed), **backlog** (parked "maybe later", kept and restorable), or
+  **removed** (soft-deleted: hidden everywhere but retained so repeat alerts stay deduped, with a
+  Removed bin for restore). The owner moves jobs between bins from the job row/detail, including a
+  **bulk multi-select** action. The Jobs feed and the all-jobs table are **filterable** (score band,
+  source, location/remote, ingestion-date range, lifecycle state) and **paginated** at 30 rows/page;
+  the feed defaults to scored, active, **oldest-ingestion-first** (so the owner drains the backlog
+  from the bottom up) with a highest-score-first sort toggle. The ingestion-batches landing also
+  pages at 30. To keep intake tractable, deterministic triage auto-parks rejected postings in
+  backlog and caps the daily active set to the top 30 eligible by triage rank; a scheduled sweep
+  auto-backlogs active postings unactioned after 120 days.
 - **Trusted submit** to Greenhouse, Lever, and Ashby. LinkedIn Easy Apply is treated as higher-risk and gated behind an explicit feature flag. Submit only proceeds with explicit owner approval, a supported target, no unknown/sensitive fields, and an auditable status result.
 - **LinkedIn contact and outreach**: save contact candidates linked to jobs, track why each is relevant, and generate tailored outreach drafts from a loose template. Drafts are presented prefilled for manual sending — never auto-sent.
 - **Web push digest** via the VAPID-keyed Web Push API delivered to the installed PWA's service worker (the daily digest).

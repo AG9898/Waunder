@@ -174,6 +174,25 @@ Be honest about the current state — most of the suite is still to be written.
 
 ### Planned (from the plan's Testing Plan)
 
+**Intake management (INTAKE / RESOLVED-20):**
+
+- `api/` request specs for `GET /api/job_posts` filters (`score_band`, `source`, `location`,
+  `date_from`/`date_to`, `state`), `sort` (`oldest` default vs `score`), and the 30-row/page
+  pagination envelope (`page.number`/`size`/`total`/`has_next`); `state=active` default excludes
+  backlog/removed.
+- `api/` request specs for `PATCH /api/job_posts/:id/lifecycle` and bulk
+  `PATCH /api/job_posts/lifecycle`: active↔backlog↔removed transitions, each writing an
+  `audit_event`; `removed` rows hidden from all feeds; soft-delete preserves the `posting_url` dedup
+  guard (re-ingesting a removed posting does not re-surface it); auth gating.
+- `api/` specs for `JobPostTriage` auto-backlog of rejected posts and the
+  `JOB_INTAKE_DAILY_ACTIVE_LIMIT` daily active cap, and a job spec for `ExpireStaleJobPostsJob`
+  auto-backlogging stale active posts past `JOB_INTAKE_STALE_AFTER_DAYS`.
+- `api/` request spec for `GET /api/ingestion_batches` pagination at 30/page.
+- `web/` render/handler tests for the Jobs filter controls, sort toggle, bin tabs
+  (active/backlog/removed), per-row + bulk backlog/remove/restore actions (assert no lifecycle
+  mutation on mount/render), and Prev/Next pagination, via the mocked `RailsClient`
+  (`SetJobLifecycle` + filter params on `Jobs()`).
+
 **Rails (`api/`):**
 
 - Request specs for all JSON endpoints.
