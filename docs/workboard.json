@@ -1234,7 +1234,7 @@
       "id": "INTAKE-01",
       "title": "Add lifecycle_state axis to JobPost (active/backlog/removed)",
       "description": "Add a lifecycle_state string column to job_posts via a Rails migration: default 'active', NOT NULL, a check constraint limiting values to active/backlog/removed, and an index. This is the owner's manual intake decision axis, orthogonal to scoring_status, triage_status, and Application#pipeline_status. Add model scopes (active/backlog/removed) and a constant set on JobPost, and ensure the default for existing rows is 'active' so nothing is hidden by the backfill. No controller/UI behavior changes here beyond exposing lifecycle_state where serializers already run; this task is the schema/model foundation the rest of INTAKE depends on.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "INTAKE",
       "depends_on": [],

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_23_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_23_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -157,6 +157,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_23_120000) do
     t.text "description"
     t.string "employment_type"
     t.datetime "expires_at"
+    t.string "lifecycle_state", default: "active", null: false
     t.string "location"
     t.integer "match_score"
     t.jsonb "missing_requirements", default: [], null: false
@@ -179,10 +180,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_23_120000) do
     t.datetime "triaged_at"
     t.datetime "updated_at", null: false
     t.index ["company_id"], name: "index_job_posts_on_company_id"
+    t.index ["lifecycle_state"], name: "index_job_posts_on_lifecycle_state"
     t.index ["posting_url"], name: "index_job_posts_on_posting_url"
     t.index ["scoring_status"], name: "index_job_posts_on_scoring_status"
     t.index ["source_url"], name: "index_job_posts_on_source_url"
     t.index ["triage_status"], name: "index_job_posts_on_triage_status"
+    t.check_constraint "lifecycle_state::text = ANY (ARRAY['active'::character varying, 'backlog'::character varying, 'removed'::character varying]::text[])", name: "job_posts_lifecycle_state_values"
     t.check_constraint "match_score IS NULL OR match_score >= 0 AND match_score <= 100", name: "job_posts_match_score_range"
     t.check_constraint "triage_score IS NULL OR triage_score >= 0 AND triage_score <= 100", name: "job_posts_triage_score_range"
   end

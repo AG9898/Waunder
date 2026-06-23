@@ -113,6 +113,7 @@ module Api
         triage_status: job_post.triage_status,
         triage_score: job_post.triage_score,
         triage_reasons: job_post.triage_reasons,
+        lifecycle_state: job_post.lifecycle_state,
         summary: job_post.summary
       }
     end
@@ -133,6 +134,7 @@ module Api
         triage_status: job_post.triage_status,
         triage_score: job_post.triage_score,
         triage_reasons: job_post.triage_reasons,
+        lifecycle_state: job_post.lifecycle_state,
         summary: job_post.summary,
         relevant_requirements: job_post.relevant_requirements,
         missing_requirements: job_post.missing_requirements,

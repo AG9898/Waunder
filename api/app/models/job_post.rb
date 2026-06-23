@@ -1,4 +1,6 @@
 class JobPost < ApplicationRecord
+  LIFECYCLE_STATES = %w[active backlog removed].freeze
+
   belongs_to :company
   has_one :application_route, dependent: :destroy
   has_many :applications, dependent: :restrict_with_error
@@ -9,4 +11,9 @@ class JobPost < ApplicationRecord
     allow_nil: true
   validates :triage_score, numericality: { greater_than_or_equal_to: 0, less_than_or_equal_to: 100 },
     allow_nil: true
+  validates :lifecycle_state, inclusion: { in: LIFECYCLE_STATES }
+
+  scope :active, -> { where(lifecycle_state: "active") }
+  scope :backlog, -> { where(lifecycle_state: "backlog") }
+  scope :removed, -> { where(lifecycle_state: "removed") }
 end
