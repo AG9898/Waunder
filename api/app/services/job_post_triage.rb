@@ -16,6 +16,12 @@ class JobPostTriage
   DEFAULT_AUTO_SCORE_DAILY_LIMIT = 20
   AUTO_SCORE_DAILY_LIMIT_ENV = "JOB_TRIAGE_AUTO_SCORE_DAILY_LIMIT".freeze
 
+  LIFECYCLE_ACTIVE = "active".freeze
+  LIFECYCLE_BACKLOG = "backlog".freeze
+
+  DEFAULT_DAILY_ACTIVE_LIMIT = 30
+  DAILY_ACTIVE_LIMIT_ENV = "JOB_INTAKE_DAILY_ACTIVE_LIMIT".freeze
+
   Result = Struct.new(:status, :score, :reasons, :remote_status, keyword_init: true) do
     def eligible? = status == STATUS_ELIGIBLE
     def rejected? = status == STATUS_REJECTED
@@ -60,6 +66,13 @@ class JobPostTriage
   def self.auto_score_daily_limit
     raw = ENV.fetch(AUTO_SCORE_DAILY_LIMIT_ENV, DEFAULT_AUTO_SCORE_DAILY_LIMIT).to_s.strip
     return DEFAULT_AUTO_SCORE_DAILY_LIMIT if raw.blank?
+
+    Integer(raw, exception: false).to_i.clamp(0, 10_000)
+  end
+
+  def self.daily_active_limit
+    raw = ENV.fetch(DAILY_ACTIVE_LIMIT_ENV, DEFAULT_DAILY_ACTIVE_LIMIT).to_s.strip
+    return DEFAULT_DAILY_ACTIVE_LIMIT if raw.blank?
 
     Integer(raw, exception: false).to_i.clamp(0, 10_000)
   end

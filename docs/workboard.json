@@ -1332,7 +1332,7 @@
       "id": "INTAKE-04",
       "title": "Triage auto-backlog of rejected posts and daily active cap",
       "description": "Extend JobPostTriage so deterministic intake keeps the Active feed drainable: triage-rejected inbound posts are set to lifecycle_state 'backlog' (kept, not surfaced in the active feed) in addition to their existing scoring_status 'filtered'; and only the top JOB_INTAKE_DAILY_ACTIVE_LIMIT eligible posts per day (default 30, ranked by triage score/order) stay 'active', with the remainder auto-backlogged. Manual entries and explicit POST /api/job_posts/:id/score remain 'active' and bypass the cap. Keep the existing JOB_TRIAGE_AUTO_SCORE_DAILY_LIMIT scoring budget intact and independent of the new active cap.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "INTAKE",
       "depends_on": [

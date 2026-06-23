@@ -71,4 +71,15 @@ RSpec.describe JobPostTriage do
   ensure
     original.nil? ? ENV.delete(described_class::AUTO_SCORE_DAILY_LIMIT_ENV) : ENV[described_class::AUTO_SCORE_DAILY_LIMIT_ENV] = original
   end
+
+  it "defaults the daily active limit to 30 and reads an override from the environment" do
+    original = ENV[described_class::DAILY_ACTIVE_LIMIT_ENV]
+    ENV.delete(described_class::DAILY_ACTIVE_LIMIT_ENV)
+    expect(described_class.daily_active_limit).to eq(30)
+
+    ENV[described_class::DAILY_ACTIVE_LIMIT_ENV] = "5"
+    expect(described_class.daily_active_limit).to eq(5)
+  ensure
+    original.nil? ? ENV.delete(described_class::DAILY_ACTIVE_LIMIT_ENV) : ENV[described_class::DAILY_ACTIVE_LIMIT_ENV] = original
+  end
 end

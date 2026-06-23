@@ -51,7 +51,60 @@ RSpec.describe ParseInboundEmailJob, type: :job do
     post = JobPost.last
     expect(post.scoring_status).to eq("filtered")
     expect(post.triage_status).to eq("rejected")
+    expect(post.lifecycle_state).to eq("backlog")
     expect(post.triage_reasons).to include("title_missing_target_role", "title_matches_exclusion")
+  end
+
+  it "auto-backlogs eligible inbound postings beyond the daily active limit" do
+    original = ENV[JobPostTriage::DAILY_ACTIVE_LIMIT_ENV]
+    ENV[JobPostTriage::DAILY_ACTIVE_LIMIT_ENV] = "1"
+    company = Company.create!(name: "AlreadyActive")
+    JobPost.create!(
+      company: company,
+      title: "Software Engineer",
+      source: "linkedin",
+      scoring_status: "deferred",
+      triage_status: "eligible",
+      triage_score: 95,
+      triage_reasons: [ "title_matches_target_roles", "location_vancouver_priority" ],
+      lifecycle_state: "active",
+      created_at: Time.current
+    )
+    email = inbound_email(data: {
+      "from" => "jobs@linkedin.com",
+      "subject" => "Job alert",
+      "text" => "Backend Developer\n" \
+        "CapCo · Calgary, AB\n" \
+        "https://www.linkedin.com/jobs/view/3812345679/\n"
+    })
+
+    expect { described_class.perform_now(email) }.to change(JobPost, :count).by(1)
+
+    post = JobPost.order(:created_at).last
+    expect(post.triage_status).to eq("eligible")
+    expect(post.lifecycle_state).to eq("backlog")
+  ensure
+    original.nil? ? ENV.delete(JobPostTriage::DAILY_ACTIVE_LIMIT_ENV) : ENV[JobPostTriage::DAILY_ACTIVE_LIMIT_ENV] = original
+  end
+
+  it "keeps eligible inbound postings active when under the daily active limit" do
+    original = ENV[JobPostTriage::DAILY_ACTIVE_LIMIT_ENV]
+    ENV[JobPostTriage::DAILY_ACTIVE_LIMIT_ENV] = "30"
+    email = inbound_email(data: {
+      "from" => "jobs@linkedin.com",
+      "subject" => "Job alert",
+      "text" => "Backend Developer\n" \
+        "CapCo · Calgary, AB\n" \
+        "https://www.linkedin.com/jobs/view/3812345680/\n"
+    })
+
+    expect { described_class.perform_now(email) }.to change(JobPost, :count).by(1)
+
+    post = JobPost.order(:created_at).last
+    expect(post.triage_status).to eq("eligible")
+    expect(post.lifecycle_state).to eq("active")
+  ensure
+    original.nil? ? ENV.delete(JobPostTriage::DAILY_ACTIVE_LIMIT_ENV) : ENV[JobPostTriage::DAILY_ACTIVE_LIMIT_ENV] = original
   end
 
   it "defers eligible inbound postings beyond the daily automatic scoring limit" do

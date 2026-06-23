@@ -867,6 +867,17 @@ trivially testable (postings are always in the rendered HTML; no OnClick handler
 Push notification (a separate concern from the on-screen landing). `Render()` keeps the "digest" tab
 id and `.digest*` CSS classes; only the screen heading changed to "Recent ingestions".
 
+### 2026-06-23 — Intake daily active cap lives in the inbound job, not JobPostTriage.call
+INTAKE-04's auto-backlog has two paths in `ParseInboundEmailJob#triage_and_maybe_score` (not inside
+`JobPostTriage#call`, which only writes triage_* fields): (1) triage-rejected posts get
+`lifecycle_state: "backlog"` alongside `scoring_status: "filtered"`; (2) eligible posts past
+`JobPostTriage.daily_active_limit` (env `JOB_INTAKE_DAILY_ACTIVE_LIMIT`, default 30) flip to
+`backlog`. The active-cap counter (`active_inbound_today`) counts same-day, non-manual,
+`triage_status: eligible` + `lifecycle_state: active` posts excluding the current one — it is
+INDEPENDENT of the scoring budget counter (`auto_scores_today`), so a backlogged post can still be
+`pending`/`deferred` for scoring. New JobPosts default to `active`, so the cap only ever flips
+over-budget posts to backlog; manual posts (`source: "manual"`) never run through this job.
+
 ### 2026-06-23 — Inbound scoring is gated by deterministic triage
 Bulk inbound jobs now run through `JobPostTriage` before any OpenRouter scoring: target title
 signals plus Vancouver/Calgary/remote location priority decide whether a post is `eligible` or

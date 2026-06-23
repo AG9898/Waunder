@@ -34,8 +34,19 @@ class ParseInboundEmailJob < ApplicationJob
 
     result = JobPostTriage.new(job_post).call
     unless result.eligible?
-      job_post.update!(scoring_status: JobPostTriage::SCORE_STATUS_FILTERED)
+      # Rejected inbound posts are kept (not deleted) but pushed off the active
+      # feed into the backlog so the owner can still find them on demand.
+      job_post.update!(
+        scoring_status: JobPostTriage::SCORE_STATUS_FILTERED,
+        lifecycle_state: JobPostTriage::LIFECYCLE_BACKLOG
+      )
       return :filtered
+    end
+
+    # Keep the Active feed drainable: only the first N eligible inbound posts per
+    # day stay active; the rest auto-backlog (still scored/deferred as usual).
+    unless active_slot_available?(excluding: job_post)
+      job_post.update!(lifecycle_state: JobPostTriage::LIFECYCLE_BACKLOG)
     end
 
     if auto_score_budget_available?(excluding: job_post)
@@ -46,6 +57,20 @@ class ParseInboundEmailJob < ApplicationJob
       job_post.update!(scoring_status: JobPostTriage::SCORE_STATUS_DEFERRED)
       :deferred
     end
+  end
+
+  def active_slot_available?(excluding:)
+    JobPostTriage.daily_active_limit > active_inbound_today(excluding: excluding)
+  end
+
+  def active_inbound_today(excluding:)
+    JobPost
+      .where(created_at: Time.current.all_day)
+      .where.not(id: excluding.id)
+      .where.not(source: "manual")
+      .where(triage_status: JobPostTriage::STATUS_ELIGIBLE)
+      .where(lifecycle_state: JobPostTriage::LIFECYCLE_ACTIVE)
+      .count
   end
 
   def auto_score_budget_available?(excluding:)
