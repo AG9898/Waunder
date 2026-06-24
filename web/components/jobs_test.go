@@ -45,9 +45,11 @@ type mockClient struct {
 	digest    Digest
 	digestErr error
 
-	batches      []IngestionBatch
-	batchesErr   error
-	batchesCalls int
+	batches        []IngestionBatch
+	batchesPage    PageMeta
+	batchesErr     error
+	batchesCalls   int
+	gotBatchesPage int
 
 	createApp      CreateApplicationResult
 	createAppErr   error
@@ -155,9 +157,13 @@ func (m *mockClient) Digest(context.Context) (Digest, error) {
 	return m.digest, m.digestErr
 }
 
-func (m *mockClient) IngestionBatches(context.Context) ([]IngestionBatch, error) {
+func (m *mockClient) IngestionBatches(_ context.Context, page int) (IngestionBatchPage, error) {
 	m.batchesCalls++
-	return m.batches, m.batchesErr
+	m.gotBatchesPage = page
+	if m.batchesErr != nil {
+		return IngestionBatchPage{}, m.batchesErr
+	}
+	return IngestionBatchPage{Batches: m.batches, Page: m.batchesPage}, nil
 }
 
 func (m *mockClient) CreateApplication(_ context.Context, jobID int) (CreateApplicationResult, error) {
@@ -1072,6 +1078,57 @@ func TestDigestReopensBatchFromQuery(t *testing.T) {
 	}
 	if strings.Count(html, " open") != 1 {
 		t.Errorf("expected exactly one expanded batch, got:\n%s", html)
+	}
+}
+
+func TestDigestPaginationControls(t *testing.T) {
+	m := &mockClient{
+		batches: []IngestionBatch{
+			{ID: "glassdoor-1", Source: "glassdoor", Date: "2026-06-23", Count: 1,
+				Jobs: []JobSummary{{ID: 3, Title: "Platform Eng"}}},
+		},
+		batchesPage: PageMeta{Number: 1, Size: 30, Total: 45, HasNext: true},
+	}
+	c := &DigestView{Client: m}
+	html := renderHTML(t, c)
+
+	// Page indicator reads the envelope; Prev is disabled on page 1, Next enabled.
+	for _, want := range []string{"Page 1 of 2", "Previous", "Next"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("digest pagination missing %q\n%s", want, html)
+		}
+	}
+}
+
+func TestDigestNextPageAdvancesAndRequestsNext(t *testing.T) {
+	m := &mockClient{
+		batches:     []IngestionBatch{{ID: "b1", Source: "linkedin", Count: 1}},
+		batchesPage: PageMeta{Number: 1, Size: 30, Total: 60, HasNext: true},
+	}
+	c := &DigestView{Client: m, pageNum: 1, page: m.batchesPage}
+
+	if !c.applyNextPage() {
+		t.Fatal("applyNextPage should advance when HasNext is true")
+	}
+	if c.pageNum != 2 {
+		t.Fatalf("pageNum = %d, want 2", c.pageNum)
+	}
+	// A subsequent fetch carries the advanced page to the server.
+	if _, err := c.Client.IngestionBatches(context.Background(), c.pageNum); err != nil {
+		t.Fatalf("fetch: %v", err)
+	}
+	if m.gotBatchesPage != 2 {
+		t.Fatalf("server requested page %d, want 2", m.gotBatchesPage)
+	}
+}
+
+func TestDigestPrevPageStopsAtOne(t *testing.T) {
+	c := &DigestView{page: PageMeta{Number: 1, HasNext: false}, pageNum: 1}
+	if c.applyPrevPage() {
+		t.Fatal("applyPrevPage should not advance below page 1")
+	}
+	if c.pageNum != 1 {
+		t.Fatalf("pageNum = %d, want 1", c.pageNum)
 	}
 }
 

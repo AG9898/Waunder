@@ -50,10 +50,11 @@ type RailsClient interface {
 	// Digest fetches the daily digest landing payload (GET /api/digest).
 	Digest(ctx context.Context) (Digest, error)
 
-	// IngestionBatches fetches the ingestion history grouped into batches —
-	// one alert/digest email's postings per batch, newest first
-	// (GET /api/ingestion_batches).
-	IngestionBatches(ctx context.Context) ([]IngestionBatch, error)
+	// IngestionBatches fetches one page of the ingestion history grouped into
+	// batches — one alert/digest email's postings per batch, newest first
+	// (GET /api/ingestion_batches). The 1-based page advances Prev/Next; the
+	// returned IngestionBatchPage carries the batches plus the page envelope.
+	IngestionBatches(ctx context.Context, page int) (IngestionBatchPage, error)
 
 	// CreateApplication starts (or reuses) an application for a job and kicks
 	// off draft generation in Rails (POST /api/applications). It returns the
@@ -373,6 +374,15 @@ type IngestionBatch struct {
 	Jobs       []JobSummary `json:"jobs"`
 }
 
+// IngestionBatchPage is one page of the ingestion history: the batches plus the
+// server's page envelope (1-based number, size, total, and whether a next page
+// exists). Paging is server-side; the UI only reads the envelope to drive
+// Prev/Next.
+type IngestionBatchPage struct {
+	Batches []IngestionBatch `json:"batches"`
+	Page    PageMeta         `json:"page"`
+}
+
 // ApplicationDraft is the generated, reviewable application draft: the
 // drafted application materials (resume emphasis, cover letter), the
 // structured question answers, and the worker-shaped autofill preview. All
@@ -671,14 +681,16 @@ func (c *httpRailsClient) Digest(ctx context.Context) (Digest, error) {
 	return out.Digest, nil
 }
 
-func (c *httpRailsClient) IngestionBatches(ctx context.Context) ([]IngestionBatch, error) {
-	var out struct {
-		Batches []IngestionBatch `json:"batches"`
+func (c *httpRailsClient) IngestionBatches(ctx context.Context, page int) (IngestionBatchPage, error) {
+	path := "/api/ingestion_batches"
+	if page > 1 {
+		path += "?page=" + strconv.Itoa(page)
 	}
-	if err := c.get(ctx, "/api/ingestion_batches", &out); err != nil {
-		return nil, err
+	var out IngestionBatchPage
+	if err := c.get(ctx, path, &out); err != nil {
+		return IngestionBatchPage{}, err
 	}
-	return out.Batches, nil
+	return out, nil
 }
 
 func (c *httpRailsClient) CreateApplication(ctx context.Context, jobID int) (CreateApplicationResult, error) {

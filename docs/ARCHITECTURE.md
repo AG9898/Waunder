@@ -73,7 +73,8 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 - Renders the client screens (go-app routes in `main.go`): the ingestion-history landing (`/`,
   `components.DigestView` — recently-ingested postings grouped into batches, one alert/digest
   email per batch, by date and newest first; each batch is a collapsible block whose postings
-  link to their detail; fed by `GET /api/ingestion_batches`), the job feed (`/jobs`,
+  link to their detail; fed by `GET /api/ingestion_batches` with Prev/Next 30-per-page
+  pagination reading the server page envelope; INTAKE-09), the job feed (`/jobs`,
   `components.JobList` — scored/unscored status tabs, lifecycle bin tabs (Active default /
   Backlog / Removed), filter controls (score band, source, location, ingestion-date range), an
   oldest/highest-score sort toggle, and Prev/Next 30-per-page pagination reading the server page
@@ -88,7 +89,11 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   relevant/missing requirements, red flags, alignment/strategy notes, the resolved
   application route, and an intake block exposing Backlog/Remove (or Restore) via
   `SetJobLifecycle`; INTAKE-08), the applications tracker (`/applications`,
-  `components.ApplicationsView` — tracked applications with status/stage controls), the
+  `components.ApplicationsView` — tracked applications with status/stage controls, plus an
+  "All jobs" table view (lazily fetched on first open) that lists every JobPost via the paginated
+  `Jobs()` feed, surfaces the same lifecycle bin filter (Active default / Backlog / Removed) so
+  removed/backlog are excluded by default, and paginates 30-per-page with Prev/Next reading the
+  server page envelope; INTAKE-09), the
   application draft review (`/applications/:id`,
   `components.DraftReview` — resume emphasis, cover letter, structured answers, and a read-only
   worker autofill preview, plus an explicit approve+submit control), the contacts/outreach screen
@@ -110,7 +115,9 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   so there is no separate `UnscoredJobs` method — INTAKE-07),
   `GET /api/job_posts/:id` (detail), `GET /api/digest` (digest), and
   `GET /api/ingestion_batches` (ingestion history — postings grouped into source+arrival-time
-  batches by `IngestionBatchBuilder`, derived without any persisted batch link or migration).
+  batches by `IngestionBatchBuilder`, derived without any persisted batch link or migration;
+  `RailsClient.IngestionBatches(ctx, page)` carries the 1-based `page` and decodes the
+  `{batches, page}` envelope into an `IngestionBatchPage` for Prev/Next — INTAKE-09).
   Rails now serves all of these
   (READ-01): session-guarded, read-only, exposing only client-safe fields. The feed returns
   compact rows (`id`, `title`, `company`, `match_score`, `scoring_status`, `lifecycle_state`,

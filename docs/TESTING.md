@@ -182,6 +182,16 @@ Be honest about the current state — most of the suite is still to be written.
   session-expired, generic) are unit-tested. Two safety tests lock the constraint: a full render
   lifecycle makes **zero** `SetJobLifecycle` calls on both `JobList` and `JobDetailView`.
 
+- **web/** — `components/jobs_test.go` + `components/applications_test.go` (INTAKE-09 landing/table
+  pagination): the ingestion-batches landing (`DigestView`) renders a Prev/Next pagination block
+  reading the page envelope (page indicator "Page N of M", Prev disabled on page 1, Next gated on
+  `has_next`); `applyNextPage`/`applyPrevPage` advance/stop and the advanced page is carried to the
+  mocked `IngestionBatches(ctx, page)`. The all-jobs table (`ApplicationsView`) lazily loads with
+  `state=active` (and unset `status`, so scored+unscored), exposes the lifecycle bin tabs (`applyTableBin`
+  resets to page 1), paginates with Prev/Next (`applyJobsNextPage`/`applyJobsPrevPage`), and the header
+  stat reflects the server `page.total`, not just the current page length. The mocked `IngestionBatches`
+  now returns an `IngestionBatchPage` and records the requested page (`gotBatchesPage`).
+
 ### Planned (from the plan's Testing Plan)
 
 **Intake management (INTAKE / RESOLVED-20):**
@@ -275,8 +285,8 @@ Keep this table up to date — add a row when adding a new test file.
 | `workers/src/worker.test.ts` | Worker orchestration | config loading, bearer-auth task fetch/report calls, clean idle without `API_INTERNAL_URL`, one-cycle poll orchestration, and unsupported-ATS safe failure |
 | `workers/src/ats/handlers.test.ts` | Worker ATS handlers | Playwright fixture coverage for Greenhouse/Lever/Ashby registration, approved field fill/submit, unknown required field pauses, and sensitive-field pauses |
 | `web/components/pwa_test.go` | Web (go-app PWA) | iOS/iPadOS detection + version parsing, iOS 16.4+ Web Push threshold, and the install/notification-permission gate decision |
-| `web/components/jobs_test.go` | Web (go-app PWA) | Job list / job detail / ingestion-batch render tests (scored/unscored tabs, lifecycle bin tabs, filter/sort controls + Prev/Next pagination, default scored+active+oldest params, explicit score request button, scored fields, batch grouping + collapsible postings, tracker status controls, empty/error/401 states) via a mocked `RailsClient` and `NewTestEngine`; engine-free `apply*`/`feedParams`/paging state transitions; explicit no-score/no-apply/no-status-update/no-extra-fetch-on-render assertions; `MatchScoreLabel`/`RouteLabel`/`jobIDFromPath` helpers |
-| `web/components/applications_test.go` | Web (go-app PWA) | Applications tracker render tests, empty/error/401 states, explicit no-status-update-on-render assertion, and direct status-update state tests |
+| `web/components/jobs_test.go` | Web (go-app PWA) | Job list / job detail / ingestion-batch render tests (scored/unscored tabs, lifecycle bin tabs, filter/sort controls + Prev/Next pagination, default scored+active+oldest params, explicit score request button, scored fields, batch grouping + collapsible postings, ingestion-landing Prev/Next pagination reading the page envelope (INTAKE-09), tracker status controls, empty/error/401 states) via a mocked `RailsClient` and `NewTestEngine`; engine-free `apply*`/`feedParams`/paging state transitions; explicit no-score/no-apply/no-status-update/no-extra-fetch-on-render assertions; `MatchScoreLabel`/`RouteLabel`/`jobIDFromPath` helpers |
+| `web/components/applications_test.go` | Web (go-app PWA) | Applications tracker render tests, empty/error/401 states, explicit no-status-update-on-render assertion, direct status-update state tests, and the all-jobs table (lazy load default active bin, bin filter, Prev/Next pagination, header total from the page envelope — INTAKE-09) |
 | `web/components/login_test.go` | Web (go-app PWA) | Login form render and `loginErrorStatus`/`loginButtonText` status mapping (401 → "Incorrect passphrase") |
 | `web/components/client_test.go` | Web (go-app PWA) | `httpRailsClient` against `httptest`: `/api`-namespaced paths, `Jobs(JobFeedParams)` filter/sort/state/page query building (and default-param omission) + `{job_posts, page}` envelope decode, explicit score request path, scored-field/route/tracker JSON decode, application/job tracker PATCH payloads, draft PATCH payload shape, Rails error-code parsing, session-cookie carry, 401 → `APIError` |
 | `web/components/profile_test.go` | Web (go-app PWA) | Profile/resume render (editable fields, contact presence flags with no PII leak, resume metadata/empty) and `doSave` write path (reseed/error/401) via a mocked `RailsClient` |

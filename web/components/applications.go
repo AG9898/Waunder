@@ -34,7 +34,14 @@ type ApplicationsView struct {
 	// the table, so the default applications view costs no extra request.
 	jobsState loadState
 	jobs      []JobSummary
+	jobsPage  PageMeta
 	jobsErr   string
+	// jobsBin is the lifecycle bin the table shows (active default / backlog /
+	// removed), so removed and backlog jobs are excluded by default.
+	jobsBin string
+	// jobsPageNum is the current 1-based page for the table feed; Prev/Next
+	// advance it without losing the bin selection.
+	jobsPageNum int
 }
 
 func (v *ApplicationsView) OnMount(ctx app.Context)     { v.ensureClient(); v.load(ctx) }
@@ -84,7 +91,13 @@ func (v *ApplicationsView) renderHeader() app.UI {
 	total := len(v.applications)
 	caption := "Total tracked"
 	if v.currentView() == viewTable {
-		total = len(v.jobs)
+		// The table is paginated, so prefer the server's total match count over
+		// the current page length; fall back to the page length before the
+		// envelope has loaded.
+		total = v.jobsPage.Total
+		if total == 0 {
+			total = len(v.jobs)
+		}
 		caption = "Total jobs"
 	}
 	return app.Div().Class("applications-header").Body(
@@ -143,33 +156,79 @@ func (v *ApplicationsView) renderApplicationsList() app.UI {
 }
 
 // renderTable renders the all-jobs spreadsheet-style tracker: one row per job
-// post with a link back to the job posting. Filtering/sorting is planned (see
-// docs/STYLE_GUIDE.md and docs/PRD.md) but not yet implemented — the table lists
-// every job for now.
+// post with a link back to the job posting. It surfaces the lifecycle bin filter
+// (Active default / Backlog / Removed) so removed/backlog jobs are excluded by
+// default, and paginates at the server's page size with Prev/Next. Sorting and
+// richer filtering are planned (docs/STYLE_GUIDE.md, docs/PRD.md).
 func (v *ApplicationsView) renderTable() app.UI {
-	return renderLoad(v.jobsState, v.jobsErr, func() app.UI {
-		if len(v.jobs) == 0 {
-			return app.P().Class("jobs-table-empty").Text("No jobs yet.")
-		}
-		return app.Div().Class("jobs-table-wrap").Body(
-			app.Table().Class("jobs-table").Body(
-				app.THead().Body(
-					app.Tr().Body(
-						app.Th().Text("Title"),
-						app.Th().Text("Company"),
-						app.Th().Text("Source"),
-						app.Th().Class("jobs-table-score-col").Text("Match"),
-						app.Th().Class("jobs-table-action-col").Text(""),
+	return app.Div().Class("jobs-table-view").Body(
+		v.renderTableBinTabs(),
+		renderLoad(v.jobsState, v.jobsErr, func() app.UI {
+			if len(v.jobs) == 0 {
+				return app.P().Class("jobs-table-empty").Text("No jobs yet.")
+			}
+			return app.Div().Class("jobs-table-wrap").Body(
+				app.Table().Class("jobs-table").Body(
+					app.THead().Body(
+						app.Tr().Body(
+							app.Th().Text("Title"),
+							app.Th().Text("Company"),
+							app.Th().Text("Source"),
+							app.Th().Class("jobs-table-score-col").Text("Match"),
+							app.Th().Class("jobs-table-action-col").Text(""),
+						),
+					),
+					app.TBody().Body(
+						app.Range(v.jobs).Slice(func(i int) app.UI {
+							return v.renderJobRow(v.jobs[i])
+						}),
 					),
 				),
-				app.TBody().Body(
-					app.Range(v.jobs).Slice(func(i int) app.UI {
-						return v.renderJobRow(v.jobs[i])
-					}),
-				),
-			),
-		)
-	})
+				v.renderTablePagination(),
+			)
+		}),
+	)
+}
+
+// renderTableBinTabs renders the lifecycle bin selector for the table, mirroring
+// the jobs feed (Active default / Backlog / Removed).
+func (v *ApplicationsView) renderTableBinTabs() app.UI {
+	active := v.jobsBin
+	if active == "" {
+		active = jobStateActive
+	}
+	tab := func(state, label string) app.UI {
+		return app.Button().
+			Class("job-bin-tab").
+			Class(viewSelectorClass(active, state)).
+			Attr("role", "tab").
+			OnClick(v.showTableBin(state)).
+			Text(label)
+	}
+	return app.Nav().Class("jobs-table-bin-tabs job-bin-tabs").Attr("role", "tablist").Body(
+		tab(jobStateActive, "Active"),
+		tab(jobStateBacklog, "Backlog"),
+		tab(jobStateRemoved, "Removed"),
+	)
+}
+
+// renderTablePagination renders Prev/Next controls and a page indicator reading
+// the server's page envelope. Prev is disabled on page 1; Next is disabled when
+// the envelope reports no further page.
+func (v *ApplicationsView) renderTablePagination() app.UI {
+	return app.Div().Class("jobs-table-pagination job-pagination").Body(
+		app.Button().
+			Class("jobs-table-page-prev").
+			Disabled(v.jobsPage.Number <= 1).
+			OnClick(v.jobsPrevPage).
+			Text("Previous"),
+		app.Span().Class("jobs-table-page-indicator").Text(pageIndicatorLabel(v.jobsPage)),
+		app.Button().
+			Class("jobs-table-page-next").
+			Disabled(!v.jobsPage.HasNext).
+			OnClick(v.jobsNextPage).
+			Text("Next"),
+	)
 }
 
 func (v *ApplicationsView) renderJobRow(job JobSummary) app.UI {
@@ -216,14 +275,31 @@ func (v *ApplicationsView) showTable(ctx app.Context, _ app.Event) {
 	ctx.Update()
 }
 
+// tableParams builds the server query for the table feed from the current bin
+// and page selection. The table tracks every job (scored and unscored) in the
+// chosen lifecycle bin, so status is left unset (Rails would otherwise default
+// to scored-only); the bin defaults to active so removed/backlog are excluded.
+func (v *ApplicationsView) tableParams() JobFeedParams {
+	bin := v.jobsBin
+	if bin == "" {
+		bin = jobStateActive
+	}
+	page := v.jobsPageNum
+	if page < 1 {
+		page = 1
+	}
+	return JobFeedParams{State: bin, Page: page}
+}
+
 func (v *ApplicationsView) loadJobs(ctx app.Context) {
 	v.jobsState = loadLoading
 	ctx.Update()
 	reqCtx := ctx.Context
+	params := v.tableParams()
 	ctx.Async(func() {
-		page, err := v.Client.Jobs(reqCtx, JobFeedParams{})
+		page, err := v.Client.Jobs(reqCtx, params)
 		ctx.Dispatch(func(ctx app.Context) {
-			v.applyJobsResult(page.Jobs, err)
+			v.applyJobsResult(page, err)
 			ctx.Update()
 		})
 	})
@@ -237,11 +313,11 @@ func (v *ApplicationsView) doShowTable(ctx context.Context) {
 		return
 	}
 	v.jobsState = loadLoading
-	page, err := v.Client.Jobs(ctx, JobFeedParams{})
-	v.applyJobsResult(page.Jobs, err)
+	page, err := v.Client.Jobs(ctx, v.tableParams())
+	v.applyJobsResult(page, err)
 }
 
-func (v *ApplicationsView) applyJobsResult(jobs []JobSummary, err error) {
+func (v *ApplicationsView) applyJobsResult(page JobPage, err error) {
 	if err != nil {
 		v.jobsState = loadError
 		if IsUnauthorized(err) {
@@ -251,8 +327,63 @@ func (v *ApplicationsView) applyJobsResult(jobs []JobSummary, err error) {
 		}
 		return
 	}
-	v.jobs = jobs
+	v.jobs = page.Jobs
+	v.jobsPage = page.Page
 	v.jobsState = loadDone
+}
+
+// showTableBin switches the table lifecycle bin, resets to page 1, and refetches.
+func (v *ApplicationsView) showTableBin(bin string) app.EventHandler {
+	return func(ctx app.Context, _ app.Event) {
+		if v.jobsBin == "" {
+			v.jobsBin = jobStateActive
+		}
+		if v.jobsBin == bin {
+			return
+		}
+		v.applyTableBin(bin)
+		v.loadJobs(ctx)
+	}
+}
+
+// applyTableBin records a bin change and resets paging. Split from the handler
+// so the transition is unit-testable without the engine.
+func (v *ApplicationsView) applyTableBin(bin string) {
+	v.jobsBin = bin
+	v.jobs = nil
+	v.jobsErr = ""
+	v.jobsPageNum = 1
+}
+
+func (v *ApplicationsView) jobsPrevPage(ctx app.Context, _ app.Event) {
+	if v.applyJobsPrevPage() {
+		v.loadJobs(ctx)
+	}
+}
+
+func (v *ApplicationsView) applyJobsPrevPage() bool {
+	if v.jobsPageNum <= 1 {
+		return false
+	}
+	v.jobsPageNum--
+	return true
+}
+
+func (v *ApplicationsView) jobsNextPage(ctx app.Context, _ app.Event) {
+	if v.applyJobsNextPage() {
+		v.loadJobs(ctx)
+	}
+}
+
+func (v *ApplicationsView) applyJobsNextPage() bool {
+	if !v.jobsPage.HasNext {
+		return false
+	}
+	if v.jobsPageNum < 1 {
+		v.jobsPageNum = 1
+	}
+	v.jobsPageNum++
+	return true
 }
 
 func (v *ApplicationsView) renderApplication(application ApplicationTracker) app.UI {

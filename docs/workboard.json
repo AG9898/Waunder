@@ -1495,7 +1495,7 @@
       "id": "INTAKE-09",
       "title": "Paginate ingestion landing and the all-jobs table",
       "description": "Apply 30/page pagination in the PWA to the ingestion-batches landing (components.DigestView, reading the paginated GET /api/ingestion_batches) and the all-jobs table view in components.ApplicationsView (which reuses the paginated Jobs() endpoint), each with Prev/Next controls reading the page envelope. The all-jobs table should also surface the same lifecycle bin filter so removed/backlog jobs are excluded by default. Reuse the do*/apply* split and the shared mockClient; keep lazy-load behavior for the table (no extra fetch until opened).",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "INTAKE",
       "depends_on": [

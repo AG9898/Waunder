@@ -1223,7 +1223,11 @@ type DigestView struct {
 
 	state   loadState
 	batches []IngestionBatch
+	page    PageMeta
 	err     string
+	// pageNum is the current 1-based page; Prev/Next advance it without losing
+	// the open-batch target.
+	pageNum int
 	// openBatch is the id of the batch to render expanded on load, set from the
 	// ?batch=… query param so returning from a job detail re-opens its batch.
 	openBatch string
@@ -1255,15 +1259,76 @@ func (v *DigestView) ensureClient() {
 }
 
 func (v *DigestView) load(ctx app.Context) {
+	if v.pageNum < 1 {
+		v.pageNum = 1
+	}
 	v.state = loadLoading
 	ctx.Update()
 	reqCtx := ctx.Context
+	page := v.pageNum
 	ctx.Async(func() {
-		batches, err := v.Client.IngestionBatches(reqCtx)
+		res, err := v.Client.IngestionBatches(reqCtx, page)
 		ctx.Dispatch(func(ctx app.Context) {
-			applyResult(ctx, &v.state, &v.err, err, func() { v.batches = batches })
+			applyResult(ctx, &v.state, &v.err, err, func() {
+				v.batches = res.Batches
+				v.page = res.Page
+			})
 		})
 	})
+}
+
+func (v *DigestView) prevPage(ctx app.Context, _ app.Event) {
+	if v.applyPrevPage() {
+		v.load(ctx)
+	}
+}
+
+// applyPrevPage steps back one page when not already on the first, returning
+// true when a refetch is warranted.
+func (v *DigestView) applyPrevPage() bool {
+	if v.pageNum <= 1 {
+		return false
+	}
+	v.pageNum--
+	return true
+}
+
+func (v *DigestView) nextPage(ctx app.Context, _ app.Event) {
+	if v.applyNextPage() {
+		v.load(ctx)
+	}
+}
+
+// applyNextPage advances one page when the envelope reports a next page exists,
+// returning true when a refetch is warranted.
+func (v *DigestView) applyNextPage() bool {
+	if !v.page.HasNext {
+		return false
+	}
+	if v.pageNum < 1 {
+		v.pageNum = 1
+	}
+	v.pageNum++
+	return true
+}
+
+// renderPagination renders Prev/Next controls and a page indicator reading the
+// server's page envelope. Prev is disabled on page 1; Next is disabled when the
+// envelope reports no further page.
+func (v *DigestView) renderPagination() app.UI {
+	return app.Div().Class("digest-pagination").Body(
+		app.Button().
+			Class("digest-page-prev").
+			Disabled(v.page.Number <= 1).
+			OnClick(v.prevPage).
+			Text("Previous"),
+		app.Span().Class("digest-page-indicator").Text(pageIndicatorLabel(v.page)),
+		app.Button().
+			Class("digest-page-next").
+			Disabled(!v.page.HasNext).
+			OnClick(v.nextPage).
+			Text("Next"),
+	)
 }
 
 func (v *DigestView) Render() app.UI {
@@ -1294,6 +1359,7 @@ func (v *DigestView) renderBatches() app.UI {
 				renderBatch(batch, batch.ID == v.openBatch),
 			)
 		}),
+		v.renderPagination(),
 	)
 }
 

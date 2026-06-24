@@ -136,6 +136,85 @@ func TestApplicationsViewTableEmpty(t *testing.T) {
 	}
 }
 
+func TestApplicationsViewTableDefaultsToActiveBin(t *testing.T) {
+	m := &mockClient{jobs: []JobSummary{{ID: 1, Title: "Eng", Company: "Acme"}}}
+	c := &ApplicationsView{Client: m}
+
+	c.doShowTable(context.Background())
+
+	// The lazy table load defaults to the active lifecycle bin so removed and
+	// backlog jobs are excluded.
+	if m.gotParams.State != jobStateActive {
+		t.Fatalf("table requested state = %q, want %q", m.gotParams.State, jobStateActive)
+	}
+	// Status is left unset so the table tracks every job (scored + unscored).
+	if m.gotParams.Status != "" {
+		t.Fatalf("table requested status = %q, want empty", m.gotParams.Status)
+	}
+}
+
+func TestApplicationsViewTableBinFilter(t *testing.T) {
+	m := &mockClient{jobs: []JobSummary{{ID: 1, Title: "Eng"}}}
+	c := &ApplicationsView{Client: m, view: viewTable, jobsState: loadDone, jobsBin: jobStateActive}
+
+	c.applyTableBin(jobStateBacklog)
+	if c.jobsBin != jobStateBacklog || c.jobsPageNum != 1 || len(c.jobs) != 0 {
+		t.Fatalf("applyTableBin: bin=%q page=%d jobs=%d", c.jobsBin, c.jobsPageNum, len(c.jobs))
+	}
+	if got := c.tableParams().State; got != jobStateBacklog {
+		t.Fatalf("tableParams state = %q, want %q", got, jobStateBacklog)
+	}
+
+	// The bin tabs render in the table view.
+	var sb strings.Builder
+	app.PrintHTML(&sb, c.renderTableBinTabs())
+	for _, want := range []string{"Active", "Backlog", "Removed", "job-bin-tab"} {
+		if !strings.Contains(sb.String(), want) {
+			t.Errorf("table bin tabs missing %q\n%s", want, sb.String())
+		}
+	}
+}
+
+func TestApplicationsViewTablePagination(t *testing.T) {
+	c := &ApplicationsView{
+		view:      viewTable,
+		jobsState: loadDone,
+		jobs:      []JobSummary{{ID: 1, Title: "Eng"}},
+		jobsPage:  PageMeta{Number: 1, Size: 30, Total: 75, HasNext: true},
+		jobsBin:   jobStateActive,
+	}
+	var sb strings.Builder
+	app.PrintHTML(&sb, c.renderTable())
+	for _, want := range []string{"Page 1 of 3", "Previous", "Next", "jobs-table-pagination"} {
+		if !strings.Contains(sb.String(), want) {
+			t.Errorf("table pagination missing %q\n%s", want, sb.String())
+		}
+	}
+
+	// Next advances; Prev stops at page 1.
+	if !c.applyJobsNextPage() || c.jobsPageNum != 2 {
+		t.Fatalf("applyJobsNextPage: page = %d, want 2", c.jobsPageNum)
+	}
+	c.jobsPageNum = 1
+	if c.applyJobsPrevPage() {
+		t.Fatal("applyJobsPrevPage should not advance below page 1")
+	}
+}
+
+func TestApplicationsViewTableHeaderUsesTotal(t *testing.T) {
+	// The header stat reflects the server total, not just the current page.
+	c := &ApplicationsView{
+		view:     viewTable,
+		jobsPage: PageMeta{Number: 1, Size: 30, Total: 75, HasNext: true},
+		jobs:     []JobSummary{{ID: 1, Title: "Eng"}},
+	}
+	var sb strings.Builder
+	app.PrintHTML(&sb, c.renderHeader())
+	if !strings.Contains(sb.String(), ">75<") {
+		t.Errorf("table header should show total 75, got:\n%s", sb.String())
+	}
+}
+
 func TestApplicationsViewEmpty(t *testing.T) {
 	c := &ApplicationsView{Client: &mockClient{}}
 	html := renderHTML(t, c)
