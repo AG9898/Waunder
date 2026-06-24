@@ -346,10 +346,33 @@ func (j *JobList) renderPagination() app.UI {
 	)
 }
 
+// allOption is the sentinel value carried by the "All" (no-filter) <option>.
+// go-app omits an empty value attribute (renders `<option>All</option>`), and
+// the browser then reports such an option's *text* as its value — so selecting
+// "All" would send `source=All` to Rails and match nothing. Giving it a real
+// value keeps the change handler reading a stable token, which optionValue maps
+// back to the empty filter.
+const allOption = "all"
+
+// optionValue maps the allOption sentinel back to the empty filter; any other
+// value passes through unchanged.
+func optionValue(raw string) string {
+	if raw == allOption {
+		return ""
+	}
+	return raw
+}
+
 // scoreBandOption builds a <option> with selected set when value matches the
-// current selection. Reused for the score-band, source, and sort selects.
+// current selection. Reused for the score-band, source, and sort selects. The
+// empty (no-filter) value is rendered as the allOption sentinel so the browser
+// never falls back to reporting the option text as its value.
 func scoreBandOption(value, label, current string) app.UI {
-	opt := app.Option().Value(value).Text(label)
+	rendered := value
+	if rendered == "" {
+		rendered = allOption
+	}
+	opt := app.Option().Value(rendered).Text(label)
 	if value == current {
 		opt = opt.Selected(true)
 	}
@@ -546,14 +569,14 @@ func (j *JobList) applyBin(state string) {
 // filter setters read the new value from the changed control, store it, reset to
 // page 1, and refetch. Each is split into an apply* helper for engine-free tests.
 func (j *JobList) setScoreBand(ctx app.Context, _ app.Event) {
-	j.applyScoreBand(ctx.JSSrc().Get("value").String())
+	j.applyScoreBand(optionValue(ctx.JSSrc().Get("value").String()))
 	j.load(ctx)
 }
 
 func (j *JobList) applyScoreBand(value string) { j.scoreBand = value; j.resetFeed() }
 
 func (j *JobList) setSource(ctx app.Context, _ app.Event) {
-	j.applySource(ctx.JSSrc().Get("value").String())
+	j.applySource(optionValue(ctx.JSSrc().Get("value").String()))
 	j.load(ctx)
 }
 

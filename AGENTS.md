@@ -914,3 +914,14 @@ serializer already had it). (3) Filters moved into a collapsed-by-default `.job-
 (`<details>`/`<summary>` "Filters & sort") with an active-filter count badge and a 2-up grid, so
 they no longer push the feed down on mobile. go-app `app.PrintHTML` HTML-escapes `&`, so a render
 test asserting the summary text must match `Filters &amp; sort`.
+
+### 2026-06-24 — go-app omits value="" so an "All" <option> reports its TEXT as the value
+The jobs-feed Source filter showed "No scored jobs yet" after picking a source then re-selecting
+"All": go-app drops an empty `value` attribute (`app.Option().Value("")` renders `<option>All</option>`),
+and an HTML `<option>` with no `value` returns its **text** as `.value` — so `OnChange` read
+`"All"` and the feed queried `source=All`, which matches nothing. Initial load worked because it
+reads Go state (`j.source == ""`), never the DOM. Fix (`web/components/jobs.go`): the shared
+`scoreBandOption` renders the empty/no-filter choice with a real `allOption` ("all") sentinel value,
+and `setSource`/`setScoreBand` pass the read value through `optionValue()` which maps the sentinel
+back to `""`. Any future go-app `<select>` whose "all/none" choice is the empty string needs the
+same sentinel-on-render + normalize-on-read treatment — never rely on a bare `Value("")` option.

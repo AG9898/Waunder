@@ -512,6 +512,44 @@ func TestJobListRendersSourceOrigin(t *testing.T) {
 	}
 }
 
+// The "All" (no-filter) options must carry a real value attribute. go-app omits
+// value="", and a valueless <option> reports its text as its value — so a bare
+// "All" option would send source=All (or score_band=All) to Rails and match
+// nothing. Assert the sentinel renders and that it maps back to the empty filter.
+func TestJobListAllOptionCarriesValue(t *testing.T) {
+	c := &JobList{Client: &mockClient{jobs: []JobSummary{{ID: 1, Title: "Eng", Company: "Acme"}}}}
+	html := renderHTML(t, c)
+	if strings.Contains(html, "<option>All</option>") {
+		t.Fatalf("an 'All' option rendered without a value attribute (browser would report its text as the value):\n%s", html)
+	}
+	if !strings.Contains(html, `value="all"`) {
+		t.Fatalf("expected the All option to carry the %q sentinel value\n%s", allOption, html)
+	}
+}
+
+func TestOptionValueMapsSentinelToEmpty(t *testing.T) {
+	if got := optionValue(allOption); got != "" {
+		t.Fatalf("optionValue(%q) = %q, want empty", allOption, got)
+	}
+	if got := optionValue("linkedin"); got != "linkedin" {
+		t.Fatalf("optionValue(linkedin) = %q, want linkedin", got)
+	}
+}
+
+// Selecting a source then re-selecting "All" must clear the source filter so the
+// feed query carries no source (matching every source again), not source=All.
+func TestApplySourceAllClearsFilter(t *testing.T) {
+	c := &JobList{Client: &mockClient{}}
+	c.applySource("linkedin")
+	if c.feedParams().Source != "linkedin" {
+		t.Fatalf("source not applied, got %q", c.feedParams().Source)
+	}
+	c.applySource(optionValue(allOption))
+	if got := c.feedParams().Source; got != "" {
+		t.Fatalf("after re-selecting All, source = %q, want empty", got)
+	}
+}
+
 func TestJobListDefaultParams(t *testing.T) {
 	m := &mockClient{jobs: []JobSummary{{ID: 1, Title: "Eng", Company: "Acme"}}}
 	c := &JobList{Client: m}
