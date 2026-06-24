@@ -1366,7 +1366,7 @@
       "id": "INTAKE-05",
       "title": "Auto-backlog stale active posts via a scheduled sweep",
       "description": "Add ExpireStaleJobPostsJob (solid_queue) that auto-backlogs JobPosts still lifecycle_state 'active' and unactioned (no Application, no manual intake change) older than JOB_INTAKE_STALE_AFTER_DAYS (default 120 days), writing an audit_event per transition. Schedule it under the production key in config/recurring.yml (e.g. daily). The job must be idempotent and safe to run repeatedly, and must never touch backlog/removed rows or rows the owner has acted on.",
-      "status": "todo",
+      "status": "done",
       "priority": "low",
       "group_id": "INTAKE",
       "depends_on": [

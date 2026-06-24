@@ -124,6 +124,11 @@ Be honest about the current state — most of the suite is still to be written.
   shaping, no-op guards (no VAPID key, no subscriptions, no digest content), expired-subscription
   pruning, and end-to-end dispatch — using a fake push transport injected via the dispatcher's
   `transport:` seam so no real Web Push is ever sent.
+- **api/** — `spec/jobs/expire_stale_job_posts_job_spec.rb`: ExpireStaleJobPostsJob stale-sweep
+  specs covering auto-backlog of active unactioned posts past `JOB_INTAKE_STALE_AFTER_DAYS` with an
+  audited transition, leaving recent/backlog/removed rows untouched, skipping owner-actioned posts
+  (with an Application or a `lifecycle_changed` audit event), idempotency across repeated runs, and
+  the env override.
 - **workers/** — `src/safety.test.ts`: unit tests for sensitive-field detection
   (`isSensitiveField`) and answer partitioning (`partitionBySensitivity`).
 - **workers/** — `src/worker.test.ts`: unit tests for worker config loading, bearer-auth task
@@ -281,6 +286,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `api/spec/services/openrouter_client_spec.rb` | API (Rails) | OpenRouter client: missing-key typed error, env model default/override, structured-JSON parse, prose/code-fence parse fallback, retry/exhaustion, and PII-safe logging via injected fake transport (no live calls) |
 | `api/spec/jobs/score_job_post_job_spec.rb` | API (Rails) | JobScorer/ScoreJobPostJob: scoring-field population from mocked LLM JSON, match_score clamping, string-list coercion, fallback-posting scoring, graceful skip with no API key, failed-on-error, PII-safe logging (mocked client) |
 | `api/spec/jobs/generate_application_draft_job_spec.rb` | API (Rails) | ApplicationDraftGenerator/GenerateApplicationDraftJob: draft generation from mocked LLM JSON, ATS-shaped autofill payload keyed to the resolved route (manual fallback for unknown), Profile data merged into autofill answers, malformed-answer dropping, graceful skip with no API key, failed-on-error, PII-safe logging (mocked client) |
+| `api/spec/jobs/expire_stale_job_posts_job_spec.rb` | API (Rails) | ExpireStaleJobPostsJob: stale-sweep auto-backlog of active unactioned posts past `JOB_INTAKE_STALE_AFTER_DAYS` with audited transition, ignoring recent/backlog/removed and owner-actioned (Application or `lifecycle_changed` audit) posts, idempotency, env override |
 | `workers/src/safety.test.ts` | Worker safety | `isSensitiveField` detection + `partitionBySensitivity` splitting of answers |
 | `workers/src/worker.test.ts` | Worker orchestration | config loading, bearer-auth task fetch/report calls, clean idle without `API_INTERNAL_URL`, one-cycle poll orchestration, and unsupported-ATS safe failure |
 | `workers/src/ats/handlers.test.ts` | Worker ATS handlers | Playwright fixture coverage for Greenhouse/Lever/Ashby registration, approved field fill/submit, unknown required field pauses, and sensitive-field pauses |

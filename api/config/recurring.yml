@@ -17,3 +17,7 @@ production:
     class: DailyDigestJob
     queue: default
     schedule: every day at 8am
+  expire_stale_job_posts:
+    class: ExpireStaleJobPostsJob
+    queue: default
+    schedule: every day at 4am

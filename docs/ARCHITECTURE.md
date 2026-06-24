@@ -264,9 +264,15 @@ The full topology and the rationale for the `/api` proxy routing decision live i
    triage-rejected posts are auto-parked in `backlog` (kept, not surfaced in the Active feed), and
    only the top `JOB_INTAKE_DAILY_ACTIVE_LIMIT` eligible posts per day (default 30, by triage rank)
    stay `active` — the remainder auto-backlog. The owner works the Active feed; the Backlog bin
-   holds everything triage set aside. A scheduled sweep (`ExpireStaleJobPostsJob`,
-   `config/recurring.yml`) auto-backlogs `active` posts older than `JOB_INTAKE_STALE_AFTER_DAYS`
-   (default 120) that the owner never actioned.
+   holds everything triage set aside. A scheduled sweep (`ExpireStaleJobPostsJob`, scheduled in
+   `config/recurring.yml` `every day at 4am`) auto-backlogs `active` posts older than
+   `JOB_INTAKE_STALE_AFTER_DAYS` (default 120) that the owner never actioned — "actioned" meaning
+   the post has an `Application` or a `lifecycle_changed` `JobPostAuditEvent` (the audit row the
+   API writes when the owner moves a post; inbound auto-backlogging writes no such row, so it never
+   counts as owner action). Each transition writes a `lifecycle_changed` audit event with
+   `metadata: {from: "active", to: "backlog", reason: "stale_sweep", stale_after_days}`. The job
+   only reads `active` rows and excludes anything already moved, so it is idempotent and safe to
+   re-run; it never touches `backlog`/`removed` rows.
 4. A daily web-push digest is sent to subscribed PWA installs. `DailyDigestJob` (scheduled
    via `config/recurring.yml`, `every day at 8am`) builds the payload from recently scored
    JobPosts with `DailyDigestBuilder` and dispatches it with `WebPushDispatcher`, which signs
