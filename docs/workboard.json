@@ -1399,7 +1399,7 @@
       "id": "INTAKE-06",
       "title": "Paginate the ingestion-batches endpoint",
       "description": "Add server-side pagination to GET /api/ingestion_batches (Api::IngestionBatchesController) using the same JOBS_PAGE_SIZE (30/page) and the same envelope shape {ingestion_batches:[...], page:{number,size,total,has_next}} introduced for the feed. Page over the derived batch list produced by IngestionBatchBuilder (newest batch first). Keep it read-only and session-gated.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "INTAKE",
       "depends_on": [

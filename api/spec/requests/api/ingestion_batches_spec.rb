@@ -52,7 +52,49 @@ RSpec.describe "Api ingestion batches", type: :request do
       get "/api/ingestion_batches"
 
       expect(response).to have_http_status(:ok)
-      expect(JSON.parse(response.body)["batches"]).to eq([])
+      body = JSON.parse(response.body)
+      expect(body["batches"]).to eq([])
+      expect(body["page"]).to include(
+        "number" => 1, "size" => Api::JobPostsController.page_size,
+        "total" => 0, "has_next" => false
+      )
+    end
+
+    it "paginates batches newest-first with the shared page envelope" do
+      sign_in!
+      original = ENV["JOBS_PAGE_SIZE"]
+      ENV["JOBS_PAGE_SIZE"] = "2"
+
+      company = Company.create!(name: "Acme")
+      # Three distinct ingestion events: different sources / time gaps so each
+      # post becomes its own batch (newest source first by ingested_at).
+      [
+        [ "linkedin", 30.minutes.ago ],
+        [ "glassdoor", 20.minutes.ago ],
+        [ "manual", 10.minutes.ago ]
+      ].each_with_index do |(source, created), i|
+        post = JobPost.create!(company: company, title: "Job #{i}", source: source,
+          match_score: 50, scoring_status: "scored")
+        post.update_column(:created_at, created)
+      end
+
+      get "/api/ingestion_batches", params: { page: 1 }
+      expect(response).to have_http_status(:ok)
+      body = JSON.parse(response.body)
+      expect(body["batches"].length).to eq(2)
+      expect(body["batches"].map { |b| b["source"] }).to eq(%w[manual glassdoor])
+      expect(body["page"]).to include(
+        "number" => 1, "size" => 2, "total" => 3, "has_next" => true
+      )
+
+      get "/api/ingestion_batches", params: { page: 2 }
+      body = JSON.parse(response.body)
+      expect(body["batches"].map { |b| b["source"] }).to eq(%w[linkedin])
+      expect(body["page"]).to include(
+        "number" => 2, "size" => 2, "total" => 3, "has_next" => false
+      )
+    ensure
+      original.nil? ? ENV.delete("JOBS_PAGE_SIZE") : ENV["JOBS_PAGE_SIZE"] = original
     end
 
     it "requires authentication" do
