@@ -89,8 +89,16 @@ figures where possible.
   `.profile`, `.manual-entry`, and `.contacts-view` act as centered page containers.
 - There is no persistent nav or tab bar in the current design. Navigation remains in-flow
   through back links and screen-specific links.
-- Feed and digest rows are soft list cards with a color-coded score pill aligned inline on the
-  title row (right), and an origin pill under the company line.
+- Feed and digest rows are soft list cards with the color-coded score pill and a lifecycle
+  status pill (Active / Backlog / Removed — `.job-status--active|backlog|removed`, tinted
+  success-soft / warning-soft / danger-soft) stacked top-right of the card in a `.job-pills`
+  column, and an origin pill under the company line. The status pill makes a card's intake bin
+  visible at a glance, which matters most on the mixed ingestion landing where rows aren't
+  pre-filtered by bin.
+- On the Jobs feed each row card is followed by a `.job-list-actions` manage bar: the selection
+  checkbox (`.job-select-label`, "Select") is grouped on the left with the lifecycle
+  backlog/remove/restore buttons on the right, rather than floating the bare checkbox above the
+  card. This keeps the per-row controls together and reads cleanly when the card stacks on mobile.
 - The origin pill leads with the source's official brand logo (LinkedIn/Glassdoor/Indeed),
   self-hosted as SVGs under `web/web/icons/` (vendored from Simple Icons with the brand color
   baked into the fill — no live CDN dependency, matching the self-hosted-font policy). Sources
@@ -103,8 +111,11 @@ figures where possible.
   spreadsheet-style tracker (sunken header row, hairline row dividers, hover row tint) listing
   every job post; the title and a trailing "View" link both route to the job posting. Score and
   source cells reuse the feed's color-coded score pill and source pill idioms.
-  *Planned (stubbed, not yet built): filter/sort controls for the all-jobs table and for the
-  main Jobs feed.*
+- The Jobs feed's filter + sort controls live in a collapsed-by-default `.job-filters-panel`
+  (`<details>`/`<summary>` "Filters & sort") so they don't push the feed down on mobile; the
+  summary carries a small count badge of how many filters are active, and the controls lay out
+  in a 2-up grid (auto-fit on wide screens). *Planned (stubbed, not yet built): filter/sort
+  controls for the all-jobs table on the Applications screen.*
 - Job detail, draft review, profile, and route sections use top hairlines plus spacing.
 - Primary actions use sage filled buttons; secondary actions use outline/surface buttons.
 - Inputs and textareas use warm surface fill, strong hairline border, 12px radius, and a

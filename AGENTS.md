@@ -898,3 +898,19 @@ size is `JobPostsController.page_size` (env `JOBS_PAGE_SIZE`, default 30); `has_
 INTAKE-01 (ARCHITECTURE/CONVENTIONS/ENV_VARS), so this pass only added the TESTING.md spec-row update.
 NOTE: this repo has no ClimateControl/WebMock — toggle `ENV["JOBS_PAGE_SIZE"]` directly in specs with
 an `ensure` restore (mirrors the existing auth-env around-hook pattern).
+
+### 2026-06-24 — Jobs feed UI refinement: manage bar, status pill, collapsible filters
+Three mobile-UX fixes to the jobs feed/digest (`web/components/jobs.go` + `web/web/app.css`):
+(1) The per-row selection checkbox was a bare grid child floating above the card — it now lives in
+a `.job-list-actions` manage bar grouped with the lifecycle buttons (`.job-select-label` "Select"),
+and `.job-list-item` is a simple flex column (the old `.job-list-row` grid was removed; nothing
+else referenced it except one wide-screen media query). (2) A lifecycle status pill
+(`.job-status--active|backlog|removed`) now renders next to the score in a shared `.job-pills`
+column on BOTH feed rows and digest items via the shared `lifecycleStatusPill()` helper +
+`LifecycleLabel()` in client.go — mainly for the ingestion landing where rows aren't bin-filtered.
+NOTE the ingestion-batch serializer (`app/services/ingestion_batch_builder.rb`) did NOT include
+`lifecycle_state` and had to be added for the digest pill to populate (the `/api/job_posts`
+serializer already had it). (3) Filters moved into a collapsed-by-default `.job-filters-panel`
+(`<details>`/`<summary>` "Filters & sort") with an active-filter count badge and a 2-up grid, so
+they no longer push the feed down on mobile. go-app `app.PrintHTML` HTML-escapes `&`, so a render
+test asserting the summary text must match `Filters &amp; sort`.

@@ -564,6 +564,22 @@ func SourceEmoji(source string) string {
 	}
 }
 
+// LifecycleLabel renders a job's lifecycle bin (active / backlog / removed) as a
+// short status label for the status pill shown next to the match score. An empty
+// state is treated as "active" so a row is never blank.
+func LifecycleLabel(state string) string {
+	switch state {
+	case "backlog":
+		return "Backlog"
+	case "removed":
+		return "Removed"
+	case "active", "":
+		return "Active"
+	default:
+		return state
+	}
+}
+
 // SourceLabel renders a job's ingestion source as a short human-readable
 // origin tag (e.g. "LinkedIn", "Glassdoor") so the feed shows where each
 // posting came from. Unknown/empty sources fall back to a generic label.

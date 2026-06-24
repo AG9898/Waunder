@@ -235,6 +235,32 @@ func (j *JobList) renderBinTabs() app.UI {
 // ingestion-date range) and the oldest/highest-score sort toggle. Each control
 // applies on change/click; no control fetches on initial render.
 func (j *JobList) renderFilters() app.UI {
+	// Tucked into a collapsible panel so the controls don't push the feed down
+	// on mobile; the summary shows how many filters are currently applied.
+	return app.Details().Class("job-filters-panel").Body(
+		app.Summary().Class("job-filters-summary").Body(
+			app.Span().Class("job-filters-summary-label").Text("Filters & sort"),
+			app.If(j.activeFilterCount() > 0, func() app.UI {
+				return app.Span().Class("job-filters-summary-count").Text(strconv.Itoa(j.activeFilterCount()))
+			}),
+		),
+		j.renderFilterControls(),
+	)
+}
+
+// activeFilterCount counts the filter selections that differ from their default
+// (sort is excluded — it always has a value), used to badge the collapsed panel.
+func (j *JobList) activeFilterCount() int {
+	n := 0
+	for _, v := range []string{j.scoreBand, j.source, j.location, j.dateFrom, j.dateTo} {
+		if v != "" {
+			n++
+		}
+	}
+	return n
+}
+
+func (j *JobList) renderFilterControls() app.UI {
 	return app.Div().Class("job-filters").Body(
 		app.Label().Class("job-filter").Body(
 			app.Span().Text("Score"),
@@ -346,36 +372,60 @@ func pageIndicatorLabel(page PageMeta) string {
 
 func (j *JobList) renderJobRow(job JobSummary) app.UI {
 	return app.Li().Class("job-list-item").Body(
-		app.Div().Class("job-list-row").Body(
-			app.Input().
-				Class("job-select").
-				Type("checkbox").
-				Checked(j.isSelected(job.ID)).
-				Attr("aria-label", "Select "+job.Title).
-				OnChange(j.toggleSelect(job.ID)),
-			app.A().
-				Class("job-list-link").
-				Href("/jobs/"+strconv.Itoa(job.ID)).
-				Body(
-					app.Span().Class("job-title").Text(job.Title),
-					app.Span().Class("job-company").Text(job.Company),
-					app.If(SourceLabel(job.Source) != "", func() app.UI {
-						return app.Span().Class("job-source").Body(
-							sourceIcon(job.Source),
-							app.Text(SourceLabel(job.Source)),
-						)
-					}),
+		app.A().
+			Class("job-list-link").
+			Href("/jobs/"+strconv.Itoa(job.ID)).
+			Body(
+				app.Span().Class("job-title").Text(job.Title),
+				app.Span().Class("job-company").Text(job.Company),
+				app.If(SourceLabel(job.Source) != "", func() app.UI {
+					return app.Span().Class("job-source").Body(
+						sourceIcon(job.Source),
+						app.Text(SourceLabel(job.Source)),
+					)
+				}),
+				app.Div().Class("job-pills").Body(
 					app.Span().
 						Class("job-score").
 						Class("job-score--"+MatchScoreBand(job.MatchScore, job.ScoringStatus)).
 						Text(MatchScoreLabel(job.MatchScore, job.ScoringStatus)),
+					lifecycleStatusPill(job.LifecycleState),
 				),
+			),
+		// Manage bar: the selection checkbox sits with the lifecycle actions so
+		// the controls that operate on a row are grouped together, not floating
+		// above the card.
+		app.Div().Class("job-list-actions").Body(
+			app.Label().Class("job-select-label").Body(
+				app.Input().
+					Class("job-select").
+					Type("checkbox").
+					Checked(j.isSelected(job.ID)).
+					Attr("aria-label", "Select "+job.Title).
+					OnChange(j.toggleSelect(job.ID)),
+				app.Span().Text("Select"),
+			),
 			app.If(j.view == jobListUnscored, func() app.UI {
 				return j.renderScoreAction(job)
 			}),
 			j.renderLifecycleActions(job.ID),
 		),
 	)
+}
+
+// lifecycleStatusPill renders the small Active / Backlog / Removed status pill
+// shown beside a job's match score, so a card's intake state is visible at a
+// glance (most useful on the mixed ingestion landing, where rows aren't
+// pre-filtered by bin).
+func lifecycleStatusPill(state string) app.UI {
+	s := state
+	if s == "" {
+		s = jobStateActive
+	}
+	return app.Span().
+		Class("job-status").
+		Class("job-status--" + s).
+		Text(LifecycleLabel(state))
 }
 
 // renderLifecycleActions renders the per-row intake controls for a job. In the
@@ -1395,10 +1445,13 @@ func renderBatch(batch IngestionBatch, open bool) app.UI {
 						Body(
 							app.Span().Class("job-title").Text(job.Title),
 							app.Span().Class("job-company").Text(job.Company),
-							app.Span().
-								Class("job-score").
-								Class("job-score--"+MatchScoreBand(job.MatchScore, job.ScoringStatus)).
-								Text(MatchScoreLabel(job.MatchScore, job.ScoringStatus)),
+							app.Div().Class("job-pills").Body(
+								app.Span().
+									Class("job-score").
+									Class("job-score--"+MatchScoreBand(job.MatchScore, job.ScoringStatus)).
+									Text(MatchScoreLabel(job.MatchScore, job.ScoringStatus)),
+								lifecycleStatusPill(job.LifecycleState),
+							),
 						),
 				)
 			}),

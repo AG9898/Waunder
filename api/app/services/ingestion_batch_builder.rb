@@ -93,6 +93,7 @@ class IngestionBatchBuilder
       source: post.source,
       match_score: post.match_score,
       scoring_status: post.scoring_status,
+      lifecycle_state: post.lifecycle_state,
       summary: post.summary
     }
   end

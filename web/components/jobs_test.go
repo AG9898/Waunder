@@ -528,6 +528,7 @@ func TestJobListRendersControls(t *testing.T) {
 	html := renderHTML(t, c)
 	for _, want := range []string{
 		"job-bin-tabs", "Active", "Backlog", "Removed",
+		"job-filters-panel", "Filters &amp; sort",
 		"job-filters", "job-filter-score-band", "job-filter-source",
 		"job-filter-location", "job-filter-date-from", "job-filter-date-to",
 		"job-filter-sort", "Oldest first", "Highest score",
@@ -1035,6 +1036,33 @@ func TestDigestRendersBatches(t *testing.T) {
 	for _, want := range []string{"Platform Eng", "Backend Dev", "Staff Eng", "/jobs/3", "/jobs/4", "/jobs/5"} {
 		if !strings.Contains(html, want) {
 			t.Errorf("batch HTML missing posting %q\n%s", want, html)
+		}
+	}
+}
+
+func TestDigestRendersLifecycleStatusPill(t *testing.T) {
+	c := &DigestView{Client: &mockClient{batches: []IngestionBatch{
+		{
+			ID: "linkedin-1", Source: "linkedin", Date: "2026-06-23", Count: 1,
+			Jobs: []JobSummary{{ID: 5, Title: "Staff Eng", Company: "Acme", LifecycleState: "backlog"}},
+		},
+	}}}
+	html := renderHTML(t, c)
+	for _, want := range []string{"job-status", "job-status--backlog", "Backlog"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("digest HTML missing status pill %q\n%s", want, html)
+		}
+	}
+}
+
+func TestJobListRendersLifecycleStatusPill(t *testing.T) {
+	c := &JobList{Client: &mockClient{jobs: []JobSummary{
+		{ID: 7, Title: "Eng", Company: "Acme", LifecycleState: "active"},
+	}}}
+	html := renderHTML(t, c)
+	for _, want := range []string{"job-status--active", "job-pills"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("job list HTML missing status pill %q\n%s", want, html)
 		}
 	}
 }
