@@ -54,7 +54,7 @@ Required production env is documented in [`ENV_VARS.md`](ENV_VARS.md). Key place
 | `VAPID_PRIVATE_KEY` | `api` |
 | `APP_SHARED_SECRET`, `SESSION_SECRET` | `api` |
 | `WORKER_SERVICE_TOKEN` | `api` and `worker` |
-| `API_INTERNAL_URL` | `web` and `worker` |
+| `API_INTERNAL_URL` | `web`; `worker` only when trusted-submit automation should run (unset worker idles/exits) |
 
 Do not print Railway variable values into logs or chat. Use `railway variable list --kv`
 only when output is redirected to a temp file, and delete that file immediately after use.

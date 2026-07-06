@@ -19,7 +19,7 @@ If any other doc mentions a variable, it should link here rather than restate it
 
 | Variable | Required | Default | Description | Where set |
 |---|---|---|---|---|
-| `API_INTERNAL_URL` | Conditional (Required in prod) | none | Base URL of the Rails `api` service. The `web` server proxies `/api/*` and `/webhooks/resend/inbound` here, and the `worker` polls it. When unset, `web` disables the Rails proxy and serves standalone, and the worker idles/exits. | `web` + `worker` runtime env (Railway private-network URL) |
+| `API_INTERNAL_URL` | Conditional (Required for prod `web`; set on `worker` only when trusted-submit automation should run) | none | Base URL of the Rails `api` service. The `web` server proxies `/api/*` and `/webhooks/resend/inbound` here, and the `worker` polls it. When unset, `web` disables the Rails proxy and serves standalone, and the worker idles/exits; production may intentionally leave it unset on `worker` to avoid idle Playwright compute. | `web` + optional `worker` runtime env (Railway private-network URL) |
 | `PORT` | No | `8000` | Port the Go `web` server listens on. | `web` runtime (Railway sets this automatically) |
 | `DATABASE_URL` | Yes | none | PostgreSQL connection string. | `api` runtime (`api/.env`, Railway) |
 | `RAILS_MASTER_KEY` | Yes (prod) | none | Decrypts Rails encrypted credentials. | `api` runtime (Railway secret; locally `api/config/master.key`) |
@@ -47,7 +47,7 @@ If any other doc mentions a variable, it should link here rather than restate it
 | `WORKER_HEADLESS` | No | `true` | Run Playwright headless. Set `false` to show the browser locally. | `worker` runtime |
 | `LINKEDIN_EASY_APPLY_ENABLED` | No | `false` | Feature flag gating the higher-risk LinkedIn Easy Apply trusted-submit flow. Set `true` in local `.env` (RESOLVED-19); **production must also set this on the `api` and `worker` services** for LinkedIn auto-submit, otherwise LinkedIn jobs fall back to the manual "Open application" link. | `api` + `worker` runtime |
 | `REDIS_URL` | No (Conditional) | none | Redis connection string. Used only if Sidekiq is introduced later; unused while solid_queue is the job backend. | `api` + `worker` runtime |
-| `SOLID_QUEUE_IN_PUMA` | Conditional (Required in prod) | unset | When set, Puma runs the Solid Queue supervisor in-process (`config/puma.rb`), so the `api` service also processes background jobs (e.g. `ParseInboundEmailJob`). The Railway `worker` service is the Node/Playwright submit worker, **not** a Rails job runner, so without this no process drains the queue. | `api` runtime |
+| `SOLID_QUEUE_IN_PUMA` | Conditional (Required in prod) | unset | When set, Puma runs the Solid Queue supervisor in-process (`config/puma.rb`), so the `api` service also processes background jobs (e.g. `ParseInboundEmailJob`). The Railway `worker` service is the Node/Playwright submit worker, **not** a Rails job runner, so without this no process drains the queue. Production queue defaults are intentionally conservative for idle-cost control: one job thread and 5-second worker/dispatcher polling. | `api` runtime |
 
 ---
 

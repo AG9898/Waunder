@@ -126,7 +126,9 @@ dispatch.
 - Domain models cover the resources in the plan: `Profile`, `ResumeDocument`, `JobPost`,
   `ApplicationRoute`, `Company`, `ContactCandidate`, `Application`, `ApplicationDraft`,
   `OutreachDraft`, `PushSubscription`, `AuditEvent`, `JobPostAuditEvent`.
-- Background work is implemented as ActiveJob jobs in `app/jobs/`, run on `solid_queue`.
+- Background work is implemented as ActiveJob jobs in `app/jobs/`, run on `solid_queue`. The
+  single-user production queue is intentionally low-concurrency/low-polling to reduce idle Railway
+  compute: one job thread and 5-second worker/dispatcher polling are the default.
 - LLM calls (OpenRouter) and all external-service calls (Resend, web push) are isolated in
   service / client objects — **never inlined in controllers**.
 - Domain logic invoked from jobs is isolated in service objects under `app/services/`. Inbound
@@ -277,6 +279,8 @@ dispatch.
   encrypted at rest.
 - `DATABASE_URL` comes from the environment only — never hardcode connection strings.
 - Jobs, cache, and cable are database-backed: `solid_queue`, `solid_cache`, `solid_cable`.
+  Solid Queue runs in the Rails `api` process when `SOLID_QUEUE_IN_PUMA` is set; keep the queue
+  polling conservative unless the app has a demonstrated latency/throughput need.
 
 ### Trusted-Submit Safety (Rails side)
 

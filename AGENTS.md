@@ -947,3 +947,11 @@ discovery below), so there was no other way to exercise this without the seam. T
 button clears only the filter controls (score band/source/location/date range/sort) via
 `applyResetFilters`, deliberately leaving the scored/unscored view and lifecycle bin tabs alone since
 those are separate navigational controls, not filters.
+
+### 2026-07-06 — Railway idle-cost controls: submit worker exits, Solid Queue polls slowly
+The Node/Playwright `worker` Railway service is only needed while a trusted submit is actively being
+processed; for idle production cost control, leave `API_INTERNAL_URL` unset on `worker` so
+`workers/src/index.ts` exits cleanly instead of polling Rails every 15 seconds (restore the private
+API URL before testing auto-submit). Rails still drains background jobs inside the `api` process via
+`SOLID_QUEUE_IN_PUMA`, but `api/config/queue.yml` now defaults to one job thread and 5-second
+dispatcher/worker polling instead of a 3-thread worker polling Postgres every 0.1s.
