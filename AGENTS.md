@@ -925,3 +925,25 @@ reads Go state (`j.source == ""`), never the DOM. Fix (`web/components/jobs.go`)
 and `setSource`/`setScoreBand` pass the read value through `optionValue()` which maps the sentinel
 back to `""`. Any future go-app `<select>` whose "all/none" choice is the empty string needs the
 same sentinel-on-render + normalize-on-read treatment — never rely on a bare `Value("")` option.
+
+### 2026-07-06 — Jobs feed filters persist via ctx.LocalStorage(), which is safe in every context
+INTAKE follow-up: the jobs feed (`web/components/jobs.go`) is recreated from scratch by the router
+factory on every navigation to `/jobs` (`app.Route("/jobs", func() app.Composer { return
+&components.JobList{} })` in `main.go`), so its filter/bin/sort/page fields were wiped whenever the
+user clicked into a job and came back. Fixed by persisting the selection to `ctx.LocalStorage()`
+(JSON-encoded under `waunder.jobFilters`) from `load()` on every fetch, and restoring it in `OnMount`
+before the first fetch. Two go-app facts made this safe without any nil/environment guard: (1)
+`ctx.LocalStorage()` (a *method* on `app.Context`) is **never nil** — `newEngine` backs it with a
+real `jsStorage` in the browser and an in-memory `memoryStorage` under `IsServer` (native binary or
+`go test`), unlike the *package-level* `app.LocalStorage`/`app.SessionStorage` vars some go-app docs
+reference, which are wasm-only and nil elsewhere. (2) Each server-side prerender request (and each
+`app.NewTestEngine()` in tests) gets its own fresh `memoryStorage`, so calling it from `OnPreRender`
+is a harmless no-op (nothing was ever saved there) — only the real browser tab's storage persists
+across the client-side navigations this feature targets. `restoreFilters`/`persistFilters` take an
+`app.BrowserStorage` directly (not `app.Context`) so they're unit-testable with a small fake
+implementing the 7-method interface, mirroring the existing mockClient/mockPusher seam pattern —
+`OnMount` is never invoked by `app.NewTestEngine()` (only `OnPreRender` is, per the 2026-06-12
+discovery below), so there was no other way to exercise this without the seam. The "Reset filters"
+button clears only the filter controls (score band/source/location/date range/sort) via
+`applyResetFilters`, deliberately leaving the scored/unscored view and lifecycle bin tabs alone since
+those are separate navigational controls, not filters.

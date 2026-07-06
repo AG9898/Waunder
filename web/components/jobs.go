@@ -95,8 +95,74 @@ type JobList struct {
 	lifecycleErr  string
 }
 
-func (j *JobList) OnMount(ctx app.Context)     { j.ensureClient(); j.load(ctx) }
+func (j *JobList) OnMount(ctx app.Context) {
+	j.ensureClient()
+	j.restoreFilters(ctx.LocalStorage())
+	j.load(ctx)
+}
+
 func (j *JobList) OnPreRender(ctx app.Context) { j.ensureClient(); j.load(ctx) }
+
+// jobFiltersStorageKey namespaces the persisted filter selection in browser
+// local storage.
+const jobFiltersStorageKey = "waunder.jobFilters"
+
+// jobFilterState is the JSON shape persisted to local storage so the feed can
+// restore the last-used selection after navigating away (e.g. into a job)
+// and back.
+type jobFilterState struct {
+	View      string `json:"view"`
+	Bin       string `json:"bin"`
+	Sort      string `json:"sort"`
+	ScoreBand string `json:"score_band"`
+	Source    string `json:"source"`
+	Location  string `json:"location"`
+	DateFrom  string `json:"date_from"`
+	DateTo    string `json:"date_to"`
+	PageNum   int    `json:"page_num"`
+}
+
+// restoreFilters loads the last-persisted filter selection into the
+// component before its first fetch. Local storage is tied to the browser tab
+// and outlives a single component instance (unlike the JobList struct, which
+// the router recreates on every navigation to /jobs), so this is what makes
+// the feed resume where the user left it. On server prerender / in tests,
+// ctx.LocalStorage() is a fresh in-memory store with nothing saved yet, so
+// this is a no-op there. Takes the storage directly (rather than app.Context)
+// so it's unit-testable with a fake.
+func (j *JobList) restoreFilters(storage app.BrowserStorage) {
+	var saved jobFilterState
+	if err := storage.Get(jobFiltersStorageKey, &saved); err != nil {
+		return
+	}
+	j.view = saved.View
+	j.bin = saved.Bin
+	j.sort = saved.Sort
+	j.scoreBand = saved.ScoreBand
+	j.source = saved.Source
+	j.location = saved.Location
+	j.dateFrom = saved.DateFrom
+	j.dateTo = saved.DateTo
+	j.pageNum = saved.PageNum
+}
+
+// persistFilters saves the current filter selection so the next time the
+// feed mounts (e.g. after navigating back from a job) it resumes here.
+// Called from load(), so every fetch — initial mount, a filter/bin/sort/view
+// change, or pagination — keeps storage in sync with what's on screen.
+func (j *JobList) persistFilters(storage app.BrowserStorage) {
+	storage.Set(jobFiltersStorageKey, jobFilterState{
+		View:      j.view,
+		Bin:       j.bin,
+		Sort:      j.sort,
+		ScoreBand: j.scoreBand,
+		Source:    j.source,
+		Location:  j.location,
+		DateFrom:  j.dateFrom,
+		DateTo:    j.dateTo,
+		PageNum:   j.pageNum,
+	})
+}
 
 func (j *JobList) ensureClient() {
 	if j.Client == nil {
@@ -138,6 +204,7 @@ func (j *JobList) feedParams() JobFeedParams {
 
 func (j *JobList) load(ctx app.Context) {
 	j.normalizeDefaults()
+	j.persistFilters(ctx.LocalStorage())
 	j.state = loadLoading
 	ctx.Update()
 	reqCtx := ctx.Context
@@ -245,7 +312,42 @@ func (j *JobList) renderFilters() app.UI {
 			}),
 		),
 		j.renderFilterControls(),
+		j.renderResetFilters(),
 	)
+}
+
+// renderResetFilters renders a control that clears the score band, source,
+// location, and date-range filters (plus the sort back to its default),
+// without touching the scored/unscored view or lifecycle bin — those are
+// separate tabs, not filters. Disabled when no filter is currently applied.
+func (j *JobList) renderResetFilters() app.UI {
+	return app.Button().
+		Class("job-filters-reset").
+		Type("button").
+		Disabled(j.activeFilterCount() == 0).
+		OnClick(j.resetFilters).
+		Text("Reset filters")
+}
+
+func (j *JobList) resetFilters(ctx app.Context, _ app.Event) {
+	if j.activeFilterCount() == 0 {
+		return
+	}
+	j.applyResetFilters()
+	j.load(ctx)
+}
+
+// applyResetFilters clears the filter selections back to their defaults.
+// Split from the event handler so the state transition is unit-testable
+// without the engine.
+func (j *JobList) applyResetFilters() {
+	j.scoreBand = ""
+	j.source = ""
+	j.location = ""
+	j.dateFrom = ""
+	j.dateTo = ""
+	j.sort = jobSortOldest
+	j.resetFeed()
 }
 
 // activeFilterCount counts the filter selections that differ from their default

@@ -1210,6 +1210,34 @@ button { font-family: inherit; }
   box-shadow: var(--focus-ring);
 }
 
+.job-filters-reset {
+  appearance: none;
+  display: block;
+  margin: 0 var(--space-4) var(--space-4);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-ink-soft);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background .14s ease, border-color .14s ease;
+}
+.job-filters-reset:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  background: var(--color-surface-sunken);
+}
+.job-filters-reset:disabled {
+  opacity: .5;
+  cursor: default;
+}
+.job-filters-reset:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 /* Jobs feed — Prev/Next pagination */
 .job-pagination {
   display: flex;

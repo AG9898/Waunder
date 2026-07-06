@@ -2,6 +2,7 @@ package components
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
@@ -277,6 +278,41 @@ func renderHTML(t *testing.T, c app.Composer) string {
 	app.PrintHTML(&sb, c)
 	return sb.String()
 }
+
+// fakeStorage is an in-memory app.BrowserStorage so the filter
+// persist/restore round trip is testable without a real browser.
+type fakeStorage struct {
+	data map[string][]byte
+}
+
+func newFakeStorage() *fakeStorage { return &fakeStorage{data: map[string][]byte{}} }
+
+func (s *fakeStorage) Set(k string, v any) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	s.data[k] = b
+	return nil
+}
+
+func (s *fakeStorage) Get(k string, v any) error {
+	b, ok := s.data[k]
+	if !ok {
+		return nil
+	}
+	return json.Unmarshal(b, v)
+}
+
+func (s *fakeStorage) Del(k string) { delete(s.data, k) }
+func (s *fakeStorage) Len() int     { return len(s.data) }
+func (s *fakeStorage) Clear()       { s.data = map[string][]byte{} }
+func (s *fakeStorage) ForEach(f func(string)) {
+	for k := range s.data {
+		f(k)
+	}
+}
+func (s *fakeStorage) Contains(k string) bool { _, ok := s.data[k]; return ok }
 
 func intPtr(n int) *int { return &n }
 
@@ -570,6 +606,7 @@ func TestJobListRendersControls(t *testing.T) {
 		"job-filters", "job-filter-score-band", "job-filter-source",
 		"job-filter-location", "job-filter-date-from", "job-filter-date-to",
 		"job-filter-sort", "Oldest first", "Highest score",
+		"job-filters-reset", "Reset filters",
 		"job-pagination", "job-page-prev", "job-page-next", "Page 1 of 1",
 	} {
 		if !strings.Contains(html, want) {
@@ -632,6 +669,84 @@ func TestJobListPagingRespectsEnvelope(t *testing.T) {
 	}
 	if c.applyPrevPage() {
 		t.Fatalf("applyPrevPage stepped before page 1")
+	}
+}
+
+func TestJobListPersistAndRestoreFilters(t *testing.T) {
+	storage := newFakeStorage()
+
+	c := &JobList{}
+	c.normalizeDefaults()
+	c.applyBin(jobStateBacklog)
+	c.applyScoreBand("high")
+	c.applySource("linkedin")
+	c.applyLocation("Vancouver")
+	c.applyDateFrom("2026-06-01")
+	c.applyDateTo("2026-06-23")
+	c.applySort(jobSortScore)
+	c.pageNum = 3
+	c.persistFilters(storage)
+
+	// A freshly-constructed JobList (as the router builds on every navigation
+	// to /jobs) restores the persisted selection before its first fetch.
+	fresh := &JobList{}
+	fresh.restoreFilters(storage)
+	got := fresh.feedParams()
+	want := JobFeedParams{
+		Status: jobListScored, State: jobStateBacklog, Sort: jobSortScore,
+		ScoreBand: "high", Source: "linkedin", Location: "Vancouver",
+		DateFrom: "2026-06-01", DateTo: "2026-06-23", Page: 3,
+	}
+	if got != want {
+		t.Fatalf("restored feedParams = %+v, want %+v", got, want)
+	}
+}
+
+func TestJobListRestoreFiltersNoopWhenNothingSaved(t *testing.T) {
+	c := &JobList{}
+	c.restoreFilters(newFakeStorage())
+	c.normalizeDefaults()
+	if got := c.feedParams(); got.Status != jobListScored || got.State != jobStateActive || got.Page != 1 {
+		t.Fatalf("feedParams = %+v, want the defaults", got)
+	}
+}
+
+func TestJobListApplyResetFiltersClearsFiltersOnly(t *testing.T) {
+	c := &JobList{pageNum: 2, jobs: []JobSummary{{ID: 1}}}
+	c.applyBin(jobStateBacklog)
+	c.applyScoreBand("high")
+	c.applySource("linkedin")
+	c.applyLocation("Vancouver")
+	c.applyDateFrom("2026-06-01")
+	c.applyDateTo("2026-06-23")
+	c.applySort(jobSortScore)
+
+	c.applyResetFilters()
+
+	if c.scoreBand != "" || c.source != "" || c.location != "" || c.dateFrom != "" || c.dateTo != "" {
+		t.Fatalf("expected filters cleared, got scoreBand=%q source=%q location=%q dateFrom=%q dateTo=%q",
+			c.scoreBand, c.source, c.location, c.dateFrom, c.dateTo)
+	}
+	if c.sort != jobSortOldest {
+		t.Fatalf("sort = %q, want reset to oldest", c.sort)
+	}
+	if c.pageNum != 1 || c.jobs != nil {
+		t.Fatalf("expected feed reset to page 1 with cleared rows, got page %d jobs %v", c.pageNum, c.jobs)
+	}
+	// The bin (a separate tab, not a filter) is untouched by reset.
+	if c.bin != jobStateBacklog {
+		t.Fatalf("bin = %q, want unchanged", c.bin)
+	}
+}
+
+func TestJobListResetFiltersButtonDisabledUntilAFilterIsApplied(t *testing.T) {
+	if got := (&JobList{}).activeFilterCount(); got != 0 {
+		t.Fatalf("activeFilterCount = %d, want 0 with no filters applied", got)
+	}
+	c := &JobList{}
+	c.applyScoreBand("high")
+	if got := c.activeFilterCount(); got != 1 {
+		t.Fatalf("activeFilterCount = %d, want 1 after applying a filter", got)
 	}
 }
 
