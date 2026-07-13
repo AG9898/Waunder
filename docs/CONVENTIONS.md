@@ -126,9 +126,10 @@ dispatch.
 - Domain models cover the resources in the plan: `Profile`, `ResumeDocument`, `JobPost`,
   `ApplicationRoute`, `Company`, `ContactCandidate`, `Application`, `ApplicationDraft`,
   `OutreachDraft`, `PushSubscription`, `AuditEvent`, `JobPostAuditEvent`.
-- Background work is implemented as ActiveJob jobs in `app/jobs/`, run on `solid_queue`. The
-  single-user production queue is intentionally low-concurrency/low-polling to reduce idle Railway
-  compute: one job thread and 5-second worker/dispatcher polling are the default.
+- Background work remains implemented as ActiveJob jobs in `app/jobs/`. Production uses one
+  bounded in-process async thread (`ACTIVE_JOB_MAX_THREADS`, default 1), not resident Solid Queue
+  supervisor/dispatcher/worker processes. Jobs must therefore persist retryable domain state;
+  intake jobs use `InboundEmail.intake_state`, and owner actions remain explicitly retryable.
 - LLM calls (OpenRouter) and all external-service calls (Resend, web push) are isolated in
   service / client objects — **never inlined in controllers**.
 - Domain logic invoked from jobs is isolated in service objects under `app/services/`. Inbound
@@ -159,10 +160,11 @@ dispatch.
   decides what gets scored. **`lifecycle_state` (active/backlog/removed)** is the owner's manual
   intake decision: keep / park / discard. `Application#pipeline_status` is the separate
   post-application tracker. Backlog/remove is a JobPost decision and exists before any `Application`.
-- Intake lifecycle rules (INTAKE-01/02): the Active feed and every list/table default to
+- Intake lifecycle rules: the Active feed and every list/table default to
   `lifecycle_state = "active"`; `backlog` and `removed` are opt-in views. `removed` is a **soft-delete** —
-  never `destroy` a JobPost from a request path; set `lifecycle_state = "removed"` so the row (and its
-  `posting_url` dedup guard) survives and the posting can be restored. Triage auto-parks rejected
+  never `destroy` a JobPost from a request path; set `lifecycle_state = "removed"` so the posting
+  remains restorable for the retention window. Maintenance is the only hard-delete path and excludes
+  every row with an Application. Triage auto-parks rejected
   posts in `backlog` and caps the daily Active set to `JOB_INTAKE_DAILY_ACTIVE_LIMIT` (top eligible by
   triage rank); `ExpireStaleJobPostsJob` auto-backlogs `active` posts older than
   `JOB_INTAKE_STALE_AFTER_DAYS`. Every effective lifecycle transition (single or bulk, via
@@ -185,7 +187,7 @@ dispatch.
   `OpenrouterClient::MissingApiKeyError` when no key is configured so callers can guard/skip, and
   never logs prompt/completion contents or the API key (PII safety).
 - Job scoring is isolated in `JobScorer` (`app/services/job_scorer.rb`) and dispatched by
-  `ScoreJobPostJob` (`app/jobs/score_job_post_job.rb`, `solid_queue`). The scorer builds the prompt,
+  `ScoreJobPostJob` (`app/jobs/score_job_post_job.rb`, bounded Active Job). The scorer builds the prompt,
   calls `OpenrouterClient`, and writes the structured results onto the JobPost (`summary`,
   `match_score` clamped to 0–100, `relevant_requirements`, `missing_requirements`,
   `resume_alignment_notes`, `application_strategy`, `red_flags`, `scoring_status`, `scored_at`). It is
@@ -194,7 +196,7 @@ dispatch.
   post `failed`. It never logs prompt/completion contents (resume PII).
 - Application draft generation is isolated in `ApplicationDraftGenerator`
   (`app/services/application_draft_generator.rb`) and dispatched by `GenerateApplicationDraftJob`
-  (`app/jobs/generate_application_draft_job.rb`, `solid_queue`). Given an `Application` (+ `Profile`),
+  (`app/jobs/generate_application_draft_job.rb`, bounded Active Job). Given an `Application` (+ `Profile`),
   it calls `OpenrouterClient` and writes an `ApplicationDraft`: `resume_emphasis_notes`,
   `cover_letter`, `message`, `structured_answers` (array of `{question, answer}`), and an
   `autofill_payload` keyed to the resolved route's ATS shape (`ats` is the worker-facing kind —
@@ -278,9 +280,9 @@ dispatch.
 - Sensitive resume/profile fields use Active Record Encryption (`encrypts :field`) so they are
   encrypted at rest.
 - `DATABASE_URL` comes from the environment only — never hardcode connection strings.
-- Jobs, cache, and cable are database-backed: `solid_queue`, `solid_cache`, `solid_cable`.
-  Solid Queue runs in the Rails `api` process when `SOLID_QUEUE_IN_PUMA` is set; keep the queue
-  polling conservative unless the app has a demonstrated latency/throughput need.
+- Jobs use the bounded in-process Active Job async adapter in production; cache and cable remain
+  database-backed through `solid_cache` and `solid_cable`. Do not re-enable resident Solid Queue
+  processes without revisiting the measured Railway memory cost and OPEN-01.
 
 ### Trusted-Submit Safety (Rails side)
 
@@ -374,6 +376,10 @@ and reports auditable results back.
 
 ## Database
 
+- `JobPost.lifecycle_state = removed` sets `expires_at` to
+  `REMOVED_JOB_RETENTION_DAYS` (default 30). Maintenance may hard-delete only expired removed rows
+  with no Application; `backlog` is never part of the purge relation.
+
 - **Migrations only.** All schema changes go through Rails migrations — never `ALTER TABLE` or
   drop/alter columns directly.
 - Foreign-key constraints are enforced at the database level, not just in application code.
@@ -410,8 +416,8 @@ Hard rules. Agents follow these unconditionally.
 - Never store sensitive resume/profile fields unencrypted.
 - Never auto-send LinkedIn messages — outreach drafts are presented for manual sending only.
 - Never hard-`destroy` a JobPost from a request path — "remove" is a soft-delete
-  (`lifecycle_state = "removed"`) so the `posting_url` dedup guard survives. Hard-purge happens only
-  via the explicit deferred retention sweep (OPEN-XX), never from the UI.
+  (`lifecycle_state = "removed"`) with a restore window. Hard-purge happens only through
+  maintenance after retention, and never for a post with an Application.
 
 ## Always
 

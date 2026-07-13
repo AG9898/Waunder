@@ -54,35 +54,20 @@ What existing code or docs does this affect?>
 
 ## Open Decisions
 
-### OPEN-01 — Background job backend: solid_queue vs. Redis + Sidekiq
+### OPEN-01 — When to introduce a durable high-volume job backend
 
-**Question:** When, if ever, should Waunder introduce Redis + Sidekiq in place of (or alongside) the database-backed solid_queue?
+**Question:** When, if ever, should Waunder replace low-cost in-process Active Job execution with a resident durable queue such as Solid Queue or Redis + Sidekiq?
 
-**Context:** solid_queue is database-backed (Postgres) and is sufficient for the current workload — a once-daily push digest plus low-volume, user-approved submit dispatches. Adding Redis means another Railway service and ongoing infra cost. This is the inverse of the decision locked in RESOLVED-10: it only reopens if job volume or latency needs grow beyond what database-backed queuing handles.
+**Context:** RESOLVED-21 prioritizes the single-user app's idle Railway cost and uses one bounded in-process thread. Persisted domain records make owner actions and held intake retryable, but in-flight jobs are not durable across process restarts. Reopen this when volume or delivery guarantees justify resident queue memory.
 
 **Options under consideration:**
-1. **Stay on solid_queue** — no Redis. Tradeoff: zero added infra; may hit throughput/latency limits if scheduled job volume grows.
-2. **Add Redis + Sidekiq** — when volume or latency demands it. Tradeoff: faster/higher-throughput queuing at the cost of an extra Railway service, a `REDIS_URL`, and operational surface.
+1. **Stay on bounded async Active Job** — lowest idle memory; in-flight work is retryable but not durable.
+2. **Restore Solid Queue resident processes** — durable Postgres jobs without Redis, at the measured cost of several Rails processes.
+3. **Add Redis + Sidekiq** — highest throughput at the cost of another Railway service and operational surface.
 
 **Blocking:** Nothing currently blocked.
 
-**See also:** RESOLVED-10, [`ARCHITECTURE.md`](ARCHITECTURE.md), [`ENV_VARS.md`](ENV_VARS.md)
-
----
-
-### OPEN-06 — Hard-purge cadence for soft-removed JobPosts
-
-**Question:** Should soft-`removed` JobPosts ever be hard-deleted, and on what retention/cadence?
-
-**Context:** RESOLVED-20 makes "remove" a soft-delete so the `posting_url` dedup guard survives and repeat alerts stay suppressed. Removed rows therefore accumulate forever. A periodic hard-purge would reclaim them, but purging a `posting_url` reopens it to re-ingestion from a future alert. For a single-user app the row volume is small, so this is deferred, not urgent.
-
-**Options under consideration:**
-1. **Never purge** — keep all removed rows indefinitely (simplest; preserves dedup forever).
-2. **Purge after a long retention window** — e.g. hard-delete removed rows older than `REMOVED_JOB_RETENTION_DAYS`; accept that a very old removed posting could re-ingest if re-alerted.
-
-**Blocking:** Nothing currently blocked. INTAKE-01 ships soft-delete without a purge job.
-
-**See also:** RESOLVED-20, [`CONVENTIONS.md`](CONVENTIONS.md), [`ENV_VARS.md`](ENV_VARS.md)
+**See also:** RESOLVED-10, RESOLVED-21, [`ARCHITECTURE.md`](ARCHITECTURE.md), [`ENV_VARS.md`](ENV_VARS.md)
 
 ---
 
@@ -364,6 +349,28 @@ What existing code or docs does this affect?>
 
 **Why:** Inbound digest volume (LinkedIn + Glassdoor) far exceeds what a single owner can apply to, so the owner needs to discard, park, and prioritize intake, and to page through a multi-hundred-row feed. Soft-delete is chosen over hard delete specifically to preserve the `posting_url` dedup guard so a removed posting does not silently reappear from the next alert. Oldest-first default drains the oldest scored backlog first. Auto-backlog + the daily active cap keep the working feed a finite, drainable queue instead of an unbounded pile.
 
-**Alternatives rejected:** Hard-delete on remove — would reopen the posting to re-ingestion and lose audit/restore (the soft-delete keeps the dedup guard; periodic hard-purge is deferred as OPEN-06). Overloading `triage_status`/`pipeline_status` for the keep/park/discard decision — conflates the scoring auto-gate and the post-apply tracker with a pre-application owner decision. Client-side slicing for pagination — does not reduce the payload of a large feed.
+**Alternatives rejected:** Immediate hard-delete on remove — would reopen the posting to re-ingestion and lose audit/restore; RESOLVED-22 adds a protected 30-day retention instead. Overloading `triage_status`/`pipeline_status` for the keep/park/discard decision — conflates the scoring auto-gate and the post-apply tracker with a pre-application owner decision. Client-side slicing for pagination — does not reduce the payload of a large feed.
 
-**Affects:** `api/` (`JobPost.lifecycle_state` migration, `Api::JobPostsController` index filters/sort/pagination + `#lifecycle` member/collection actions, `JobPostTriage`, `ExpireStaleJobPostsJob`, `config/recurring.yml`, routes), `web/` (`components.JobList`/`ApplicationsView`/`DigestView` filters, bins, bulk actions, paging; `RailsClient` filter params + `SetJobLifecycle`), `JOBS_PAGE_SIZE`/`JOB_INTAKE_DAILY_ACTIVE_LIMIT`/`JOB_INTAKE_STALE_AFTER_DAYS` in [`ENV_VARS.md`](ENV_VARS.md), [`ARCHITECTURE.md`](ARCHITECTURE.md), [`CONVENTIONS.md`](CONVENTIONS.md), [`PRD.md`](PRD.md), [`TESTING.md`](TESTING.md). See also OPEN-06.
+**Affects:** `api/` (`JobPost.lifecycle_state` migration, `Api::JobPostsController` index filters/sort/pagination + `#lifecycle` member/collection actions, `JobPostTriage`, `ExpireStaleJobPostsJob`, routes), `web/` (`components.JobList`/`ApplicationsView`/`DigestView` filters, bins, bulk actions, paging; `RailsClient` filter params + `SetJobLifecycle`), `JOBS_PAGE_SIZE`/`JOB_INTAKE_DAILY_ACTIVE_LIMIT`/`JOB_INTAKE_STALE_AFTER_DAYS` in [`ENV_VARS.md`](ENV_VARS.md), [`ARCHITECTURE.md`](ARCHITECTURE.md), [`CONVENTIONS.md`](CONVENTIONS.md), [`PRD.md`](PRD.md), [`TESTING.md`](TESTING.md). See also RESOLVED-22.
+
+### RESOLVED-21 — Low-cost single-process Active Job runtime and owner-controlled intake
+
+**Resolved:** 2026-07-13
+
+**Decision:** Production runs Active Job through one bounded in-process async thread inside Puma and does not start the Solid Queue Puma plugin. The authenticated ingestion landing owns a persistent Pause/Resume control. A paused, valid Resend webhook is acknowledged and stored as a lightweight `held` InboundEmail reference without body retrieval, parsing, scoring, or LLM spend; resume queues held references. The status read schedules cleanup at most once daily.
+
+**Why:** Railway metrics showed the API averaging roughly 0.79 GB because resident Solid Queue supervisor/dispatcher/worker processes multiplied the Ruby/Rails runtime, while the Go shell used about 20 MB. This is a single-user, intermittent application whose owner actions and inbound references are persisted and retryable, so lower idle memory is more valuable than resident queue durability.
+
+**Tradeoff accepted:** In-flight jobs can be lost when Railway stops the Puma process. Persisted state remains retryable; stale intake rows marked `processing` are returned to `held` on resume. Restore a durable queue under OPEN-01 if volume or delivery guarantees outgrow this mode.
+
+**Affects:** `api/config/environments/production.rb`, `api/config/puma.rb`, `IntakeControl`, `InboundEmail.intake_state`, `GET/PATCH /api/intake`, the Resend webhook, the PWA ingestion landing, [`ARCHITECTURE.md`](ARCHITECTURE.md), [`ENV_VARS.md`](ENV_VARS.md), [`PRODUCTION_SETUP.md`](PRODUCTION_SETUP.md).
+
+### RESOLVED-22 — Purge explicitly removed, unapplied JobPosts after 30 days
+
+**Resolved:** 2026-07-13
+
+**Decision:** Moving a JobPost to `removed` assigns `expires_at` using `REMOVED_JOB_RETENTION_DAYS` (default 30). Maintenance hard-deletes an expired removed row only when it has no Application. Restoring the post clears the deadline. Backlog rows are never purged, and pre-policy removed rows receive a full retention window on the first maintenance sweep.
+
+**Why:** The owner wants clearly discarded postings to stop accumulating while retaining a recovery window and protecting every posting with application history. Losing the old posting URL dedup after 30 days is acceptable for an explicitly removed, unapplied post.
+
+**Affects:** `JobPost`, `Api::JobPostsController`, `ExpireStaleJobPostsJob`, `REMOVED_JOB_RETENTION_DAYS`, [`PRD.md`](PRD.md), [`ARCHITECTURE.md`](ARCHITECTURE.md), [`CONVENTIONS.md`](CONVENTIONS.md).

@@ -180,6 +180,7 @@ button { font-family: inherit; }
 .profile-contact h2,
 .profile-resume h2,
 .push-toggle h2,
+.intake-control h2,
 .draft-submit h2,
 .draft-autofill h2 {
   margin: 0 0 var(--space-2);
@@ -193,7 +194,48 @@ button { font-family: inherit; }
 /* --------------------------------------------------------------------------
    4. List rows — digest & jobs feed (gentle cards)
    -------------------------------------------------------------------------- */
+.digest-content,
 .digest-body { display: flex; flex-direction: column; gap: var(--space-4); }
+
+.intake-control {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.intake-control-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.intake-control h2 { margin-bottom: var(--space-1); }
+.intake-control-note,
+.intake-held-count {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-sm);
+}
+.intake-status {
+  flex: 0 0 auto;
+  display: inline-flex;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.intake-status--on {
+  background: var(--color-success-soft);
+  color: var(--color-success-ink);
+}
+.intake-status--paused {
+  background: var(--color-warning-soft);
+  color: var(--color-warning-ink);
+}
 
 .app-tabs {
   display: flex;
@@ -1597,6 +1639,7 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
 .job-apply-button,
 .profile-save,
 .contact-outreach-generate,
+.intake-toggle,
 .push-toggle-enable {
   appearance: none;
   display: inline-flex;
@@ -1620,6 +1663,7 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
 .job-apply-button:hover,
 .profile-save:hover,
 .contact-outreach-generate:hover,
+.intake-toggle:hover,
 .push-toggle-enable:hover { background: var(--color-accent-strong); }
 
 .login-submit:active,
@@ -1629,6 +1673,7 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
 .job-apply-button:active,
 .profile-save:active,
 .contact-outreach-generate:active,
+.intake-toggle:active,
 .push-toggle-enable:active { transform: translateY(1px); }
 
 /* secondary / outline */
@@ -1664,6 +1709,7 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
 .job-apply-button:disabled,
 .profile-save:disabled,
 .contact-outreach-generate:disabled,
+.intake-toggle:disabled,
 .push-toggle-busy {
   opacity: .55;
   cursor: progress;
@@ -1713,6 +1759,7 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
 .job-pipeline-error,
 .job-lifecycle-error,
 .contact-outreach-error,
+.intake-error,
 .push-toggle-error {
   margin: var(--space-3) 0 0;
   padding: 10px 14px;
@@ -1730,6 +1777,13 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
   padding: 10px 14px;
   background: var(--color-success-soft);
   border-radius: var(--radius-md);
+  color: var(--color-success-ink);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.intake-message {
+  margin: 0;
   color: var(--color-success-ink);
   font-size: var(--text-sm);
   font-weight: 600;

@@ -29,6 +29,22 @@ RSpec.describe "Resend inbound webhook", type: :request do
     clear_enqueued_jobs
   end
 
+  it "holds a verified email without parsing when intake is paused" do
+    IntakeControl.current.pause!
+    payload = inbound_payload.to_json
+
+    expect do
+      post "/webhooks/resend/inbound",
+        params: payload,
+        headers: signed_headers(payload).merge("Content-Type" => "application/json")
+    end.to change(InboundEmail, :count).by(1)
+
+    expect(response).to have_http_status(:ok)
+    expect(JSON.parse(response.body)).to eq("status" => "held")
+    expect(InboundEmail.last.intake_state).to eq("held")
+    expect(enqueued_jobs).to be_empty
+  end
+
   it "persists a verified email.received payload and enqueues parsing without a session" do
     payload = inbound_payload.to_json
 
@@ -49,6 +65,7 @@ RSpec.describe "Resend inbound webhook", type: :request do
     expect(inbound_email.raw_payload).to include(
       "type" => "email.received",
     )
+    expect(inbound_email.intake_state).to eq("queued")
   end
 
   it "rejects an invalid signature and does not enqueue parsing" do

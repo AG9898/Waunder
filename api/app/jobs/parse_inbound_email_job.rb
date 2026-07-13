@@ -2,6 +2,8 @@ class ParseInboundEmailJob < ApplicationJob
   queue_as :default
 
   def perform(inbound_email)
+    return unless claim_for_processing!(inbound_email)
+
     hydrate_body!(inbound_email)
 
     result = InboundEmailParser.new(inbound_email).call
@@ -25,9 +27,27 @@ class ParseInboundEmailJob < ApplicationJob
         "deferred=#{triaged.count { |status| status == :deferred }} " \
         "llm_fallback=#{result.fallback?}"
     )
+    inbound_email.update!(intake_state: "processed")
+  rescue StandardError
+    inbound_email.update!(intake_state: "failed") if inbound_email&.persisted?
+    raise
   end
 
   private
+
+  def claim_for_processing!(inbound_email)
+    inbound_email.with_lock do
+      return false if %w[processing processed].include?(inbound_email.intake_state)
+
+      unless IntakeControl.current.enabled?
+        inbound_email.update!(intake_state: "held")
+        return false
+      end
+
+      inbound_email.update!(intake_state: "processing")
+      true
+    end
+  end
 
   def triage_and_maybe_score(job_post)
     return :already_scored if job_post.scoring_status == JobScorer::STATUS_SCORED

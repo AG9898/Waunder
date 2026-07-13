@@ -25,6 +25,14 @@ type RailsClient interface {
 	// the signed, HTTP-only session cookie; subsequent calls carry it.
 	Login(ctx context.Context, passphrase string) error
 
+	// Intake fetches the persisted email-intake state and held-reference count
+	// (GET /api/intake). Reading it may schedule the once-daily maintenance sweep.
+	Intake(ctx context.Context) (IntakeStatus, error)
+
+	// SetIntake pauses or resumes future email processing (PATCH /api/intake).
+	// Paused webhooks are retained as lightweight references; resuming queues them.
+	SetIntake(ctx context.Context, enabled bool) (IntakeStatus, error)
+
 	// Jobs fetches a page of the job feed (GET /api/job_posts). The params carry
 	// the server-side filter/sort/lifecycle-state selection and 1-based page; the
 	// returned JobPage carries the rows plus the page envelope so the UI can
@@ -142,6 +150,18 @@ type ManualJobInput struct {
 	Text    string `json:"text"`
 	Title   string `json:"title"`
 	Company string `json:"company"`
+}
+
+// IntakeStatus is the owner-visible state of inbound job-alert processing.
+// QueuedCount is populated by a resume action and reports how many held
+// references were submitted to the bounded in-process queue.
+type IntakeStatus struct {
+	Enabled         bool   `json:"enabled"`
+	PausedAt        string `json:"paused_at"`
+	ResumedAt       string `json:"resumed_at"`
+	HeldCount       int    `json:"held_count"`
+	ProcessingCount int    `json:"processing_count"`
+	QueuedCount     int    `json:"queued_count"`
 }
 
 // ManualJobResult is the created JobPost as the manual-entry endpoint returns
@@ -625,6 +645,27 @@ func (c *httpRailsClient) Login(ctx context.Context, passphrase string) error {
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	return c.do(req, nil)
+}
+
+func (c *httpRailsClient) Intake(ctx context.Context) (IntakeStatus, error) {
+	var out struct {
+		Intake IntakeStatus `json:"intake"`
+	}
+	if err := c.get(ctx, "/api/intake", &out); err != nil {
+		return IntakeStatus{}, err
+	}
+	return out.Intake, nil
+}
+
+func (c *httpRailsClient) SetIntake(ctx context.Context, enabled bool) (IntakeStatus, error) {
+	body := map[string]any{"intake": map[string]bool{"enabled": enabled}}
+	var out struct {
+		Intake IntakeStatus `json:"intake"`
+	}
+	if err := c.sendJSON(ctx, http.MethodPatch, "/api/intake", body, &out); err != nil {
+		return IntakeStatus{}, err
+	}
+	return out.Intake, nil
 }
 
 func (c *httpRailsClient) Jobs(ctx context.Context, params JobFeedParams) (JobPage, error) {

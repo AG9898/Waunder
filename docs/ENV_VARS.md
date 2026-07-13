@@ -36,7 +36,8 @@ If any other doc mentions a variable, it should link here rather than restate it
 | `JOBS_PAGE_SIZE` | No | `30` | Server-side page size (rows/page) for paginated list reads (`GET /api/job_posts`, `GET /api/ingestion_batches`). See RESOLVED-20. | `api` runtime |
 | `JOB_INTAKE_DAILY_ACTIVE_LIMIT` | No | `30` | Maximum number of inbound, triage-eligible JobPosts that stay `lifecycle_state: active` per day (top-ranked by triage); the rest auto-park in `backlog` so the working feed stays drainable (RESOLVED-20). | `api` runtime |
 | `JOB_INTAKE_STALE_AFTER_DAYS` | No | `120` | Age (days) after which `ExpireStaleJobPostsJob` auto-backlogs an `active`, owner-unactioned JobPost (RESOLVED-20). | `api` runtime |
-| `REMOVED_JOB_RETENTION_DAYS` | No | unset | (Deferred — OPEN-06) If a hard-purge of soft-`removed` JobPosts is ever added, the retention window before purge. Unused while remove stays a permanent soft-delete. | `api` runtime |
+| `REMOVED_JOB_RETENTION_DAYS` | No | `30` | Days an explicitly `removed` JobPost remains restorable before maintenance hard-purges it. Rows with an Application are never purged; backlog rows are unaffected. | `api` runtime |
+| `ACTIVE_JOB_MAX_THREADS` | No | `1` | Maximum in-process Active Job threads in low-cost production (clamped 1–4). Keep at 1 for the single-user workload and lowest idle memory. | `api` runtime |
 | `RESEND_WEBHOOK_SECRET` | Conditional | none | Svix signing secret that validates Resend inbound (`email.received`) webhook signatures at `POST /webhooks/resend/inbound`; required for email ingestion (RESOLVED-13). | `api` runtime (secret) |
 | `RESEND_API_KEY` | Conditional | none | Resend account API key used by `ResendInboundClient` to fetch the **body** of a received email (`GET /emails/receiving/{email_id}`). The `email.received` webhook delivers only metadata — no text/html — so without this key `ParseInboundEmailJob` has no body to parse and every alert dead-ends. | `api` runtime (secret) |
 | `RESEND_INBOUND_DOMAIN` | Conditional | none | The Resend-verified receiving domain that forwarded job alerts are sent to (reference/config; e.g. `adenguo.com`). | `api` runtime |
@@ -46,8 +47,8 @@ If any other doc mentions a variable, it should link here rather than restate it
 | `WORKER_POLL_INTERVAL_MS` | No | `15000` | Worker poll interval (ms) for fetching approved tasks. | `worker` runtime |
 | `WORKER_HEADLESS` | No | `true` | Run Playwright headless. Set `false` to show the browser locally. | `worker` runtime |
 | `LINKEDIN_EASY_APPLY_ENABLED` | No | `false` | Feature flag gating the higher-risk LinkedIn Easy Apply trusted-submit flow. Set `true` in local `.env` (RESOLVED-19); **production must also set this on the `api` and `worker` services** for LinkedIn auto-submit, otherwise LinkedIn jobs fall back to the manual "Open application" link. | `api` + `worker` runtime |
-| `REDIS_URL` | No (Conditional) | none | Redis connection string. Used only if Sidekiq is introduced later; unused while solid_queue is the job backend. | `api` + `worker` runtime |
-| `SOLID_QUEUE_IN_PUMA` | Conditional (Required in prod) | unset | When set, Puma runs the Solid Queue supervisor in-process (`config/puma.rb`), so the `api` service also processes background jobs (e.g. `ParseInboundEmailJob`). The Railway `worker` service is the Node/Playwright submit worker, **not** a Rails job runner, so without this no process drains the queue. Production queue defaults are intentionally conservative for idle-cost control: one job thread and 5-second worker/dispatcher polling. | `api` runtime |
+| `REDIS_URL` | No (Conditional) | none | Redis connection string. Used only if Sidekiq is introduced later; unused by the low-cost in-process Active Job runtime. | `api` + `worker` runtime |
+| `SOLID_QUEUE_IN_PUMA` | No (legacy) | unset | Deprecated in low-cost production. Puma no longer loads the Solid Queue plugin; remove this Railway variable after deployment. | `api` runtime |
 
 ---
 

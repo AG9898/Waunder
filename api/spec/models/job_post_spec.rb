@@ -51,4 +51,8 @@ RSpec.describe JobPost, type: :model do
     expect(described_class.backlog).to contain_exactly(backlog)
     expect(described_class.removed).to contain_exactly(removed)
   end
+
+  it "defaults removed retention to 30 days" do
+    expect(described_class.removed_retention_days).to eq(30)
+  end
 end

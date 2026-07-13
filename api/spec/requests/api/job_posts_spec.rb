@@ -457,6 +457,7 @@ RSpec.describe "Api job posts", type: :request do
       end.not_to change(JobPost, :count)
 
       expect(job_post.reload.lifecycle_state).to eq("removed")
+      expect(job_post.expires_at).to be_within(2.seconds).of(30.days.from_now)
       # Row persists so posting_url dedup still suppresses repeat alerts.
       expect(JobPost.exists?(posting_url: "https://example.com/job")).to be(true)
       expect(JobPost.active.where(id: job_post.id)).to be_empty
@@ -464,6 +465,7 @@ RSpec.describe "Api job posts", type: :request do
       patch "/api/job_posts/#{job_post.id}/lifecycle", params: { lifecycle_state: "active" }
 
       expect(job_post.reload.lifecycle_state).to eq("active")
+      expect(job_post.expires_at).to be_nil
       expect(JobPostAuditEvent.count).to eq(2)
     end
 

@@ -46,9 +46,14 @@ Rails.application.configure do
   # Replace the default in-process memory cache store with a durable alternative.
   config.cache_store = :solid_cache_store
 
-  # Replace the default in-process and non-durable queuing backend for Active Job.
-  config.active_job.queue_adapter = :solid_queue
-  config.solid_queue.connects_to = { database: { writing: :queue } }
+  # This single-user app favors a bounded in-process queue over multiple
+  # always-resident Solid Queue processes. Jobs are retryable from persisted
+  # domain state, and the adapter exits with Puma when Railway sleeps the API.
+  config.active_job.queue_adapter = ActiveJob::QueueAdapters::AsyncAdapter.new(
+    min_threads: 0,
+    max_threads: ENV.fetch("ACTIVE_JOB_MAX_THREADS", 1).to_i.clamp(1, 4),
+    idletime: 60
+  )
 
   # Ignore bad email addresses and do not raise email delivery errors.
   # Set this to true and configure the email server for immediate delivery to raise delivery errors.

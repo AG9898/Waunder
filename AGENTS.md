@@ -12,7 +12,7 @@ Waunder is a mobile-first, single-user personal job-application assistant: it fi
 scores relevant job openings, notifies the user, drafts tailored application materials,
 tracks contacts, and performs trusted application submission only after explicit per-application
 approval. It is a monorepo of three services deployed on Railway — `api/` (Rails 8.1 API,
-the single source of truth for all data, LLM orchestration, jobs, and worker dispatch),
+the single source of truth for all data, LLM orchestration, bounded in-process jobs, and worker dispatch),
 `web/` (a Go + go-app WebAssembly PWA shell plus a small server that reverse-proxies `/api/*`
 and the Resend inbound webhook path to Rails — no business logic), and `workers/` (a Node +
 Playwright worker that executes only pre-approved structured submit tasks). Agents implement
@@ -75,7 +75,7 @@ web/           Go + go-app WebAssembly PWA (frontend) + small Go server
   Dockerfile      Two-target (WASM + native server) build for Railway
 api/           Rails 8.1 API-only app (single source of truth)
   app/controllers/api/  Client-facing JSON endpoints (under /api)
-  app/jobs/             solid_queue background jobs
+  app/jobs/             Active Job background work (bounded async in production)
   config/routes.rb      Route definitions
   spec/                 RSpec test suite
 workers/       Node + TypeScript + Playwright automation worker
@@ -145,7 +145,8 @@ Full topology, component responsibilities, data flow, and deployment targets: [`
 ### Patterns
 
 - API endpoints live under the `/api` namespace in `api/config/routes.rb` and controllers in `app/controllers/api/`.
-- Background work goes through solid_queue jobs in `app/jobs/`, not inline in controllers.
+- Background work goes through Active Job classes in `app/jobs/`, not inline in controllers;
+  production uses a bounded in-process async adapter for low idle memory.
 - Worker tasks flow through `src/safety.ts` gating before any form interaction; per-ATS logic lives in `src/ats/`.
 
 Full convention guide: [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md)
@@ -238,7 +239,8 @@ Names agents commonly need (no values here): `API_INTERNAL_URL` (Rails base URL 
 proxy), `PORT` (web server port, default 8000), `OPENROUTER_*` (LLM gateway + `OPENROUTER_MODEL`),
 VAPID keys (web push), Active Record Encryption keys, auth secrets (`APP_SHARED_SECRET`,
 `SESSION_SECRET`, `WORKER_SERVICE_TOKEN`), `RESEND_WEBHOOK_SECRET` (inbound email), `DATABASE_URL`,
-and a conditional `REDIS_URL` (only if Redis/Sidekiq is ever introduced — see OPEN-01).
+`ACTIVE_JOB_MAX_THREADS` (low-cost queue concurrency), and a conditional `REDIS_URL` (only if a
+resident durable queue is introduced — see OPEN-01).
 
 See [`docs/ENV_VARS.md`](docs/ENV_VARS.md) for the canonical variable and secret matrix.
 
@@ -955,3 +957,11 @@ processed; for idle production cost control, leave `API_INTERNAL_URL` unset on `
 API URL before testing auto-submit). Rails still drains background jobs inside the `api` process via
 `SOLID_QUEUE_IN_PUMA`, but `api/config/queue.yml` now defaults to one job thread and 5-second
 dispatcher/worker polling instead of a 3-thread worker polling Postgres every 0.1s.
+
+### 2026-07-13 — Low-cost intake uses one in-process job thread
+Railway metrics showed the resident Solid Queue supervisor/dispatcher/worker stack made the Rails
+API average roughly 0.79 GB, while the Go shell used about 20 MB. Production now uses one bounded
+in-process Active Job thread and a persistent intake toggle: paused Resend events are held without
+body retrieval/parsing/LLM work, and resume requeues them; in-flight async work is intentionally
+retryable rather than durable. Explicitly removed JobPosts use `expires_at` for a 30-day purge
+deadline, but maintenance never purges backlog rows or any post with an Application.

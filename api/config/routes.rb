@@ -9,6 +9,7 @@ Rails.application.routes.draw do
   namespace :api do
     get "health", to: "health#show"
     resource :session, only: %i[create destroy]
+    resource :intake, only: %i[show update], controller: "intake"
 
     # Single-user structured profile and resume ingest. The portfolio export
     # pipeline pushes its JSON Resume + PDF to POST /api/profile/resume.

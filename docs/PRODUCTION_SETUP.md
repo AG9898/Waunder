@@ -26,7 +26,7 @@ Production runs in one Railway project with these services:
 | Service | Role |
 |---|---|
 | `web` | Public Go/go-app PWA server and proxy |
-| `api` | Private Rails API, jobs, LLM orchestration, webhook handling |
+| `api` | Private single-Puma Rails API, bounded async jobs, LLM orchestration, webhook handling |
 | `worker` | Private Playwright worker for approved submit tasks |
 | `Postgres` | Managed PostgreSQL backing Rails data, jobs, cache, and cable |
 
@@ -55,6 +55,7 @@ Required production env is documented in [`ENV_VARS.md`](ENV_VARS.md). Key place
 | `APP_SHARED_SECRET`, `SESSION_SECRET` | `api` |
 | `WORKER_SERVICE_TOKEN` | `api` and `worker` |
 | `API_INTERNAL_URL` | `web`; `worker` only when trusted-submit automation should run (unset worker idles/exits) |
+| `ACTIVE_JOB_MAX_THREADS` | `api` (optional; default 1) |
 
 Do not print Railway variable values into logs or chat. Use `railway variable list --kv`
 only when output is redirected to a temp file, and delete that file immediately after use.
@@ -88,6 +89,13 @@ text/html separately via `ResendInboundClient` (`GET /emails/receiving/{email_id
 is ever created. Forwarded alerts (manual or Gmail-filter) are matched by the original sender found
 in the forwarded `From:` line; anything the deterministic parsers can't handle falls back to LLM
 extraction (`InboundEmailLlmExtractor`), and every resulting JobPost is enqueued for scoring.
+
+**Pause/resume:** the ingestion landing calls authenticated `GET/PATCH /api/intake`. Pausing does
+not disable the Resend endpoint: signed events still return 200 and persist metadata with
+`intake_state=held`, but no body retrieval, parsing, or scoring runs. Resume queues held references.
+This keeps the rest of the app online and avoids webhook retries. Production should not set
+`SOLID_QUEUE_IN_PUMA`; Active Job runs with one bounded thread inside Puma, and Railway Serverless
+should be enabled for `api` and `web` so idle deployments can sleep.
 
 ---
 

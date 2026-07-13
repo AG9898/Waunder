@@ -42,7 +42,10 @@ Phase 1 delivers the full plan scenario: forward a job-alert email → Resend in
   spreadsheet-style tracker listing every job post with a link back to each posting. A stats
   cluster in the header shows totals (total count for now).
 - **Intake management** (INTAKE): inbound volume exceeds what one owner can apply to, so the Jobs
-  pages let the owner shed and organize intake. Each job carries a `lifecycle_state` — **active**
+  landing includes a persistent **Pause intake / Resume intake** control. While paused, verified
+  Resend events are acknowledged and retained as lightweight references, but Waunder does not
+  fetch bodies, parse postings, or spend LLM budget; resume queues the held references. The Jobs
+  pages also let the owner shed and organize intake. Each job carries a `lifecycle_state` — **active**
   (default, in the working feed), **backlog** (parked "maybe later", kept and restorable), or
   **removed** (soft-deleted: hidden everywhere but retained so repeat alerts stay deduped, with a
   Removed bin for restore). The owner moves jobs between bins from the job row/detail, including a
@@ -52,7 +55,8 @@ Phase 1 delivers the full plan scenario: forward a job-alert email → Resend in
   from the bottom up) with a highest-score-first sort toggle. The ingestion-batches landing also
   pages at 30. To keep intake tractable, deterministic triage auto-parks rejected postings in
   backlog and caps the daily active set to the top 30 eligible by triage rank; a scheduled sweep
-  auto-backlogs active postings unactioned after 120 days.
+  auto-backlogs active postings unactioned after 120 days. Explicitly `removed` postings remain
+  restorable for 30 days, then are hard-purged only when no Application exists.
 - **Trusted submit** to Greenhouse, Lever, and Ashby. LinkedIn Easy Apply is treated as higher-risk and gated behind an explicit feature flag. Submit only proceeds with explicit owner approval, a supported target, no unknown/sensitive fields, and an auditable status result.
 - **LinkedIn contact and outreach**: save contact candidates linked to jobs, track why each is relevant, and generate tailored outreach drafts from a loose template. Drafts are presented prefilled for manual sending — never auto-sent.
 - **Web push digest** via the VAPID-keyed Web Push API delivered to the installed PWA's service worker (the daily digest).
@@ -63,7 +67,7 @@ Phase 1 delivers the full plan scenario: forward a job-alert email → Resend in
 
 - Richer manual-entry and job-management UX beyond the lightweight Phase 1 fallback.
 - Broader ATS platform support beyond Greenhouse/Lever/Ashby.
-- Redis/Sidekiq for background jobs if needs outgrow Rails' built-in `solid_queue`.
+- A resident durable queue (Solid Queue or Redis/Sidekiq) if volume/delivery needs outgrow the bounded low-cost runtime.
 
 ### Out of Scope
 
@@ -78,6 +82,7 @@ Phase 1 delivers the full plan scenario: forward a job-alert email → Resend in
 ## Success Criteria
 
 - A forwarded job-alert email reliably becomes a normalized job record; eligible postings are scored automatically within the daily triage budget, and filtered/deferred postings remain available for manual score requests.
+- The owner can pause intake without taking the app offline, see held-alert count, and resume held processing later.
 - The daily push digest is delivered to the installed PWA via Web Push (VAPID).
 - The owner can review a scored job and a generated application draft, and must approve before any submit occurs.
 - The owner can see tracked applications in the PWA, manually change pipeline status/stage, and

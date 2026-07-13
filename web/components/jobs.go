@@ -2,6 +2,7 @@ package components
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"strconv"
 	"time"
@@ -1396,10 +1397,14 @@ type DigestView struct {
 	// Client is the Rails client; tests inject a mock.
 	Client RailsClient
 
-	state   loadState
-	batches []IngestionBatch
-	page    PageMeta
-	err     string
+	state         loadState
+	batches       []IngestionBatch
+	page          PageMeta
+	err           string
+	intake        IntakeStatus
+	intakeBusy    bool
+	intakeErr     string
+	intakeMessage string
 	// pageNum is the current 1-based page; Prev/Next advance it without losing
 	// the open-batch target.
 	pageNum int
@@ -1442,14 +1447,104 @@ func (v *DigestView) load(ctx app.Context) {
 	reqCtx := ctx.Context
 	page := v.pageNum
 	ctx.Async(func() {
+		intake, intakeErr := v.Client.Intake(reqCtx)
 		res, err := v.Client.IngestionBatches(reqCtx, page)
 		ctx.Dispatch(func(ctx app.Context) {
+			if intakeErr != nil {
+				err = intakeErr
+			}
 			applyResult(ctx, &v.state, &v.err, err, func() {
+				v.intake = intake
 				v.batches = res.Batches
 				v.page = res.Page
 			})
 		})
 	})
+}
+
+func (v *DigestView) toggleIntake(ctx app.Context, _ app.Event) {
+	if v.intakeBusy {
+		return
+	}
+	v.intakeBusy = true
+	v.intakeErr = ""
+	v.intakeMessage = ""
+	target := !v.intake.Enabled
+	reqCtx := ctx.Context
+	ctx.Update()
+	ctx.Async(func() {
+		status, err := v.Client.SetIntake(reqCtx, target)
+		ctx.Dispatch(func(ctx app.Context) {
+			v.applyIntakeResult(status, err)
+			ctx.Update()
+		})
+	})
+}
+
+// doSetIntake and applyIntakeResult keep the explicit owner action testable
+// without a browser context; rendering never changes intake on its own.
+func (v *DigestView) doSetIntake(ctx context.Context, enabled bool) {
+	v.intakeBusy = true
+	status, err := v.Client.SetIntake(ctx, enabled)
+	v.applyIntakeResult(status, err)
+}
+
+func (v *DigestView) applyIntakeResult(status IntakeStatus, err error) {
+	v.intakeBusy = false
+	if err != nil {
+		v.intakeErr = "Could not update intake. Please try again."
+		v.intakeMessage = ""
+		return
+	}
+	v.intake = status
+	v.intakeErr = ""
+	if status.Enabled {
+		if status.QueuedCount > 0 {
+			v.intakeMessage = fmt.Sprintf("Intake resumed. Processing %d held alerts.", status.QueuedCount)
+		} else {
+			v.intakeMessage = "Intake resumed."
+		}
+	} else {
+		v.intakeMessage = "Intake paused. New alerts will be held for later."
+	}
+}
+
+func (v *DigestView) renderIntakeControl() app.UI {
+	statusClass := "intake-status intake-status--paused"
+	statusText := "Paused"
+	buttonText := "Resume intake"
+	if v.intake.Enabled {
+		statusClass = "intake-status intake-status--on"
+		statusText = "Running"
+		buttonText = "Pause intake"
+	}
+	if v.intakeBusy {
+		buttonText = "Updating…"
+	}
+
+	return app.Section().Class("intake-control").Body(
+		app.Div().Class("intake-control-heading").Body(
+			app.Div().Body(
+				app.H2().Text("Job alert intake"),
+				app.P().Class("intake-control-note").Text("Pause new parsing and scoring while keeping saved jobs available."),
+			),
+			app.Span().Class(statusClass).Text(statusText),
+		),
+		app.If(v.intake.HeldCount > 0, func() app.UI {
+			return app.P().Class("intake-held-count").Text(fmt.Sprintf("%d alerts held for later.", v.intake.HeldCount))
+		}),
+		app.Button().
+			Class("intake-toggle").
+			Disabled(v.intakeBusy).
+			OnClick(v.toggleIntake).
+			Text(buttonText),
+		app.If(v.intakeErr != "", func() app.UI {
+			return app.P().Class("intake-error").Text(v.intakeErr)
+		}),
+		app.If(v.intakeMessage != "", func() app.UI {
+			return app.P().Class("intake-message").Text(v.intakeMessage)
+		}),
+	)
 }
 
 func (v *DigestView) prevPage(ctx app.Context, _ app.Event) {
@@ -1510,7 +1605,12 @@ func (v *DigestView) Render() app.UI {
 	return app.Div().Class("digest").Body(
 		renderAppTabs("digest"),
 		app.H1().Text("Recent ingestions"),
-		renderLoad(v.state, v.err, func() app.UI { return v.renderBatches() }),
+		renderLoad(v.state, v.err, func() app.UI {
+			return app.Div().Class("digest-content").Body(
+				v.renderIntakeControl(),
+				v.renderBatches(),
+			)
+		}),
 	)
 }
 

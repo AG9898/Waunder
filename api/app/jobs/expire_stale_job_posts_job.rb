@@ -1,5 +1,5 @@
-# Recurring background job that keeps the active job-post feed fresh by
-# auto-backlogging stale, unactioned posts.
+# Maintenance job that keeps the job-post store bounded by auto-backlogging
+# stale, unactioned posts and purging explicitly removed posts after retention.
 #
 # A post is auto-backlogged when ALL of these hold:
 #   - lifecycle_state is still "active" (never touch backlog/removed rows)
@@ -39,7 +39,13 @@ class ExpireStaleJobPostsJob < ApplicationJob
       expired += 1
     end
 
-    Rails.logger.info("ExpireStaleJobPostsJob complete expired=#{expired} cutoff=#{cutoff.iso8601}")
+    scheduled_for_purge = schedule_untracked_removed_posts!
+    purged = purge_expired_removed_posts!
+
+    Rails.logger.info(
+      "ExpireStaleJobPostsJob complete expired=#{expired} " \
+        "scheduled_for_purge=#{scheduled_for_purge} purged=#{purged} cutoff=#{cutoff.iso8601}"
+    )
   end
 
   private
@@ -52,5 +58,31 @@ class ExpireStaleJobPostsJob < ApplicationJob
       .where(created_at: ..cutoff)
       .where.not(id: Application.select(:job_post_id))
       .where.not(id: JobPostAuditEvent.where(event_type: "lifecycle_changed").select(:job_post_id))
+  end
+
+  # Existing removed rows predate the retention policy and have no expires_at.
+  # Give them a full retention window from the first low-cost maintenance run.
+  def schedule_untracked_removed_posts!
+    JobPost
+      .removed
+      .where(expires_at: nil)
+      .where.not(id: Application.select(:job_post_id))
+      .update_all(
+        expires_at: JobPost.removed_retention_days.days.from_now,
+        updated_at: Time.current
+      )
+  end
+
+  def purge_expired_removed_posts!
+    count = 0
+    JobPost
+      .removed
+      .where(expires_at: ..Time.current)
+      .where.not(id: Application.select(:job_post_id))
+      .find_each do |job_post|
+        job_post.destroy!
+        count += 1
+      end
+    count
   end
 end

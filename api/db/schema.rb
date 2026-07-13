@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_23_140000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_13_170000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -139,14 +139,26 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_23_140000) do
     t.datetime "created_at", null: false
     t.string "event_id", null: false
     t.string "event_type", null: false
+    t.string "intake_state", default: "queued", null: false
     t.string "provider", default: "resend", null: false
     t.string "provider_email_id"
     t.jsonb "raw_payload", null: false
     t.datetime "updated_at", null: false
     t.index ["event_type"], name: "index_inbound_emails_on_event_type"
+    t.index ["intake_state"], name: "index_inbound_emails_on_intake_state"
     t.index ["provider", "event_id"], name: "index_inbound_emails_on_provider_and_event_id", unique: true
     t.index ["provider_email_id"], name: "index_inbound_emails_on_provider_email_id"
+    t.check_constraint "intake_state::text = ANY (ARRAY['queued'::character varying, 'held'::character varying, 'processing'::character varying, 'processed'::character varying, 'failed'::character varying]::text[])", name: "inbound_emails_intake_state_values"
     t.check_constraint "jsonb_typeof(raw_payload) = 'object'::text", name: "inbound_emails_raw_payload_json_object"
+  end
+
+  create_table "intake_controls", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.boolean "enabled", default: true, null: false
+    t.datetime "last_maintenance_at"
+    t.datetime "paused_at"
+    t.datetime "resumed_at"
+    t.datetime "updated_at", null: false
   end
 
   create_table "job_post_audit_events", force: :cascade do |t|

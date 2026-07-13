@@ -77,6 +77,43 @@ func TestClientUnauthorizedMapsToAPIError(t *testing.T) {
 	}
 }
 
+func TestClientIntakeReadsAndUpdatesState(t *testing.T) {
+	var patchEnabled bool
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/intake", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodPatch {
+			var body struct {
+				Intake struct {
+					Enabled bool `json:"enabled"`
+				} `json:"intake"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatalf("decode intake body: %v", err)
+			}
+			patchEnabled = body.Intake.Enabled
+			_, _ = w.Write([]byte(`{"intake":{"enabled":false,"held_count":3}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"intake":{"enabled":true,"held_count":0}}`))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	c := &httpRailsClient{http: srv.Client(), base: srv.URL}
+
+	status, err := c.Intake(context.Background())
+	if err != nil || !status.Enabled {
+		t.Fatalf("Intake = %+v, %v", status, err)
+	}
+	status, err = c.SetIntake(context.Background(), false)
+	if err != nil {
+		t.Fatalf("SetIntake: %v", err)
+	}
+	if patchEnabled || status.Enabled || status.HeldCount != 3 {
+		t.Fatalf("unexpected updated intake: sent=%v response=%+v", patchEnabled, status)
+	}
+}
+
 func TestClientJobsBuildsFilterQueryAndDecodesPage(t *testing.T) {
 	var gotQuery url.Values
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

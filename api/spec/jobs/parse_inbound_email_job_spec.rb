@@ -7,6 +7,17 @@ RSpec.describe ParseInboundEmailJob, type: :job do
     clear_enqueued_jobs
   end
 
+  it "leaves an email held when intake is paused" do
+    IntakeControl.current.pause!
+    email = inbound_email(data: {
+      "from" => "jobs@linkedin.com",
+      "text" => "Senior Engineer\nAcme · Remote\nhttps://www.linkedin.com/jobs/view/3812345678/"
+    })
+
+    expect { described_class.perform_now(email) }.not_to change(JobPost, :count)
+    expect(email.reload.intake_state).to eq("held")
+  end
+
   def inbound_email(data:, parse_result: nil)
     payload = { "type" => "email.received", "data" => data }
     payload["parse_result"] = parse_result if parse_result
@@ -32,6 +43,7 @@ RSpec.describe ParseInboundEmailJob, type: :job do
       .to change(JobPost, :count).by(1)
       .and have_enqueued_job(ScoreJobPostJob)
     expect(email.reload.raw_payload.dig("parse_result", "needs_llm_fallback")).to be(false)
+    expect(email.intake_state).to eq("processed")
     expect(JobPost.last.triage_status).to eq("eligible")
     expect(JobPost.last.triage_reasons).to include("location_vancouver_priority")
   end

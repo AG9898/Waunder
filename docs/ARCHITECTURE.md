@@ -21,8 +21,8 @@ backs the Rails app, including its database-backed jobs, cache, and cable.
 ## System Topology
 
 Three Railway services in one project, plus Railway managed PostgreSQL. Services
-communicate over Railway's private network (no public internet hop). Redis is introduced
-only if Sidekiq later replaces solid_queue.
+communicate over Railway's private network (no public internet hop). Redis or a resident durable
+queue is introduced only if the bounded low-cost Active Job runtime is outgrown.
 
 - **web** (Railway — Go 1.26 + go-app v10 WebAssembly PWA + small native Go HTTP server;
   Go module `github.com/ag9898/waunder/web`): serves the compiled `app.wasm`, go-app's
@@ -33,8 +33,8 @@ only if Sidekiq later replaces solid_queue.
   server binary). Listens on `$PORT` (default `8000`).
 - **api** (Railway — Rails 8.1.3 API-only, Ruby 3.2.3, Puma): owns all data, LLM
   orchestration via OpenRouter, notification dispatch, Resend inbound webhook handling,
-  background jobs, and worker dispatch. Jobs run on `solid_queue`, cache on `solid_cache`,
-  cable on `solid_cable` — all database-backed, so no Redis is required initially.
+  background jobs, and worker dispatch. Jobs run on one in-Puma async thread; cache uses
+  `solid_cache` and cable uses `solid_cable`, so no Redis is required initially.
   Client-facing endpoints live under `/api` and include health, session, profile/resume,
   manual job entry, application submit, and worker task handoff/status APIs. Rails also
   exposes the `/up` boot check and the Resend webhook endpoint. It has **no public domain**
@@ -139,9 +139,8 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   separate axis (INTAKE-01): `PATCH /api/job_posts/:id/lifecycle` (body `{lifecycle_state:
   active|backlog|removed}`) parks a job in the backlog or soft-removes it, writing a
   `JobPostAuditEvent` (`event_type: "lifecycle_changed"`, `metadata: {from, to}`); a no-op
-  transition writes nothing; `removed` is a soft-delete (the row is retained so `JobPostMaterializer`'s
-  `posting_url` dedup keeps suppressing repeat alerts) hidden from every feed/table but restorable
-  from the Removed bin. `lifecycle_state` is orthogonal to `scoring_status`/`triage_status`
+  transition writes nothing; `removed` is a retained/restorable state for 30 days, then maintenance
+  may hard-purge it only when no Application exists. `lifecycle_state` is orthogonal to `scoring_status`/`triage_status`
   (scoring-pipeline + auto-gate) and to `Application#pipeline_status` (the post-apply tracker). A
   bulk variant `PATCH /api/job_posts/lifecycle` (body `{ids: [...], lifecycle_state}`) moves many
   at once. An unknown id returns
@@ -216,7 +215,7 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   outreach drafts, resume/profile storage, push subscriptions, and audit events.
 - Orchestrates LLM calls through OpenRouter (structured JSON for scoring, summaries, drafts).
 - Handles the Resend inbound webhook (`/webhooks/resend/inbound`, Svix-signature-validated),
-  notification dispatch (web push), background jobs (`solid_queue`), and worker dispatch.
+  notification dispatch (web push), bounded in-process Active Job execution, and worker dispatch.
 - Encrypts sensitive resume/profile fields with Active Record Encryption — never plaintext.
 - Owns the database schema; all changes go through Rails migrations.
 
@@ -230,7 +229,8 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 ### database (Railway managed PostgreSQL)
 - Single source of truth for all application state.
 - Schema is managed exclusively through Rails migrations — never `ALTER TABLE` directly.
-- Also backs `solid_queue` (jobs), `solid_cache` (cache), and `solid_cable` (cable).
+- Also backs `solid_cache` (cache) and `solid_cable` (cable). Solid Queue tables remain available
+  for a future durable/high-volume mode, but production does not run its resident processes.
 
 ---
 
@@ -250,8 +250,11 @@ The full topology and the rationale for the `/api` proxy routing decision live i
    public `web` service domain; `web` forwards that exact path to Rails over the private
    `API_INTERNAL_URL` proxy. The Svix signature (`svix-id`/`svix-timestamp`/`svix-signature`)
    is validated against `RESEND_WEBHOOK_SECRET`.
-3. Rails stores the webhook event (metadata only — the `email.received` payload carries no body)
-   and enqueues `ParseInboundEmailJob`, which first **hydrates the body** by fetching text/html
+3. Rails stores the webhook event (metadata only — the `email.received` payload carries no body).
+   `IntakeControl` is checked after signature verification: when paused the row is marked `held`,
+   acknowledged with HTTP 200, and no body fetch/parser/LLM work occurs. `GET/PATCH /api/intake`
+   exposes the authenticated control and held count; resume queues held references. When enabled,
+   Rails enqueues `ParseInboundEmailJob`, which first **hydrates the body** by fetching text/html
    from Resend's receiving API (`ResendInboundClient` → `GET /emails/receiving/{email_id}`, using
    `RESEND_API_KEY`), then: parse alert (deterministic known-sender parsers, forward-aware via the
    in-body `From:` header) → if no postings, LLM fallback extraction (`InboundEmailLlmExtractor`)
@@ -264,20 +267,18 @@ The full topology and the rationale for the `/api` proxy routing decision live i
    triage-rejected posts are auto-parked in `backlog` (kept, not surfaced in the Active feed), and
    only the top `JOB_INTAKE_DAILY_ACTIVE_LIMIT` eligible posts per day (default 30, by triage rank)
    stay `active` — the remainder auto-backlog. The owner works the Active feed; the Backlog bin
-   holds everything triage set aside. A scheduled sweep (`ExpireStaleJobPostsJob`, scheduled in
-   `config/recurring.yml` `every day at 4am`) auto-backlogs `active` posts older than
+   holds everything triage set aside. A maintenance sweep (`ExpireStaleJobPostsJob`, scheduled at
+   most once daily when the authenticated intake status is read) auto-backlogs `active` posts older than
    `JOB_INTAKE_STALE_AFTER_DAYS` (default 120) that the owner never actioned — "actioned" meaning
    the post has an `Application` or a `lifecycle_changed` `JobPostAuditEvent` (the audit row the
    API writes when the owner moves a post; inbound auto-backlogging writes no such row, so it never
    counts as owner action). Each transition writes a `lifecycle_changed` audit event with
    `metadata: {from: "active", to: "backlog", reason: "stale_sweep", stale_after_days}`. The job
    only reads `active` rows and excludes anything already moved, so it is idempotent and safe to
-   re-run; it never touches `backlog`/`removed` rows.
-4. A daily web-push digest is sent to subscribed PWA installs. `DailyDigestJob` (scheduled
-   via `config/recurring.yml`, `every day at 8am`) builds the payload from recently scored
-   JobPosts with `DailyDigestBuilder` and dispatches it with `WebPushDispatcher`, which signs
-   each message with the VAPID keys. Live sends are guarded behind VAPID key presence: with no
-   key or no stored subscriptions the dispatcher no-ops, so the recurring job is always safe.
+   re-run. It also assigns a 30-day `expires_at` when the owner moves a post to `removed`, then
+   hard-purges expired removed rows only when no Application exists; backlog rows are never purged.
+4. `DailyDigestJob` remains available for explicit execution, but low-cost production does not
+   keep a resident recurring scheduler. The on-screen ingestion history remains the primary view.
 
 **Manual job/link entry**:
 1. The authenticated owner posts a URL and/or pasted posting text to `POST /api/job_posts`
@@ -350,13 +351,13 @@ status-report endpoints — it does not use the human session. See RESOLVED-14 i
 
 | Service | Purpose | Required / Optional |
 |---|---|---|
-| Railway managed PostgreSQL | Primary datastore; also backs solid_queue/solid_cache/solid_cable | Required |
+| Railway managed PostgreSQL | Primary datastore; also backs solid_cache/solid_cable and retains dormant Solid Queue tables | Required |
 | Resend | Inbound email for forwarded job alerts (`email.received` → `POST /webhooks/resend/inbound`, Svix-signature-validated) — the first ingestion path. Inbound-only; the app sends no email (RESOLVED-13). | Required for email ingestion |
 | OpenRouter | LLM gateway for scoring, summaries, and drafts (structured JSON); model configurable by env | Required for scoring/drafting features |
 | Web Push (VAPID) | Push notifications via the go-app service worker (iOS 16.4+, PWA installed to home screen) | Required for the push digest |
 | Portfolio project (`My_Portfolio`) | External source of truth for the resume; pushes its JSON Resume + exported PDF/markdown to `POST /api/profile/resume` (push-on-export). Waunder never reaches back into it. | Optional — provides the resume; manual upload is the fallback |
 | Active Storage (local disk service) | Stores the resume PDF blob attached to `ResumeDocument`. On Railway the local disk is ephemeral, but the portfolio re-pushes the PDF on every export, so it self-heals (RESOLVED-18). | Required to hold the worker-uploadable resume file |
-| Redis / Sidekiq | Background-job backend only if needs outgrow solid_queue | Optional — not used initially; database-backed solid_queue is the default |
+| Resident durable queue (Solid Queue or Redis/Sidekiq) | Optional replacement if bounded in-process jobs no longer meet delivery/volume needs | Optional — not active in low-cost production |
 
 ---
 
@@ -371,6 +372,12 @@ There is **no staging environment** — only Production (Railway) and Local dev.
 | Local dev | `localhost:8000` (Go server, `make run`) | local Rails (`bin/rails s`, e.g. `:3000`) | local Node worker (`npm run dev`) | local/Docker Postgres |
 
 See [`ENV_VARS.md`](ENV_VARS.md) for the canonical variable and secret matrix per environment.
+
+Production uses one bounded `ActiveJob::QueueAdapters::AsyncAdapter` thread inside Puma rather
+than Solid Queue supervisor/dispatcher/worker processes. This materially reduces idle memory and
+lets Railway Serverless sleep the API. The accepted single-user tradeoff is that in-flight jobs
+are not durable across a process restart; persisted records remain retryable, and stale intake
+`processing` rows are returned to `held` on resume.
 
 ---
 

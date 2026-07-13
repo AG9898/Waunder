@@ -1,5 +1,11 @@
 class JobPost < ApplicationRecord
   LIFECYCLE_STATES = %w[active backlog removed].freeze
+  DEFAULT_REMOVED_RETENTION_DAYS = 30
+
+  def self.removed_retention_days
+    value = Integer(ENV.fetch("REMOVED_JOB_RETENTION_DAYS", DEFAULT_REMOVED_RETENTION_DAYS), exception: false)
+    value&.positive? ? value : DEFAULT_REMOVED_RETENTION_DAYS
+  end
 
   belongs_to :company
   has_one :application_route, dependent: :destroy

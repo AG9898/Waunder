@@ -19,6 +19,14 @@ type mockClient struct {
 	loginErr  error
 	loginPass string
 
+	intake           IntakeStatus
+	intakeConfigured bool
+	intakeErr        error
+	intakeCalls      int
+	setIntakeErr     error
+	setIntakeCalls   int
+	gotIntakeEnabled bool
+
 	jobs      []JobSummary
 	jobsPage  PageMeta
 	jobsErr   error
@@ -117,6 +125,28 @@ type mockClient struct {
 func (m *mockClient) Login(_ context.Context, passphrase string) error {
 	m.loginPass = passphrase
 	return m.loginErr
+}
+
+func (m *mockClient) Intake(context.Context) (IntakeStatus, error) {
+	m.intakeCalls++
+	if m.intakeErr != nil {
+		return IntakeStatus{}, m.intakeErr
+	}
+	if !m.intakeConfigured {
+		return IntakeStatus{Enabled: true}, nil
+	}
+	return m.intake, nil
+}
+
+func (m *mockClient) SetIntake(_ context.Context, enabled bool) (IntakeStatus, error) {
+	m.setIntakeCalls++
+	m.gotIntakeEnabled = enabled
+	if m.setIntakeErr != nil {
+		return IntakeStatus{}, m.setIntakeErr
+	}
+	m.intake.Enabled = enabled
+	m.intakeConfigured = true
+	return m.intake, nil
 }
 
 func (m *mockClient) Jobs(_ context.Context, params JobFeedParams) (JobPage, error) {
@@ -1190,6 +1220,51 @@ func TestDigestRendersBatches(t *testing.T) {
 		if !strings.Contains(html, want) {
 			t.Errorf("batch HTML missing posting %q\n%s", want, html)
 		}
+	}
+}
+
+func TestDigestRendersPausedIntakeWithoutChangingItOnMount(t *testing.T) {
+	m := &mockClient{
+		intakeConfigured: true,
+		intake:           IntakeStatus{Enabled: false, HeldCount: 4},
+	}
+	c := &DigestView{Client: m}
+	html := renderHTML(t, c)
+
+	for _, want := range []string{"Job alert intake", "Paused", "Resume intake", "4 alerts held for later"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("paused intake HTML missing %q\n%s", want, html)
+		}
+	}
+	if m.setIntakeCalls != 0 {
+		t.Fatalf("render changed intake %d times; want 0", m.setIntakeCalls)
+	}
+}
+
+func TestDigestDoSetIntakeResumesHeldAlerts(t *testing.T) {
+	m := &mockClient{
+		intakeConfigured: true,
+		intake:           IntakeStatus{Enabled: false, HeldCount: 2, QueuedCount: 2},
+	}
+	c := &DigestView{Client: m, intake: m.intake}
+
+	c.doSetIntake(context.Background(), true)
+
+	if !c.intake.Enabled || !m.gotIntakeEnabled || m.setIntakeCalls != 1 {
+		t.Fatalf("resume state client=%+v component=%+v calls=%d", m.intake, c.intake, m.setIntakeCalls)
+	}
+	if !strings.Contains(c.intakeMessage, "Processing 2 held alerts") {
+		t.Fatalf("unexpected resume message %q", c.intakeMessage)
+	}
+}
+
+func TestDigestDoSetIntakeReportsError(t *testing.T) {
+	c := &DigestView{Client: &mockClient{setIntakeErr: errors.New("boom")}}
+
+	c.doSetIntake(context.Background(), false)
+
+	if c.intakeErr == "" || c.intakeBusy {
+		t.Fatalf("expected settled intake error, busy=%v err=%q", c.intakeBusy, c.intakeErr)
 	}
 }
 

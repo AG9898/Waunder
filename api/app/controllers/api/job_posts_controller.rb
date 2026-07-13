@@ -96,8 +96,8 @@ module Api
 
     # PATCH /api/job_posts/:id/lifecycle
     # Transition a single JobPost between active/backlog/removed. "removed" is a
-    # soft-delete: the row persists so JobPostMaterializer's posting_url dedup
-    # keeps suppressing repeat alerts. Restorable by setting state back to active.
+    # soft-delete: the row remains restorable for the configured retention
+    # window, then the maintenance sweep may purge it when no Application exists.
     def lifecycle
       target = lifecycle_target
       return render_invalid_lifecycle unless target
@@ -143,10 +143,17 @@ module Api
       previous = job_post.lifecycle_state
       return if previous == target
 
-      job_post.update!(lifecycle_state: target)
+      job_post.update!(
+        lifecycle_state: target,
+        expires_at: target == "removed" ? JobPost.removed_retention_days.days.from_now : nil
+      )
       job_post.audit_events.create!(
         event_type: "lifecycle_changed",
-        metadata: { "from" => previous, "to" => target }
+        metadata: {
+          "from" => previous,
+          "to" => target,
+          "purge_after" => job_post.expires_at&.iso8601
+        }.compact
       )
     end
 

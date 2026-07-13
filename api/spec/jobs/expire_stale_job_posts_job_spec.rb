@@ -37,13 +37,32 @@ RSpec.describe ExpireStaleJobPostsJob, type: :job do
       expect(fresh.audit_events).to be_empty
     end
 
-    it "never touches backlog or removed rows" do
+    it "never backlogs backlog or removed rows" do
       backlogged = job_post(created_at: 200.days.ago, lifecycle_state: "backlog")
       removed = job_post(created_at: 200.days.ago, lifecycle_state: "removed")
 
       described_class.new.perform
 
       expect(backlogged.reload.lifecycle_state).to eq("backlog")
+      expect(removed.reload.lifecycle_state).to eq("removed")
+      expect(removed.expires_at).to be_within(2.seconds).of(30.days.from_now)
+    end
+
+    it "purges an explicitly removed post after its retention deadline" do
+      removed = job_post(created_at: 40.days.ago, lifecycle_state: "removed")
+      removed.update!(expires_at: 1.minute.ago)
+
+      expect { described_class.new.perform }.to change(JobPost, :count).by(-1)
+      expect { removed.reload }.to raise_error(ActiveRecord::RecordNotFound)
+    end
+
+    it "never purges a removed post that has an Application" do
+      removed = job_post(created_at: 40.days.ago, lifecycle_state: "removed")
+      removed.update!(expires_at: 1.minute.ago)
+      Application.create!(job_post: removed)
+
+      described_class.new.perform
+
       expect(removed.reload.lifecycle_state).to eq("removed")
     end
 
