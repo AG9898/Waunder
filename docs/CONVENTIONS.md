@@ -159,6 +159,11 @@ dispatch.
    not use broad query stripping, page scraping, or an LLM for duplicate decisions. Exact identity
    matches reuse the existing JobPost and append a URL alias/audit event; normalized company/title
    matches are only possible-match hints.
+- `ManualJobPostImporter` performs URL-identity lookup and alias writes in one transaction. Its
+  result has one of `new`, `already_tracked`, or `already_submitted`: only a new record proceeds to
+  route resolution and `ScoreJobPostJob`; an exact match writes a `manual_import_matched`
+  `JobPostAuditEvent` and never re-scores. Pass a supplied external application URL to
+  `ApplicationRouteResolver` as its preferred candidate, but do not fetch or scrape it.
 - **Already submitted** is defined by `Application.status == "submitted"`, which is written after
   a successful worker report. `pipeline_status == "applied"` and non-terminal automation states
   must not be used as a submission duplicate signal.

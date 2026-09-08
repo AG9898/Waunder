@@ -197,14 +197,16 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   exposes **no send action**: outreach is prefilled for manual sending only, upholding the
   never-auto-send-LinkedIn-outreach rule. (Outreach drafts are generated on demand; there is no
   list-drafts read endpoint.)
-- The manual job entry screen (WEB-06) writes a new posting with
-  `POST /api/job_posts` (MANUAL-01): the client sends a `job_post` object carrying `url` and/or
-  `text` plus optional `title`/`company` hints, and Rails returns the created post
-  (`{job_post: {id, title, company, posting_url, source, scoring_status, route}}`, HTTP 201) or
-  the standard `{error: {code: "invalid_input", ...}}` shape (HTTP 422). The post is created only
-  on an explicit form submit — never on mount/render — and the client does no validation beyond a
-  "URL or text present" hint (Rails owns normalization, the HTTP(S)-URL check, route resolution,
-  and scoring). On success the screen links to `/jobs/:id` so the new post can be followed into the
+- The manual job entry screen (WEB-06) writes a posting with `POST /api/job_posts`
+  (MANUAL-01/MANUAL-02): the client sends a `job_post` object carrying a listing `url` and/or
+  `text`, optional `application_url`, and optional `title`/`company` hints. Rails returns
+  `{job_post: {...}, import: {status, application_status}}`: a no-match is `status: "new"`
+  (HTTP 201) and is route-resolved/scored, while an exact URL identity is `"already_tracked"` or
+  `"already_submitted"` (HTTP 200) with no duplicate score job. The optional external URL is the
+  preferred route candidate for a new post. The post is created only on an explicit form submit -
+  never on mount/render - and the client does no validation beyond a "URL or text present" hint
+  (Rails owns normalization, the HTTP(S)-URL check, identity matching, route resolution, and
+  scoring). On success the screen links to `/jobs/:id` so the new post can be followed into the
   feed once Rails finishes scoring it (`scoring_status` starts `pending`).
 - Holds **no business logic** — it never reads the database, never calls the LLM, never scores
   or resolves routes (it only renders fields Rails owns), and stores no secrets beyond the
@@ -299,9 +301,10 @@ The full topology and the rationale for the `/api` proxy routing decision live i
    the lowest JobPost id for historical collisions and records the discarded aliases on the other
    preserved JobPost as a `url_identity_collision_resolved` audit event. This flow never fetches
    or scrapes a job-board page to discover an external apply link.
-3. Rails checks supplied stable identities against the stored identity set in the same
+3. Rails locks and checks supplied stable identities against the stored identity set in the same
    transaction as the import. An exact match reuses the existing `JobPost`, attaches any novel
-   URL alias, and records an import audit event rather than creating a duplicate row. It returns
+   URL alias, and records a `manual_import_matched` audit event rather than creating a duplicate
+   row or score job. Its response has `import: {status, application_status}`; it returns
    `already_submitted` only when a matching `Application.status` is `submitted`; draft, approved,
    paused, and failed applications return `already_tracked` with their status. Company/title
    similarities are non-authoritative possible matches.

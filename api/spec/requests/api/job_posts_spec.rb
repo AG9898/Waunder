@@ -34,13 +34,14 @@ RSpec.describe "Api job posts", type: :request do
   end
 
   describe "POST /api/job_posts" do
-    it "creates a normalized manual JobPost, resolves its route, and enqueues scoring" do
+    it "creates a normalized manual JobPost, resolves its external application route, and enqueues scoring" do
       sign_in!
 
       expect do
         post "/api/job_posts", params: {
           job_post: {
             url: "https://jobs.lever.co/acme/abc-123",
+            application_url: "https://boards.greenhouse.io/acme/jobs/456",
             text: "Senior Platform Engineer\nBuild Rails APIs.",
             company: "Acme"
           }
@@ -57,9 +58,67 @@ RSpec.describe "Api job posts", type: :request do
       expect(body.dig("job_post", "title")).to eq("Senior Platform Engineer")
       expect(body.dig("job_post", "company")).to eq("Acme")
       expect(body.dig("job_post", "source")).to eq("manual")
-      expect(body.dig("job_post", "route", "route_type")).to eq("lever")
+      expect(body.dig("job_post", "route", "route_type")).to eq("greenhouse")
+      expect(body.fetch("import")).to eq("status" => "new", "application_status" => nil)
       expect(post.description).to include("Build Rails APIs.")
       expect(post.scoring_status).to eq("pending")
+    end
+
+    it "reuses an exact identity without enqueueing duplicate scoring" do
+      sign_in!
+      company = Company.create!(name: "Acme")
+      job_post = JobPost.create!(company: company, title: "Platform Engineer", source: "manual")
+      JobPostUrlIdentity.create!(
+        job_post: job_post,
+        role: "posting",
+        original_url: "https://www.linkedin.com/jobs/view/123",
+        identity_key: "linkedin:123"
+      )
+      application = Application.create!(job_post: job_post, status: "failed")
+      job_post_count = JobPost.count
+
+      expect do
+        post "/api/job_posts", params: {
+          job_post: {
+            url: "https://www.linkedin.com/comm/jobs/view/123?trk=alert",
+            application_url: "https://jobs.lever.co/acme/platform-engineer"
+          }
+        }
+      end.to change(JobPostAuditEvent, :count).by(1)
+
+      expect(JobPost.count).to eq(job_post_count)
+      expect(response).to have_http_status(:ok)
+      expect(JSON.parse(response.body)).to include(
+        "import" => {
+          "status" => "already_tracked",
+          "application_status" => application.status
+        }
+      )
+      expect(job_post.url_identities.where(role: "application").pluck(:original_url)).to eq(
+        [ "https://jobs.lever.co/acme/platform-engineer" ]
+      )
+      expect(enqueued_jobs).to be_empty
+    end
+
+    it "reports already_submitted for an exact identity with a submitted application" do
+      sign_in!
+      company = Company.create!(name: "Acme")
+      job_post = JobPost.create!(company: company, title: "Platform Engineer", source: "manual")
+      JobPostUrlIdentity.create!(
+        job_post: job_post,
+        role: "posting",
+        original_url: "https://www.linkedin.com/jobs/view/123",
+        identity_key: "linkedin:123"
+      )
+      Application.create!(job_post: job_post, status: "submitted")
+
+      post "/api/job_posts", params: {
+        job_post: { url: "https://www.linkedin.com/comm/jobs/view/123?trk=alert" }
+      }
+
+      expect(response).to have_http_status(:ok)
+      expect(JSON.parse(response.body).dig("import", "status")).to eq("already_submitted")
+      expect(enqueued_jobs).to be_empty
     end
 
     it "requires authentication" do
@@ -99,6 +158,23 @@ RSpec.describe "Api job posts", type: :request do
 
       expect(response).to have_http_status(:unprocessable_content)
       expect(JSON.parse(response.body).dig("error", "code")).to eq("invalid_input")
+      expect(enqueued_jobs).to be_empty
+    end
+
+    it "rejects an invalid optional application URL" do
+      sign_in!
+
+      post "/api/job_posts", params: {
+        job_post: {
+          text: "Platform Engineer",
+          application_url: "ftp://jobs.example.com/apply"
+        }
+      }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(JSON.parse(response.body).dig("error", "message")).to eq(
+        "Application URL must be an HTTP or HTTPS URL"
+      )
       expect(enqueued_jobs).to be_empty
     end
   end

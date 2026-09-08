@@ -82,6 +82,17 @@ RSpec.describe ApplicationRouteResolver do
       expect(resolution.application_url).to eq("https://boards.greenhouse.io/acme/jobs/1")
     end
 
+    it "prefers a supplied external application URL over the job-board listing" do
+      resolution = described_class.new(
+        job_post_with(posting_url: "https://www.linkedin.com/jobs/view/1"),
+        application_url: "https://boards.greenhouse.io/acme/jobs/1"
+      ).resolve
+
+      expect(resolution.route_type).to eq("greenhouse")
+      expect(resolution.recommended_route).to eq("direct_ats")
+      expect(resolution.application_url).to eq("https://boards.greenhouse.io/acme/jobs/1")
+    end
+
     it "falls back to a job-board source_url when the posting_url host is unknown" do
       resolution = described_class.new(
         job_post_with(

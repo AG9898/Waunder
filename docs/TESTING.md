@@ -59,8 +59,10 @@ Be honest about the current state — most of the suite is still to be written.
   `PATCH /api/applications/:id/status`, covering tracker list/update behavior and
   automation-vs-pipeline status separation.
 - **api/** — `spec/requests/api/job_posts_spec.rb`: request specs for authenticated manual
-  `POST /api/job_posts`, covering deterministic JobPost creation, route resolution, scoring-job
-  enqueueing, unauthenticated refusal, and invalid-input JSON errors; plus the read endpoints
+  `POST /api/job_posts`, covering deterministic JobPost creation, optional external-application
+  route resolution, exact-match `new`/`already_tracked`/`already_submitted` response shapes,
+  alias/audit persistence, no duplicate scoring, unauthenticated refusal, and invalid-input JSON
+  errors; plus the read endpoints
   `GET /api/job_posts` (scored feed ranked by match score, auth gating),
   `GET /api/job_posts?status=unscored` (filtered/deferred feed with triage metadata), and
   `GET /api/job_posts/:id` (scored detail, resolved route, current tracker state, auth gating),
@@ -112,6 +114,9 @@ Be honest about the current state — most of the suite is still to be written.
 - **api/** — `spec/services/job_post_url_identity_backfill_spec.rb`: historical URL-alias backfill
    coverage for source/posting/application URLs, blank-value skipping, rerun idempotency, and
    deterministic collision ownership with retained JobPost audit records.
+- **api/** — `spec/services/manual_job_post_importer_spec.rb`: transactional manual import coverage
+  for exact identity reuse, source/posting/application alias persistence, import audit events,
+  submitted-vs-tracked result selection, and optional application-URL validation.
 - **api/** — `spec/services/openrouter_client_spec.rb`: OpenRouter client specs covering missing/blank
   API-key typed error, env model default/override, structured-JSON parsing, parse fallback for
   prose/code-fence-wrapped JSON, retry on 429/5xx then exhaustion, and PII-safe logging — all against
@@ -288,7 +293,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `api/spec/requests/api/auth_spec.rb` | API (Rails) | shared-secret session success/failure, protected endpoint gating, health bypass, worker bearer guard |
 | `api/spec/requests/api/intake_spec.rb` | API (Rails) | authenticated intake status, pause/resume, held-reference requeue, once-daily maintenance scheduling, and invalid-state rejection |
 | `api/spec/requests/api/applications_spec.rb` | API (Rails) | `POST /api/applications/:id/submit` approved clean-payload dispatch, audit event recording, approval-required/unsupported/unsafe refusal paths, and 401 auth gating with no enqueue on refusal; `GET /api/applications/:id` draft + job context + worker-shaped autofill preview, read-only (no audit/enqueue), not-found JSON shape, and auth gating; `PATCH /api/applications/:id/draft` reviewed autofill-answer persistence, safety warnings, malformed edit rejection, draft-required rejection, and auth |
-| `api/spec/requests/api/job_posts_spec.rb` | API (Rails) | `POST /api/job_posts` authenticated manual URL/text ingestion, route resolution, scoring enqueue, 401 auth gating, and invalid-input JSON error shape; `GET /api/job_posts` scored+active oldest-first default feed with the `{number,size,total,has_next}` page envelope + auth; `GET /api/job_posts` `sort=score` ranking, `state=backlog`/active-default exclusion of backlog+removed, AND-combined `score_band`/`source`/`location`/`date_from`/`date_to` filters, and `JOBS_PAGE_SIZE`-driven pagination; `GET /api/job_posts?status=unscored` filtered/deferred feed with triage metadata; `POST /api/job_posts/:id/score` explicit scoring enqueue/manual override; `GET /api/job_posts/:id` scored detail with resolved route, not-found JSON shape, and auth |
+| `api/spec/requests/api/job_posts_spec.rb` | API (Rails) | `POST /api/job_posts` manual URL/text import with optional external application URL, typed new/tracked/submitted response, exact-identity alias/audit reuse without duplicate scoring, auth, and invalid-input errors; `GET /api/job_posts` scored+active oldest-first default feed with the `{number,size,total,has_next}` page envelope + auth; `GET /api/job_posts` `sort=score` ranking, `state=backlog`/active-default exclusion of backlog+removed, AND-combined `score_band`/`source`/`location`/`date_from`/`date_to` filters, and `JOBS_PAGE_SIZE`-driven pagination; `GET /api/job_posts?status=unscored` filtered/deferred feed with triage metadata; `POST /api/job_posts/:id/score` explicit scoring enqueue/manual override; `GET /api/job_posts/:id` scored detail with resolved route, not-found JSON shape, and auth |
 | `api/spec/services/job_post_triage_spec.rb` | API (Rails) | deterministic inbound title/location triage for developer/software/AI-adjacent roles, Vancouver/Calgary/remote prioritization, rejection reasons, remote-status inference, and env-driven daily budget parsing |
 | `api/spec/requests/api/digest_spec.rb` | API (Rails) | `GET /api/digest` latest digest of recently scored JobPosts (no scoring/LLM on read), empty-jobs case, and 401 auth gating |
 | `api/spec/requests/api/ingestion_batches_spec.rb` | API (Rails) | `GET /api/ingestion_batches` ingestion history grouped into source+arrival-time batches newest-first (no scoring/LLM on read), empty case, and 401 auth gating |
@@ -303,6 +308,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `api/spec/services/application_route_resolver_spec.rb` | API (Rails) | Deterministic ATS route-type detection from URL fixtures, recommended-route preference ranking, confidence, unknown→manual LLM fallback, and ApplicationRoute persistence/idempotency |
 | `api/spec/services/job_url_identity_spec.rb` | API (Rails) | Pure host-aware URL identity keys: LinkedIn job-id canonicalization, tracking-parameter removal, generic/ATS job-component retention, invalid-input safety, and no HTTP/LLM construction |
 | `api/spec/services/job_post_url_identity_backfill_spec.rb` | API (Rails) | Historical URL alias backfill, blank URL skipping, rerun idempotency, deterministic collision ownership, and preserved duplicate audit records |
+| `api/spec/services/manual_job_post_importer_spec.rb` | API (Rails) | Manual import exact-identity lookup, novel alias/audit persistence, new/tracked/submitted result typing, and application-URL validation |
 | `api/spec/services/openrouter_client_spec.rb` | API (Rails) | OpenRouter client: missing-key typed error, env model default/override, structured-JSON parse, prose/code-fence parse fallback, retry/exhaustion, and PII-safe logging via injected fake transport (no live calls) |
 | `api/spec/jobs/score_job_post_job_spec.rb` | API (Rails) | JobScorer/ScoreJobPostJob: scoring-field population from mocked LLM JSON, match_score clamping, string-list coercion, fallback-posting scoring, graceful skip with no API key, failed-on-error, PII-safe logging (mocked client) |
 | `api/spec/jobs/generate_application_draft_job_spec.rb` | API (Rails) | ApplicationDraftGenerator/GenerateApplicationDraftJob: draft generation from mocked LLM JSON, ATS-shaped autofill payload keyed to the resolved route (manual fallback for unknown), Profile data merged into autofill answers, malformed-answer dropping, graceful skip with no API key, failed-on-error, PII-safe logging (mocked client) |

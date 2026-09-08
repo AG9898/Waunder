@@ -997,3 +997,8 @@ fragment component so an ATS's job-defining parameters cannot be over-normalized
 different JobPost id, rather than a globally unique key, so source/posting/application aliases on
 one JobPost can share a stable identity. The DATA-06 backfill chooses the lowest id for historical
 cross-post collisions and records each discarded loser alias in `JobPostAuditEvent`.
+
+### 2026-09-08 — Manual imports match aliases before scoring
+`ManualJobPostImporter` locks `JobPostUrlIdentity` rows and writes aliases in the same transaction,
+so exact URL imports reuse the existing JobPost and never enqueue duplicate scoring. A supplied
+`application_url` is an alias plus the preferred deterministic route candidate only; it is never fetched or scraped.

@@ -55,7 +55,10 @@ Phase 1 delivers the full plan scenario: forward a job-alert email → Resend in
   status is `submitted` is shown as **Already submitted**; another application state is shown as
   **Already tracked** with its current status. Company/title similarity is only a non-blocking
   possible match, so a reposted role is never falsely called submitted. A match records newly
-  supplied URL aliases against the existing job rather than creating a duplicate JobPost.
+  supplied URL aliases against the existing job rather than creating a duplicate JobPost. The
+  import result is typed as `new`, `already_tracked`, or `already_submitted`; it includes the
+  matching automation status when an Application exists, and exact-match imports never queue
+  duplicate scoring.
 - **Intake management** (INTAKE): inbound volume exceeds what one owner can apply to, so the Jobs
   landing includes a persistent **Pause intake / Resume intake** control. While paused, verified
   Resend events are acknowledged and retained as lightweight references, but Waunder does not

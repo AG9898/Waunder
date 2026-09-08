@@ -59,8 +59,13 @@ module Api
       end
 
       job_post = result.job_post
-      resolution = ApplicationRouteResolver.new(job_post).call
-      ScoreJobPostJob.perform_later(job_post)
+      resolution = if result.new?
+        ApplicationRouteResolver.new(job_post, application_url: result.application_url).call.tap do
+          ScoreJobPostJob.perform_later(job_post)
+        end
+      else
+        job_post.application_route
+      end
 
       render json: {
         job_post: {
@@ -71,12 +76,16 @@ module Api
           source: job_post.source,
           scoring_status: job_post.scoring_status,
           route: {
-            route_type: resolution.route_type,
-            recommended_route: resolution.recommended_route,
-            application_url: resolution.application_url
+            route_type: resolution&.route_type,
+            recommended_route: resolution&.recommended_route,
+            application_url: resolution&.application_url
           }
+        },
+        import: {
+          status: result.status,
+          application_status: result.application&.status
         }
-      }, status: :created
+      }, status: result.new? ? :created : :ok
     end
 
     def score
@@ -265,7 +274,7 @@ module Api
 
     def job_post_params
       source = params[:job_post].presence || params
-      source.permit(:url, :posting_url, :text, :pasted_text, :description, :title, :company)
+      source.permit(:url, :posting_url, :application_url, :text, :pasted_text, :description, :title, :company)
     end
 
     # Compact feed row. Only client-safe fields; no sensitive PII is stored on

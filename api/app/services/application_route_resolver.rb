@@ -57,8 +57,9 @@ class ApplicationRouteResolver
     def needs_llm_fallback? = needs_llm_fallback
   end
 
-  def initialize(job_post)
+  def initialize(job_post, application_url: nil)
     @job_post = job_post
+    @application_url = application_url
   end
 
   # Resolve and persist the ApplicationRoute for the job post, returning the
@@ -101,10 +102,13 @@ class ApplicationRouteResolver
 
   attr_reader :job_post
 
-  # URLs to inspect, in the order they should win ties. The posting URL is the
-  # most authoritative application target; source_url is the alert/board link.
+  # URLs to inspect, in the order they should win ties. A supplied external
+  # application URL is more authoritative than the job-board posting/source.
   def candidate_urls
-    [ job_post.posting_url, job_post.source_url ].map { |u| u&.strip.presence }.compact.uniq
+    [ @application_url, job_post.posting_url, job_post.source_url ]
+      .map { |url| url&.strip.presence }
+      .compact
+      .uniq
   end
 
   def detect(urls)

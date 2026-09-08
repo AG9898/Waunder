@@ -1662,7 +1662,7 @@
       "id": "MANUAL-02",
       "title": "Make manual job imports submission-aware",
       "description": "Extend the authenticated manual JobPost import endpoint to accept an optional external application URL, atomically compare supplied stable identities, and return a typed result for new, already-tracked, or already-submitted records. Exact matches reuse the existing JobPost, attach a new alias and import audit event, and never enqueue duplicate scoring; only Application.status `submitted` yields already-submitted. Company/title candidates remain optional non-authoritative hints. Do not add page scraping or automatic submission.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "MANUAL",
       "depends_on": [
