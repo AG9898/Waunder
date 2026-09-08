@@ -29,6 +29,7 @@ func (c *AppChrome) OnMount(ctx app.Context) {
 	}
 	c.layout = normalizeLayout(saved)
 	c.applyLayout()
+	ctx.Update()
 }
 
 func (c *AppChrome) applyLayout() {

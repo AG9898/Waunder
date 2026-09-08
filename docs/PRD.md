@@ -33,6 +33,12 @@ Phase 1 delivers the full plan scenario: forward a job-alert email → Resend in
 - **Deterministic inbound triage before LLM scoring**: bulk email-ingested jobs are title/location gated before OpenRouter. Target roles include developer, software engineer, AI/ML engineer, platform/infrastructure/devops, and adjacent data roles; Vancouver is highest location priority, then Calgary, then remote. Unknown or broad Canada/BC/Alberta locations are allowed at lower priority because some alert templates omit city detail. Filtered/deferred jobs stay visible in the PWA and can be explicitly scored by the owner.
 - **LLM scoring and summaries** via OpenRouter (structured JSON where supported): job summary, match score, relevant requirements, missing/weak requirements, resume alignment notes, suggested application strategy, and red flags. Automatic inbound scoring is capped by `JOB_TRIAGE_AUTO_SCORE_DAILY_LIMIT`; manual job entries and explicit score requests bypass the cap.
 - **Application assistance**: tailored resume emphasis notes, cover letter / message drafts where relevant, structured application answers, and reviewable/editable autofill payloads for known form systems.
+- **Desktop and mobile workflows**: the same website/PWA automatically selects its layout by
+  viewport width, with a saved per-browser Auto/Desktop/Mobile override. Desktop supports wider
+  job review and manual application work; mobile supports quick intake review with bottom
+  navigation. Manual applications lead with an external application link and an explicit
+  mark-as-applied action. Draft generation is optional, materials can be copied, and trusted
+  submission remains separately gated by explicit approval.
 - **Application tracking**: every job can be tracked through a user-facing pipeline status and
   optional stage independent of the worker automation status. The owner can mark jobs as
   interested, drafting, applied/waiting, interviewing, offer, rejected, withdrawn, archived, or

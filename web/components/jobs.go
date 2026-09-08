@@ -243,24 +243,28 @@ func (j *JobList) Render() app.UI {
 	return app.Div().Class("job-list").Body(
 		renderAppTabs("jobs"),
 		app.H1().Text("Jobs"),
-		j.renderViewSelector(),
-		j.renderBinTabs(),
-		j.renderFilters(),
-		renderLoad(j.state, j.err, func() app.UI {
-			if len(j.jobs) == 0 {
-				return app.P().Class("job-list-empty").Text(j.emptyText())
-			}
-			return app.Div().Class("job-list-results").Body(
-				j.renderBulkActions(),
-				app.Ul().Class("job-list-items").Body(
-					app.Range(j.jobs).Slice(func(i int) app.UI {
-						job := j.jobs[i]
-						return j.renderJobRow(job)
-					}),
-				),
-				j.renderPagination(),
-			)
-		}),
+		app.Div().Class("job-feed-workspace").Body(
+			app.Div().Class("job-feed-controls").Body(
+				j.renderViewSelector(),
+				j.renderBinTabs(),
+				j.renderFilters(),
+			),
+			renderLoad(j.state, j.err, func() app.UI {
+				if len(j.jobs) == 0 {
+					return app.P().Class("job-list-empty").Text(j.emptyText())
+				}
+				return app.Div().Class("job-list-results").Body(
+					j.renderBulkActions(),
+					app.Ul().Class("job-list-items").Body(
+						app.Range(j.jobs).Slice(func(i int) app.UI {
+							job := j.jobs[i]
+							return j.renderJobRow(job)
+						}),
+					),
+					j.renderPagination(),
+				)
+			}),
+		),
 	)
 }
 
@@ -1162,29 +1166,82 @@ func (d *JobDetailView) Render() app.UI {
 					Class("job-score").
 					Class("job-score--"+MatchScoreBand(job.MatchScore, job.ScoringStatus)).
 					Text("Match: "+MatchScoreLabel(job.MatchScore, job.ScoringStatus)),
-				app.If(job.Summary != "", func() app.UI {
-					return app.P().Class("job-summary").Text(job.Summary)
-				}),
-				requirementList("Relevant requirements", "job-relevant", job.RelevantRequirements),
-				requirementList("Missing requirements", "job-missing", job.MissingRequirements),
-				requirementList("Red flags", "job-red-flags", job.RedFlags),
-				app.If(job.ResumeAlignment != "", func() app.UI {
-					return app.P().Class("job-alignment").Text(job.ResumeAlignment)
-				}),
-				app.If(job.ApplicationStrategy != "", func() app.UI {
-					return app.P().Class("job-strategy").Text(job.ApplicationStrategy)
-				}),
-				renderRoute(job.Route),
-				d.renderPipelineStatus(job.Application),
-				d.renderLifecycle(job.LifecycleState),
-				d.renderApply(),
-				app.A().
-					Class("job-contacts-link").
-					Href("/jobs/"+strconv.Itoa(job.ID)+"/contacts").
-					Text("View contacts and outreach"),
+				app.Div().Class("job-workspace").Body(
+					app.Aside().Class("job-workspace-actions").Aria("label", "Application workspace").Body(
+						d.renderManualActions(),
+						d.renderPipelineStatus(job.Application),
+						app.Details().Class("job-optional-actions").Body(
+							app.Summary().Text("Drafts & outreach"),
+							d.renderApply(),
+							app.A().Class("job-contacts-link").Href("/jobs/"+strconv.Itoa(job.ID)+"/contacts").Text("View contacts and outreach"),
+						),
+						d.renderLifecycle(job.LifecycleState),
+					),
+					app.Div().Class("job-assessment").Body(
+						app.H2().Text("Job assessment"),
+						app.If(job.Summary != "", func() app.UI {
+							return app.P().Class("job-summary").Text(job.Summary)
+						}).Else(func() app.UI {
+							return app.P().Class("job-summary").Text("No assessment yet. You can still review the original posting and apply manually.")
+						}),
+						requirementList("Relevant requirements", "job-relevant", job.RelevantRequirements),
+						requirementList("Missing requirements", "job-missing", job.MissingRequirements),
+						requirementList("Red flags", "job-red-flags", job.RedFlags),
+						app.If(job.ResumeAlignment != "", func() app.UI {
+							return app.Div().Class("job-alignment").Body(app.H2().Text("Resume alignment"), app.P().Text(job.ResumeAlignment))
+						}),
+						app.If(job.ApplicationStrategy != "", func() app.UI {
+							return app.Div().Class("job-strategy").Body(app.H2().Text("Application approach"), app.P().Text(job.ApplicationStrategy))
+						}),
+					),
+				),
 			)
 		}),
 	)
+}
+
+func (d *JobDetailView) renderManualActions() app.UI {
+	route := d.job.Route
+	route.ApplicationURL = externalApplicationURL(route.ApplicationURL, d.job.PostingURL)
+	return app.Section().Class("manual-application").Body(
+		renderRoute(route),
+		app.If(d.job.Application != nil, func() app.UI {
+			return app.P().Class("manual-tracker-current").Attr("role", "status").Text(PipelineStatusLabel(d.job.Application.PipelineStatus, d.job.Application.PipelineStage))
+		}),
+		app.If(route.ApplicationURL == "", func() app.UI {
+			return app.P().Class("manual-application-note").Text("No application link is available. Use the original alert to find the posting.")
+		}).Else(func() app.UI {
+			return app.P().Class("manual-application-note").Text("Apply on the employer or job-board site in a new tab. When finished, record it here.")
+		}),
+		app.If(canMarkApplied(d.job.Application), func() app.UI {
+			label := "Mark as applied"
+			if d.statusSaving {
+				label = "Saving…"
+			}
+			return app.Button().Class("job-mark-applied").Disabled(d.statusSaving).OnClick(d.markApplied).Text(label)
+		}),
+		app.If(d.statusErr != "", func() app.UI {
+			return app.P().Class("manual-status-error").Attr("role", "alert").Text(d.statusErr)
+		}),
+	)
+}
+
+func externalApplicationURL(candidates ...string) string {
+	for _, candidate := range candidates {
+		u, err := url.Parse(candidate)
+		if err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != "" {
+			return candidate
+		}
+	}
+	return ""
+}
+
+func canMarkApplied(application *ApplicationTracker) bool {
+	return application == nil || application.PipelineStatus == "interested" || application.PipelineStatus == "drafting" || application.PipelineStatus == "needs_review"
+}
+
+func (d *JobDetailView) markApplied(ctx app.Context, _ app.Event) {
+	d.saveJobPipelineStatus(ctx, ApplicationStatusUpdate{PipelineStatus: "applied", PipelineStage: "waiting"})
 }
 
 func (d *JobDetailView) renderPipelineStatus(application *ApplicationTracker) app.UI {
@@ -1196,10 +1253,14 @@ func (d *JobDetailView) renderPipelineStatus(application *ApplicationTracker) ap
 	}
 	return app.Div().Class("job-pipeline-status").Body(
 		app.H2().Text("Application status"),
+		app.If(application != nil, func() app.UI {
+			return app.P().Class("job-tracker-current").Attr("role", "status").Text(PipelineStatusLabel(status, stage))
+		}),
 		app.Label().Class("pipeline-select-label").Body(
 			app.Span().Text("Status"),
 			app.Select().
 				Class("pipeline-status-select").
+				Disabled(d.statusSaving).
 				OnChange(d.jobStatusSetter(stage)).
 				Body(pipelineStatusOptions(status)...),
 		),
@@ -1207,6 +1268,7 @@ func (d *JobDetailView) renderPipelineStatus(application *ApplicationTracker) ap
 			app.Span().Text("Stage"),
 			app.Select().
 				Class("pipeline-stage-select").
+				Disabled(d.statusSaving).
 				OnChange(d.jobStageSetter(status)).
 				Body(pipelineStageOptions(stage)...),
 		),
@@ -1226,11 +1288,12 @@ func (d *JobDetailView) jobStatusSetter(_ string) app.EventHandler {
 	}
 }
 
-func (d *JobDetailView) jobStageSetter(status string) app.EventHandler {
+func (d *JobDetailView) jobStageSetter(_ string) app.EventHandler {
 	return func(ctx app.Context, _ app.Event) {
-		next := ctx.JSSrc().Get("value").String()
-		if status == "" {
-			status = "interested"
+		next := pipelineStageValue(ctx.JSSrc().Get("value").String())
+		status := "interested"
+		if d.job.Application != nil && d.job.Application.PipelineStatus != "" {
+			status = d.job.Application.PipelineStatus
 		}
 		d.saveJobPipelineStatus(ctx, ApplicationStatusUpdate{PipelineStatus: status, PipelineStage: next})
 	}
@@ -1363,7 +1426,7 @@ func (d *JobDetailView) applyLifecycleResult(state string, updated []JobSummary,
 // renderApply shows the explicit "start application" control: it prepares a
 // tailored draft (and, for supported ATS targets, the trusted auto-submit
 // payload) for review before the user approves and submits on the next screen.
-// The button is the only path that starts an application.
+// This optional button requests draft generation; manual tracking uses its own endpoint.
 func (d *JobDetailView) renderApply() app.UI {
 	return app.Div().Class("job-apply").Body(
 		app.Button().
@@ -1372,7 +1435,7 @@ func (d *JobDetailView) renderApply() app.UI {
 			OnClick(d.apply).
 			Text(applyButtonLabel(d.applyState)),
 		app.P().Class("job-apply-note").
-			Text("Generates a tailored draft to review before you approve and submit."),
+			Text("Optional: generate tailored materials to review and use in your application."),
 		app.If(d.applyState == applyError, func() app.UI {
 			return app.P().Class("job-apply-error").Text(d.applyErr)
 		}),
@@ -1383,7 +1446,7 @@ func applyButtonLabel(s applyStatus) string {
 	if s == applyCreating {
 		return "Preparing…"
 	}
-	return "Apply"
+	return "Prepare application draft"
 }
 
 // DigestView renders the ingestion-history landing: recently-ingested postings
@@ -1798,7 +1861,7 @@ func requirementList(heading, class string, items []string) app.UI {
 }
 
 func renderRoute(route JobRoute) app.UI {
-	return app.If(route.RouteType != "" || route.RecommendedRoute != "", func() app.UI {
+	return app.If(route.RouteType != "" || route.RecommendedRoute != "" || route.ApplicationURL != "", func() app.UI {
 		return app.Div().Class("job-route").Body(
 			app.H2().Text("How to apply"),
 			app.P().Class("job-route-type").Text(RouteLabel(route)),
@@ -1807,6 +1870,7 @@ func renderRoute(route JobRoute) app.UI {
 					Class("job-route-link").
 					Href(route.ApplicationURL).
 					Target("_blank").
+					Rel("noopener noreferrer").
 					Text("Open application")
 			}),
 		)

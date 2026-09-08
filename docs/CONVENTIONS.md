@@ -64,6 +64,10 @@ package compiles both to WebAssembly for the browser and to a native server bina
   go-app takes over at that call and the server code never runs; on the server it is a no-op.
 - UI components live in the `components/` package — one type per screen (e.g. `Home`), each
   embedding `app.Compo` and implementing `Render() app.UI`.
+- Event handlers should read mutable component state at event time. go-app compares handler
+  function pointers and may retain a closure across renders; capturing a tracker status when
+  rendering can make a later stage change restore an outdated status. Capture stable IDs and
+  look up the current record in the component instead.
 
 ### Naming Conventions
 

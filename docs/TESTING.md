@@ -235,6 +235,14 @@ Be honest about the current state — most of the suite is still to be written.
 - Push subscription flow tested behind an abstraction, with the browser Notification/Push APIs
   mocked.
 - A PWA smoke check: manifest validity, service-worker registration, and installability.
+- Responsive/manual-workflow browser check: install the existing `workers/` Playwright
+  dependencies and Chromium, then run `cd web && make wasm server`. Start the shell with
+  `env -u API_INTERNAL_URL PORT=8094 ./bin/server`; in another terminal at the repository root,
+  run `node web/scripts/layout-smoke.cjs`. If using a preinstalled Chromium, set
+  `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to its executable. The script mocks all API requests,
+  blocks service workers for deterministic asset updates, and writes screenshots to a temporary
+  directory printed on success. This verifies Chromium at phone/tablet/desktop widths; physical
+  iPhone Safari/Home Screen behavior still benefits from an on-device check.
 
 **Automation (`workers/`):**
 
@@ -292,8 +300,9 @@ Keep this table up to date — add a row when adding a new test file.
 | `workers/src/worker.test.ts` | Worker orchestration | config loading, bearer-auth task fetch/report calls, clean idle without `API_INTERNAL_URL`, one-cycle poll orchestration, and unsupported-ATS safe failure |
 | `workers/src/ats/handlers.test.ts` | Worker ATS handlers | Playwright fixture coverage for Greenhouse/Lever/Ashby registration, approved field fill/submit, unknown required field pauses, and sensitive-field pauses |
 | `web/components/pwa_test.go` | Web (go-app PWA) | iOS/iPadOS detection + version parsing, iOS 16.4+ Web Push threshold, and the install/notification-permission gate decision |
-| `web/components/chrome_test.go` | Web (go-app PWA) | Shared navigation accessibility, layout choices, and invalid-preference fallback |
-| `web/components/jobs_test.go` | Web (go-app PWA) | Job list / detail / ingestion batches, lifecycle/filter/pagination behavior, explicit intake pause/resume state and error paths, held count, and no intake mutation on render via a mocked `RailsClient` |
+| `web/components/chrome_test.go` | Web (go-app PWA) | Shared navigation accessibility, layout choices, invalid-preference fallback, copy-control initial state, and empty-stage handling |
+| `web/scripts/layout-smoke.cjs` | Web (Playwright Chromium) | Eight screens at 320/390/768/960/1440px, layout persistence/resize, overflow, explicit manual tracking success/failure, stage clearing, copy success/blocked feedback, and no application writes on navigation; all API calls use local fixtures |
+| `web/components/jobs_test.go` | Web (go-app PWA) | Job list / detail / ingestion batches, lifecycle/filter/pagination behavior, manual application link fallback and safe URL handling, no regression of later tracking statuses, explicit intake pause/resume state and error paths, held count, and no intake mutation on render via a mocked `RailsClient` |
 | `web/components/applications_test.go` | Web (go-app PWA) | Applications tracker render tests, empty/error/401 states, explicit no-status-update-on-render assertion, direct status-update state tests, and the all-jobs table (lazy load default active bin, bin filter, Prev/Next pagination, header total from the page envelope — INTAKE-09) |
 | `web/components/login_test.go` | Web (go-app PWA) | Login form render and `loginErrorStatus`/`loginButtonText` status mapping (401 → "Incorrect passphrase") |
 | `web/components/client_test.go` | Web (go-app PWA) | `httpRailsClient` against `httptest`: `/api` paths, intake GET/PATCH, Jobs filters/page decode, scoring/tracker/draft payloads, session-cookie carry, and API errors |

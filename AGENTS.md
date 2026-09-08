@@ -977,3 +977,11 @@ then keep the resulting archive outside the repository with owner-only permissio
 root; CSS resolves Auto at 960px, so resizing works without JS listeners. Keep desktop variable
 overrides identical for explicit Desktop and Auto's wide-screen media query, and reserve bottom
 navigation plus safe-area space in mobile screens.
+
+### 2026-09-08 — Manual application controls use tracker endpoints only
+The job-detail quick action writes applied/waiting through the existing application-status
+endpoint; it must never call draft creation or submit. Status updates omit untouched notes and
+follow-up dates to preserve them, and an empty stage uses the `none` select sentinel because
+go-app omits empty option values.
+Stage-change handlers read the current tracker at click time: go-app compares handler function
+pointers and can retain a closure across renders, including its stale captured status.

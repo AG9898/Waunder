@@ -26,3 +26,19 @@ func TestNormalizeLayout(t *testing.T) {
 		}
 	}
 }
+
+func TestCopyButtonDoesNotReportSuccessOnRender(t *testing.T) {
+	html := renderHTML(t, &CopyButton{Text: "Private draft", Label: "Copy answer"})
+	if !strings.Contains(html, "Copy answer") || strings.Contains(html, "Copied.") || strings.Contains(html, "Private draft") {
+		t.Fatal("copy control should expose its action, with no premature success or duplicate draft content")
+	}
+}
+
+func TestPipelineStageEmptyOption(t *testing.T) {
+	if pipelineStageValue("none") != "" || pipelineStageValue("waiting") != "waiting" {
+		t.Fatal("stage option sentinel must round trip to an empty stage")
+	}
+	if PipelineStatusLabel("applied", "") != "Applied" {
+		t.Fatal("an empty stage should not be displayed as a stage")
+	}
+}

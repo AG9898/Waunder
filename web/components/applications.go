@@ -114,15 +114,17 @@ func (v *ApplicationsView) renderHeader() app.UI {
 // renderViewSelector is the segmented control that switches between the tracked
 // applications cards and the all-jobs table.
 func (v *ApplicationsView) renderViewSelector() app.UI {
-	return app.Div().Class("applications-view-selector").Attr("role", "tablist").Body(
+	return app.Div().Class("applications-view-selector").Attr("role", "group").Aria("label", "Application view").Body(
 		app.Button().
 			Class("view-selector-option").
 			Class(viewSelectorClass(v.currentView(), viewApplications)).
+			Aria("pressed", v.currentView() == viewApplications).
 			OnClick(v.showApplications).
 			Text("Applications"),
 		app.Button().
 			Class("view-selector-option").
 			Class(viewSelectorClass(v.currentView(), viewTable)).
+			Aria("pressed", v.currentView() == viewTable).
 			OnClick(v.showTable).
 			Text("All jobs"),
 	)
@@ -398,8 +400,9 @@ func (v *ApplicationsView) renderApplication(application ApplicationTracker) app
 				Text(PipelineStatusLabel(application.PipelineStatus, application.PipelineStage)),
 		),
 		app.Div().Class("application-row-meta").Body(
-			app.Span().Class("application-automation-status").
-				Text("Automation: "+AutomationStatusLabel(application.AutomationStatus)),
+			app.If(application.AutomationStatus != "" && application.AutomationStatus != "draft", func() app.UI {
+				return app.Span().Class("application-automation-status").Text("Automation: " + AutomationStatusLabel(application.AutomationStatus))
+			}),
 			app.If(application.SubmittedAt != "", func() app.UI {
 				return app.Span().Class("application-submitted-at").Text("Submitted")
 			}),
@@ -453,9 +456,18 @@ func (v *ApplicationsView) statusSetter(application ApplicationTracker) app.Even
 
 func (v *ApplicationsView) stageSetter(application ApplicationTracker) app.EventHandler {
 	return func(ctx app.Context, _ app.Event) {
-		next := ctx.JSSrc().Get("value").String()
+		next := pipelineStageValue(ctx.JSSrc().Get("value").String())
+		// go-app may retain this handler across renders. Read the live status,
+		// not the status captured when the row was first rendered.
+		status := application.PipelineStatus
+		for _, current := range v.applications {
+			if current.ApplicationID == application.ApplicationID {
+				status = current.PipelineStatus
+				break
+			}
+		}
 		v.saveStatus(ctx, application.ApplicationID, ApplicationStatusUpdate{
-			PipelineStatus: application.PipelineStatus,
+			PipelineStatus: status,
 			PipelineStage:  next,
 		})
 	}
@@ -553,10 +565,21 @@ func pipelineStageOptions(selected string) []app.UI {
 	return optionNodes(pipelineStageDefs, selected)
 }
 
+func pipelineStageValue(value string) string {
+	if value == "none" {
+		return ""
+	}
+	return value
+}
+
 func optionNodes(defs []optionDef, selected string) []app.UI {
 	nodes := make([]app.UI, 0, len(defs))
 	for _, def := range defs {
-		nodes = append(nodes, app.Option().Value(def.value).Selected(def.value == selected).Text(def.label))
+		value := def.value
+		if value == "" {
+			value = "none"
+		}
+		nodes = append(nodes, app.Option().Value(value).Selected(def.value == selected).Text(def.label))
 	}
 	return nodes
 }
@@ -567,7 +590,7 @@ func PipelineStatusLabel(status, stage string) string {
 		statusLabel = "Interested"
 	}
 	stageLabel := optionLabel(stage, pipelineStageDefs)
-	if stageLabel == "" || status == "interested" || status == "drafting" {
+	if stage == "" || stageLabel == "" || status == "interested" || status == "drafting" {
 		return statusLabel
 	}
 	return statusLabel + " · " + stageLabel

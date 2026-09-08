@@ -1013,10 +1013,44 @@ func TestJobDetailFetchesByID(t *testing.T) {
 	}
 }
 
+func TestManualApplicationLinkFallbackAndSafety(t *testing.T) {
+	for _, tc := range []struct{ route, posting, want string }{
+		{"https://employer.example/apply", "https://board.example/job", "https://employer.example/apply"},
+		{"", "https://board.example/job", "https://board.example/job"},
+		{"javascript:alert(1)", "https://board.example/job", "https://board.example/job"},
+		{"/relative", "", ""},
+	} {
+		if got := externalApplicationURL(tc.route, tc.posting); got != tc.want {
+			t.Errorf("URL = %q, want %q", got, tc.want)
+		}
+	}
+	m := &mockClient{job: JobDetail{ID: 7, PostingURL: "https://board.example/job"}}
+	html := renderHTML(t, &JobDetailView{JobID: 7, Client: m})
+	for _, want := range []string{`href="https://board.example/job"`, `rel="noopener noreferrer"`, "Mark as applied"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+	if m.createAppCalls != 0 || m.submitCalls != 0 || m.updateJobStatusCalls != 0 {
+		t.Fatal("rendering manual actions must not generate, submit, or update an application")
+	}
+}
+
+func TestMarkAppliedDoesNotRegressTrackedApplications(t *testing.T) {
+	if !canMarkApplied(nil) {
+		t.Fatal("an untracked job can be marked applied")
+	}
+	for _, status := range []string{"applied", "interviewing", "offer", "rejected", "withdrawn", "archived"} {
+		if canMarkApplied(&ApplicationTracker{PipelineStatus: status}) {
+			t.Errorf("quick action should not regress %s", status)
+		}
+	}
+}
+
 func TestJobDetailRendersApplyButton(t *testing.T) {
 	c := &JobDetailView{JobID: 7, Client: &mockClient{job: JobDetail{ID: 7, Title: "X", Company: "Y"}}}
 	html := renderHTML(t, c)
-	for _, want := range []string{"job-apply-button", "Apply"} {
+	for _, want := range []string{"job-apply-button", "Prepare application draft", "Mark as applied"} {
 		if !strings.Contains(html, want) {
 			t.Errorf("job detail HTML missing apply control %q\n%s", want, html)
 		}

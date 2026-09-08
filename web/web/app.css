@@ -1966,6 +1966,7 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
 }
 
 .app-chrome { margin-bottom: 28px; }
+html { scroll-padding-bottom: var(--screen-bottom); }
 .app-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .app-brand { margin-right: auto; font-size: 21px; font-weight: 700; color: var(--color-ink); }
 .app-add-job { font-size: var(--text-sm); font-weight: 600; padding: 12px 0; }
@@ -2006,4 +2007,82 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
 /* iOS must not zoom when focusing a form control. */
 @media (pointer: coarse) {
   input, textarea, select { font-size: max(16px, 1em); }
+}
+
+/* Workspaces respond to the selected page width, so forced Mobile on a large
+   monitor stays a single column and forced Desktop on a phone never overflows. */
+:is(.digest, .job-list, .applications, .job-detail, .draft-review, .profile, .manual-entry, .contacts-view) {
+  container-type: inline-size;
+}
+.job-feed-workspace { display: grid; gap: 24px; }
+.job-workspace { display: flex; flex-direction: column; gap: 24px; }
+.job-feed-controls, .job-list-results, .job-assessment, .job-workspace-actions { min-width: 0; }
+.job-workspace-actions { display: contents; }
+.manual-application { order: 0; padding: 20px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
+.job-assessment { order: 1; }
+.job-workspace .job-pipeline-status { order: 2; }
+.job-optional-actions { order: 3; }
+.job-workspace .job-lifecycle { order: 4; }
+.manual-application .job-route { padding-top: 0; border-top: 0; padding-bottom: 0; }
+.manual-application .job-route-link { display: flex; background: var(--color-accent); color: #fff; }
+.manual-application .job-route-link:hover { background: var(--color-accent-strong); }
+.manual-application-note, .draft-manual-intro { color: var(--color-ink-soft); font-size: var(--text-sm); }
+.job-mark-applied, .copy-button {
+  min-height: 44px; padding: 10px 14px; border: 1px solid var(--color-accent); border-radius: var(--radius-md);
+  background: var(--color-surface); color: var(--color-accent-strong); font: inherit; font-weight: 600; cursor: pointer;
+}
+.job-mark-applied { width: 100%; }
+.job-mark-applied:hover, .copy-button:hover { background: var(--color-accent-soft); }
+.job-mark-applied:disabled, .copy-button:disabled { opacity: .6; cursor: wait; }
+.job-mark-applied:focus-visible, .copy-button:focus-visible, .job-route-link:focus-visible {
+  outline: 2px solid var(--color-accent-strong); outline-offset: 3px;
+}
+.job-workspace-actions .job-pipeline-status { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.job-pipeline-status > :is(h2, p) { grid-column: 1 / -1; }
+.job-workspace-actions .pipeline-select-label { min-width: 0; margin: 0; }
+.job-workspace-actions select { width: 100%; min-width: 0; }
+.job-tracker-current { color: var(--color-success-ink); margin: 0; font-weight: 600; }
+.manual-tracker-current { color: var(--color-success-ink); font-weight: 600; }
+.manual-status-error { color: var(--color-danger); font-size: var(--text-sm); }
+.job-optional-actions, .draft-automation { padding: 16px 0; border-top: 1px solid var(--color-border); }
+.job-optional-actions > summary, .draft-automation > summary { cursor: pointer; min-height: 44px; padding: 10px 0; font-weight: 600; }
+.job-optional-actions .job-apply { margin: 0; padding: 12px 0; border: 0; }
+.job-optional-actions .job-contacts-link { margin-top: 0; padding: 10px 0; font-size: var(--text-sm); }
+.job-assessment { padding-top: 20px; }
+.job-alignment p, .job-strategy p { margin: 0; }
+.draft-cover-letter p, .draft-answer-value { white-space: pre-wrap; }
+.copy-control { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
+.copy-status { font-size: var(--text-sm); color: var(--color-ink-soft); }
+.draft-materials > * { min-width: 0; }
+.draft-manual-intro { margin-bottom: 24px; }
+.jobs-table-wrap { max-width: 100%; }
+.job-list-link, .digest-link { min-width: 0; grid-template-columns: minmax(0, 1fr) auto; }
+
+@container (min-width: 800px) {
+  .job-feed-workspace { grid-template-columns: 260px minmax(0, 1fr); align-items: start; gap: 32px; }
+  .job-feed-controls { position: sticky; top: 24px; }
+  .job-feed-controls .job-filters { grid-template-columns: minmax(0, 1fr); }
+  .job-list-items { gap: 20px; }
+  .job-list-link { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) auto; padding: 18px 20px; }
+  .job-list-link .job-title { grid-column: 1; grid-row: 1 / span 2; }
+  .job-list-link .job-company { grid-column: 2; grid-row: 1; }
+  .job-list-link .job-source { grid-column: 2; grid-row: 2; }
+  .job-list-link .job-pills { grid-column: 3; grid-row: 1 / span 2; }
+  .job-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 48px; align-items: start; }
+  .job-assessment { grid-column: 1; grid-row: 1; padding-top: 0; }
+  .job-workspace-actions { display: block; grid-column: 2; grid-row: 1; position: sticky; top: 24px; max-height: calc(100dvh - 48px); overflow-y: auto; padding: 20px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
+  .manual-application { padding: 0; border: 0; background: transparent; }
+  .digest-items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .applications-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .draft-materials { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 40px; align-items: start; }
+  .draft-resume-emphasis { grid-column: 1 / -1; }
+  .profile-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+  .profile-field:has(.profile-summary), .profile-form > :is(button, p) { grid-column: 1 / -1; }
+  .profile-save { justify-self: start; }
+  .contacts-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .manual-entry-form { max-width: 800px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }

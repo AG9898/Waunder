@@ -236,22 +236,34 @@ func (r *DraftReview) Render() app.UI {
 					return app.P().Class("draft-pipeline-status").
 						Text("Application: " + PipelineStatusLabel(d.PipelineStatus, d.PipelineStage))
 				}),
-				app.If(d.ResumeEmphasis != "", func() app.UI {
-					return app.Div().Class("draft-resume-emphasis").Body(
-						app.H2().Text("Resume emphasis"),
-						app.P().Text(d.ResumeEmphasis),
-					)
-				}),
-				app.If(d.CoverLetter != "", func() app.UI {
-					return app.Div().Class("draft-cover-letter").Body(
-						app.H2().Text("Cover letter"),
-						app.P().Text(d.CoverLetter),
-					)
-				}),
-				answerList("Application answers", "draft-answers", d.StructuredAnswers),
-				r.renderAutofill(),
-				renderWorkerReport(d),
-				r.renderSubmit(),
+				app.Div().Class("draft-manual-intro").Body(
+					app.P().Text("Review these materials, then copy them into your application. Update your application status from the job page when finished."),
+					app.If(externalApplicationURL(d.Autofill.ApplyURL) != "", func() app.UI {
+						return app.A().Class("job-route-link").Href(d.Autofill.ApplyURL).Target("_blank").Rel("noopener noreferrer").Text("Open application")
+					}),
+				),
+				app.Div().Class("draft-materials").Body(
+					app.If(d.ResumeEmphasis != "", func() app.UI {
+						return app.Div().Class("draft-resume-emphasis").Body(
+							app.H2().Text("Resume emphasis"),
+							app.P().Text(d.ResumeEmphasis),
+						)
+					}),
+					app.If(d.CoverLetter != "", func() app.UI {
+						return app.Div().Class("draft-cover-letter").Body(
+							app.H2().Text("Cover letter"),
+							app.P().Text(d.CoverLetter),
+							&CopyButton{Text: d.CoverLetter, Label: "Copy cover letter"},
+						)
+					}),
+					answerList("Application answers", "draft-answers", d.StructuredAnswers),
+				),
+				app.Details().Class("draft-automation").Body(
+					app.Summary().Text("Automation & autofill"),
+					r.renderAutofill(),
+					renderWorkerReport(d),
+					r.renderSubmit(),
+				),
 			)
 		}),
 	)
@@ -383,6 +395,7 @@ func answerList(heading, class string, answers []StructuredAnswer) app.UI {
 					return app.Li().Class("draft-answer").Body(
 						app.Span().Class("draft-answer-field").Text(a.Field),
 						app.Span().Class("draft-answer-value").Text(a.Value),
+						&CopyButton{Text: a.Value, Label: "Copy answer"},
 					)
 				}),
 			),

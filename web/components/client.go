@@ -455,8 +455,10 @@ type ApplicationTracker struct {
 type ApplicationStatusUpdate struct {
 	PipelineStatus string `json:"pipeline_status"`
 	PipelineStage  string `json:"pipeline_stage"`
-	PipelineNote   string `json:"pipeline_note"`
-	NextFollowUpOn string `json:"next_follow_up_on"`
+	// These screens edit status/stage only. Omit untouched optional details
+	// so a status change preserves notes and follow-up dates already in Rails.
+	PipelineNote   string `json:"pipeline_note,omitempty"`
+	NextFollowUpOn string `json:"next_follow_up_on,omitempty"`
 }
 
 // StructuredAnswer is one reviewed question/answer pair the worker will fill.

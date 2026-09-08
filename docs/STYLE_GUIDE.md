@@ -121,6 +121,18 @@ figures where possible.
   in a 2-up grid (auto-fit on wide screens). *Planned (stubbed, not yet built): filter/sort
   controls for the all-jobs table on the Applications screen.*
 - Job detail, draft review, profile, and route sections use top hairlines plus spacing.
+- Desktop workspaces use the available width: Jobs has a filter sidebar and compact rows;
+  job detail pairs the assessment with a sticky application panel; ingestion batches, tracked
+  applications, contacts, profile fields, and draft materials use two columns where useful.
+  Container queries at 800px of content width keep these layouts tied to the selected layout,
+  including forced Mobile on a wide monitor and narrow windows in Desktop mode.
+- Manual application is the primary job-detail flow: open the resolved application link in a
+  new tab (fall back to the original posting), then explicitly mark applied/waiting. On mobile,
+  the primary actions precede the assessment and secondary tracking/organization follows it.
+  Draft generation and outreach live in an expandable section; draft-review materials have
+  copy controls with success/blocked feedback, and automation controls are collapsed initially.
+  Existing notes/follow-up dates survive status-only edits; clearing a stage uses a real select
+  sentinel mapped back to an empty API value (Rails still defaults Applied to Waiting).
 - Primary actions use sage filled buttons; secondary actions use outline/surface buttons.
 - Inputs and textareas use warm surface fill, strong hairline border, 12px radius, and a
   visible sage focus ring.
@@ -147,8 +159,8 @@ figures where possible.
   match-score pill, but tinted success-soft/sunken rather than sage, so "resume parsed" and
   "notifications on" read as calm status facts rather than another action button.
 
-If a new screen is added, extend the same system: one centered column, a compact title,
-hairline sections, one primary action where possible, and no decorative background imagery.
+If a new screen is added, extend the same system: a readable mobile column, purposeful desktop
+columns, a compact title, hairline sections, and one primary action where possible.
 
 ---
 
