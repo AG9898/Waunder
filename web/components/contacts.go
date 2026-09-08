@@ -171,6 +171,7 @@ func applyGenerateResult(g *outreachGen, draft OutreachDraft, err error) {
 
 func (v *ContactsView) Render() app.UI {
 	return app.Div().Class("contacts-view").Body(
+		renderAppTabs("jobs"),
 		app.A().Class("contacts-back").Href(v.backHref()).Text("← Job"),
 		app.H1().Class("contacts-title").Text("Contacts"),
 		app.P().Class("contacts-note").

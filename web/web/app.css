@@ -96,7 +96,7 @@
   --focus-ring: 0 0 0 3px rgba(94,125,106,.30);
 
   /* Layout */
-  --page-max: 720px;
+  --page-max: 560px;
   --page-pad: 20px;
 }
 
@@ -1919,35 +1919,91 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
 /* --------------------------------------------------------------------------
    14. Responsive — desktop refinements (mobile-first base above)
    -------------------------------------------------------------------------- */
-@media (min-width: 768px) {
-  :root { --page-pad: 32px; }
-
-  .digest > h1,
-  .job-list > h1,
-  .profile > h1,
-  .manual-entry > h1,
-  .contacts-title,
-  .job-detail .job-title,
-  .draft-title { font-size: 1.625rem; }
-
-  /* form buttons no longer need to span full width */
-  .login-submit,
-  .manual-entry-submit,
-  .profile-save { align-self: flex-start; }
-
-  .job-list-score-error {
-    max-width: 160px;
-  }
-
-  /* filters get more breathing room across the page on wide screens */
-  .job-filters {
-    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-  }
-
-  .digest-link,
-  .job-list-link { padding: var(--space-5) var(--space-6); }
+/* Layout is based on usable window width, independent of OS or PWA install.
+   The explicit preference overrides Auto, with shared variables keeping both
+   paths identical. Even Desktop can shrink safely into a narrow window. */
+:root {
+  --nav-position: fixed;
+  --nav-width: min(100%, 560px);
+  --nav-margin: 0;
+  --nav-justify: space-around;
+  --nav-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --screen-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  --nav-transform: translateX(-50%);
 }
 
-@media (min-width: 1024px) {
-  :root { --page-max: 760px; }
+:root[data-layout="desktop"] {
+  --page-max: 1280px;
+  --page-pad: 32px;
+  --nav-position: static;
+  --nav-width: auto;
+  --nav-margin: 16px 0 0;
+  --nav-justify: flex-start;
+  --nav-safe-bottom: 0px;
+  --screen-bottom: 48px;
+  --nav-transform: none;
+}
+
+@media (min-width: 960px) {
+  :root:not([data-layout="mobile"]) {
+    --page-max: 1280px;
+    --page-pad: 32px;
+    --nav-position: static;
+    --nav-width: auto;
+    --nav-margin: 16px 0 0;
+    --nav-justify: flex-start;
+    --nav-safe-bottom: 0px;
+    --screen-bottom: 48px;
+    --nav-transform: none;
+  }
+}
+
+:is(.digest, .job-list, .applications, .job-detail, .draft-review, .profile, .manual-entry, .contacts-view) {
+  padding-top: max(var(--page-pad), env(safe-area-inset-top, 0px));
+  padding-bottom: var(--screen-bottom);
+  padding-left: max(var(--page-pad), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--page-pad), env(safe-area-inset-right, 0px));
+}
+
+.app-chrome { margin-bottom: 28px; }
+.app-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.app-brand { margin-right: auto; font-size: 21px; font-weight: 700; color: var(--color-ink); }
+.app-add-job { font-size: var(--text-sm); font-weight: 600; padding: 12px 0; }
+.layout-control { display: flex; align-items: center; gap: 6px; font-size: var(--text-sm); color: var(--color-ink-soft); }
+.layout-select {
+  min-height: 44px;
+  max-width: 110px;
+  padding: 8px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 16px;
+}
+.layout-error { font-size: var(--text-sm); color: var(--color-danger); }
+.app-chrome .app-tabs {
+  position: var(--nav-position);
+  left: 50%;
+  bottom: 0;
+  transform: var(--nav-transform);
+  z-index: 20;
+  width: var(--nav-width);
+  margin: var(--nav-margin);
+  justify-content: var(--nav-justify);
+  gap: 2px;
+  padding: 8px 4px calc(8px + var(--nav-safe-bottom));
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+.app-chrome .app-tab { min-height: 44px; display: flex; align-items: center; padding: 8px 10px; }
+.layout-select:focus-visible, .app-add-job:focus-visible, .app-tab:focus-visible {
+  outline: 2px solid var(--color-accent-strong);
+  outline-offset: 3px;
+}
+
+/* iOS must not zoom when focusing a form control. */
+@media (pointer: coarse) {
+  input, textarea, select { font-size: max(16px, 1em); }
 }

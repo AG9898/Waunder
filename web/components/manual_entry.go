@@ -140,6 +140,7 @@ func (m *ManualEntry) inputPresent() bool {
 
 func (m *ManualEntry) Render() app.UI {
 	return app.Div().Class("manual-entry").Body(
+		renderAppTabs("jobs"),
 		app.A().Class("manual-entry-back").Href("/jobs").Text("← Jobs"),
 		app.H1().Text("Add a job"),
 		app.P().Class("manual-entry-note").

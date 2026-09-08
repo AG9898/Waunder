@@ -292,6 +292,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `workers/src/worker.test.ts` | Worker orchestration | config loading, bearer-auth task fetch/report calls, clean idle without `API_INTERNAL_URL`, one-cycle poll orchestration, and unsupported-ATS safe failure |
 | `workers/src/ats/handlers.test.ts` | Worker ATS handlers | Playwright fixture coverage for Greenhouse/Lever/Ashby registration, approved field fill/submit, unknown required field pauses, and sensitive-field pauses |
 | `web/components/pwa_test.go` | Web (go-app PWA) | iOS/iPadOS detection + version parsing, iOS 16.4+ Web Push threshold, and the install/notification-permission gate decision |
+| `web/components/chrome_test.go` | Web (go-app PWA) | Shared navigation accessibility, layout choices, and invalid-preference fallback |
 | `web/components/jobs_test.go` | Web (go-app PWA) | Job list / detail / ingestion batches, lifecycle/filter/pagination behavior, explicit intake pause/resume state and error paths, held count, and no intake mutation on render via a mocked `RailsClient` |
 | `web/components/applications_test.go` | Web (go-app PWA) | Applications tracker render tests, empty/error/401 states, explicit no-status-update-on-render assertion, direct status-update state tests, and the all-jobs table (lazy load default active bin, bin filter, Prev/Next pagination, header total from the page envelope — INTAKE-09) |
 | `web/components/login_test.go` | Web (go-app PWA) | Login form render and `loginErrorStatus`/`loginButtonText` status mapping (401 → "Incorrect passphrase") |

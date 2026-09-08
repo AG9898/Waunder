@@ -505,12 +505,7 @@ func (v *ApplicationsView) applyStatusResult(application ApplicationTracker, err
 }
 
 func renderAppTabs(active string) app.UI {
-	return app.Nav().Class("app-tabs").Body(
-		app.A().Class(tabClass(active, "digest")).Href("/").Text("Digest"),
-		app.A().Class(tabClass(active, "jobs")).Href("/jobs").Text("Jobs"),
-		app.A().Class(tabClass(active, "applications")).Href("/applications").Text("Applications"),
-		app.A().Class(tabClass(active, "profile")).Href("/profile").Text("Profile"),
-	)
+	return &AppChrome{Active: active}
 }
 
 func tabClass(active, name string) string {

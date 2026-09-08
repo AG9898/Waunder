@@ -223,6 +223,7 @@ func (r *DraftReview) doSubmit(ctx context.Context) {
 
 func (r *DraftReview) Render() app.UI {
 	return app.Div().Class("draft-review").Body(
+		renderAppTabs("applications"),
 		app.A().Class("draft-back").Href("/jobs").Text("← Jobs"),
 		renderLoad(r.state, r.err, func() app.UI {
 			d := r.draft

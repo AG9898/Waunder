@@ -971,3 +971,9 @@ Railway Postgres currently runs PostgreSQL 18 while the `api` Docker image ships
 client tools, so `pg_dump` from `api` fails on the server-version mismatch. Before a production
 reset, run and validate the dump through `railway ssh --service Postgres` (`pg_restore --list`),
 then keep the resulting archive outside the repository with owner-only permissions.
+
+### 2026-09-08 — Layout preference is independent of PWA installation
+`AppChrome` stores Auto/Desktop/Mobile in `waunder.layout` and applies `data-layout` to the document
+root; CSS resolves Auto at 960px, so resizing works without JS listeners. Keep desktop variable
+overrides identical for explicit Desktop and Auto's wide-screen media query, and reserve bottom
+navigation plus safe-area space in mobile screens.

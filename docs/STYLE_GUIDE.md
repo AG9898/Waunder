@@ -87,8 +87,12 @@ figures where possible.
 
 - Routed screen roots such as `.digest`, `.job-list`, `.job-detail`, `.draft-review`,
   `.profile`, `.manual-entry`, and `.contacts-view` act as centered page containers.
-- There is no persistent nav or tab bar in the current design. Navigation remains in-flow
-  through back links and screen-specific links.
+- Every signed-in screen shares navigation and an Auto / Desktop / Mobile layout selector.
+  Auto uses a 960px viewport breakpoint; PWA installation and user-agent strings do not affect
+  layout. The override is saved locally per browser under `waunder.layout` and survives navigation
+  and reloads. Mobile uses a centered 560px maximum column and bottom navigation with iPhone safe
+  area padding. Desktop uses up to 1280px with in-flow top navigation; narrow desktop windows still
+  wrap safely. Add job is available from the shared header. Intake is the ingestion-history tab.
 - Feed and digest rows are soft list cards with the color-coded score pill and a lifecycle
   status pill (Active / Backlog / Removed — `.job-status--active|backlog|removed`, tinted
   success-soft / warning-soft / danger-soft) stacked top-right of the card in a `.job-pills`

@@ -1142,6 +1142,7 @@ func (d *JobDetailView) backFallbackLabel() string {
 
 func (d *JobDetailView) Render() app.UI {
 	return app.Div().Class("job-detail").Body(
+		renderAppTabs("jobs"),
 		app.A().Class("job-detail-back").Href(d.backFallback()).Text(d.backFallbackLabel()),
 		renderLoad(d.state, d.err, func() app.UI {
 			job := d.job
