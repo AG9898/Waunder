@@ -1594,7 +1594,7 @@
       "id": "DATA-06",
       "title": "Backfill and harden JobPost URL identities",
       "description": "Use the deterministic ROUTE-02 identity service to idempotently backfill source/posting/application aliases from existing JobPost and ApplicationRoute values. Resolve historical exact-identity collisions deterministically without deleting JobPosts, retain an audit trail of the resolution, then enforce the documented one-owner identity invariant. This task is limited to existing data and persistence integrity; it does not change ingest, manual import, or UI behavior.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "DATA",
       "depends_on": [

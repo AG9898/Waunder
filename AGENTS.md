@@ -991,3 +991,9 @@ pointers and can retain a closure across renders, including its stale captured s
 listing variants resolve to `linkedin:<id>`, while other HTTP(S) URLs use `url:<normalized-url>`.
 It strips only its explicit tracking-parameter allowlist; preserve every other path, query, and
 fragment component so an ATS's job-defining parameters cannot be over-normalized.
+
+### 2026-09-08 — JobPost identity ownership allows same-post aliases
+`JobPostUrlIdentity` uses a PostgreSQL `btree_gist` exclusion constraint on identity key plus a
+different JobPost id, rather than a globally unique key, so source/posting/application aliases on
+one JobPost can share a stable identity. The DATA-06 backfill chooses the lowest id for historical
+cross-post collisions and records each discarded loser alias in `JobPostAuditEvent`.

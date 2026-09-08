@@ -86,7 +86,8 @@ Be honest about the current state — most of the suite is still to be written.
 - **api/** — `spec/models/company_spec.rb`, `spec/models/job_post_spec.rb`, and
   `spec/models/application_route_spec.rb`, and `spec/models/job_post_url_identity_spec.rb`: model
   specs for the core job-posting associations, validations, route-type and URL-role allowlists,
-  URL-alias preservation/uniqueness, and score/confidence bounds.
+  URL-alias preservation, same-owner aliases, and cross-JobPost identity protection at both the
+  model and database levels.
 - **api/** — `spec/models/application_spec.rb`, `spec/models/application_draft_spec.rb`, and
   `spec/models/audit_event_spec.rb`: model specs for the application lifecycle, draft JSON
   payload shape, audit payload shape, and associations.
@@ -108,6 +109,9 @@ Be honest about the current state — most of the suite is still to be written.
 - **api/** — `spec/services/job_url_identity_spec.rb`: pure stable URL identity generation for
   LinkedIn listing variants, known tracking-parameter removal, generic/ATS path/query retention,
   malformed/non-HTTP(S) refusal, and no HTTP/LLM construction.
+- **api/** — `spec/services/job_post_url_identity_backfill_spec.rb`: historical URL-alias backfill
+   coverage for source/posting/application URLs, blank-value skipping, rerun idempotency, and
+   deterministic collision ownership with retained JobPost audit records.
 - **api/** — `spec/services/openrouter_client_spec.rb`: OpenRouter client specs covering missing/blank
   API-key typed error, env model default/override, structured-JSON parsing, parse fallback for
   prose/code-fence-wrapped JSON, retry on 429/5xx then exhaustion, and PII-safe logging — all against
@@ -277,7 +281,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `api/spec/models/company_spec.rb` | API (Rails) | company name validation and job-post association |
 | `api/spec/models/contact_candidate_spec.rb` | API (Rails) | contact candidate job-post association, relevance reason validation, and owned outreach drafts |
 | `api/spec/models/job_post_spec.rb` | API (Rails) | job post company/title validations, application-route and URL-identity associations, match-score bounds |
-| `api/spec/models/job_post_url_identity_spec.rb` | API (Rails) | URL-identity role allowlist, required original URL/identity key, raw URL preservation, and per-job alias uniqueness |
+| `api/spec/models/job_post_url_identity_spec.rb` | API (Rails) | URL-identity role allowlist, raw URL preservation, per-job alias uniqueness, same-owner shared identities, and cross-job database ownership enforcement |
 | `api/spec/models/outreach_draft_spec.rb` | API (Rails) | outreach draft contact-candidate association and manual-send message validation |
 | `api/spec/models/profile_spec.rb` | API (Rails) | profile name/JSON-shape validation, encrypted-at-rest ciphertext check for email/phone/address, deterministic-email queryability |
 | `api/spec/models/resume_document_spec.rb` | API (Rails) | resume document profile/title validation, parsed_structure default, encrypted-at-rest ciphertext check for raw_text/parsed_structure |
@@ -298,6 +302,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `api/spec/jobs/parse_inbound_email_job_spec.rb` | API (Rails) | ParseInboundEmailJob wiring to the parser service for known-sender and fallback paths, including deterministic triage filtering and daily scoring-budget deferral |
 | `api/spec/services/application_route_resolver_spec.rb` | API (Rails) | Deterministic ATS route-type detection from URL fixtures, recommended-route preference ranking, confidence, unknown→manual LLM fallback, and ApplicationRoute persistence/idempotency |
 | `api/spec/services/job_url_identity_spec.rb` | API (Rails) | Pure host-aware URL identity keys: LinkedIn job-id canonicalization, tracking-parameter removal, generic/ATS job-component retention, invalid-input safety, and no HTTP/LLM construction |
+| `api/spec/services/job_post_url_identity_backfill_spec.rb` | API (Rails) | Historical URL alias backfill, blank URL skipping, rerun idempotency, deterministic collision ownership, and preserved duplicate audit records |
 | `api/spec/services/openrouter_client_spec.rb` | API (Rails) | OpenRouter client: missing-key typed error, env model default/override, structured-JSON parse, prose/code-fence parse fallback, retry/exhaustion, and PII-safe logging via injected fake transport (no live calls) |
 | `api/spec/jobs/score_job_post_job_spec.rb` | API (Rails) | JobScorer/ScoreJobPostJob: scoring-field population from mocked LLM JSON, match_score clamping, string-list coercion, fallback-posting scoring, graceful skip with no API key, failed-on-error, PII-safe logging (mocked client) |
 | `api/spec/jobs/generate_application_draft_job_spec.rb` | API (Rails) | ApplicationDraftGenerator/GenerateApplicationDraftJob: draft generation from mocked LLM JSON, ATS-shaped autofill payload keyed to the resolved route (manual fallback for unknown), Profile data merged into autofill answers, malformed-answer dropping, graceful skip with no API key, failed-on-error, PII-safe logging (mocked client) |

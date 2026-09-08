@@ -10,8 +10,9 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_08_143916) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_08_150000) do
   # These are extensions that must be enabled in order to support this database
+  enable_extension "btree_gist"
   enable_extension "pg_catalog.plpgsql"
 
   create_table "active_storage_attachments", force: :cascade do |t|
@@ -183,6 +184,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_08_143916) do
     t.index ["job_post_id", "role", "original_url"], name: "index_job_post_url_identities_on_alias", unique: true
     t.index ["job_post_id"], name: "index_job_post_url_identities_on_job_post_id"
     t.check_constraint "role::text = ANY (ARRAY['source'::character varying, 'posting'::character varying, 'application'::character varying]::text[])", name: "job_post_url_identities_role_check"
+    t.exclusion_constraint "identity_key WITH =, job_post_id WITH <>", using: :gist, name: "job_post_url_identities_one_owner"
   end
 
   create_table "job_posts", force: :cascade do |t|

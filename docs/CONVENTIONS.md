@@ -295,7 +295,10 @@ dispatch.
 - `JobPostUrlIdentity::ROLES` is the canonical URL-alias role list: `source`, `posting`, and
   `application`. Each alias retains its `original_url` and deterministic `identity_key`; roles are
   validated in the model and database, while duplicate raw aliases are prevented per JobPost and
-  role. Do not make `identity_key` globally unique until historical collisions are reconciled.
+  role. Same-JobPost aliases may share an identity key, but the PostgreSQL `btree_gist` exclusion
+  constraint and model validation prevent a different JobPost from claiming it. The one-time
+  backfill resolves historical collisions to the lowest JobPost id and writes a
+  `url_identity_collision_resolved` JobPostAuditEvent on each preserved non-owner post.
 - Sensitive resume/profile fields use Active Record Encryption (`encrypts :field`) so they are
   encrypted at rest.
 - `DATABASE_URL` comes from the environment only — never hardcode connection strings.

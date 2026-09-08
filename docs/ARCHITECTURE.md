@@ -294,8 +294,11 @@ The full topology and the rationale for the `/api` proxy routing decision live i
    `url:<normalized-url>`, removing only known tracking parameters while retaining paths and
    non-tracking query/fragment components. Invalid or non-HTTP(S) URLs have no identity key. The
    original supplied URL remains auditable. Aliases are unique per JobPost, role, and original URL;
-   global identity ownership is enforced only after historical aliases are reconciled. This flow
-   never fetches or scrapes a job-board page to discover an external apply link.
+   a PostgreSQL `btree_gist` exclusion constraint permits same-JobPost aliases to share a key but
+   prevents different JobPosts from claiming one stable identity. The ownership backfill selects
+   the lowest JobPost id for historical collisions and records the discarded aliases on the other
+   preserved JobPost as a `url_identity_collision_resolved` audit event. This flow never fetches
+   or scrapes a job-board page to discover an external apply link.
 3. Rails checks supplied stable identities against the stored identity set in the same
    transaction as the import. An exact match reuses the existing `JobPost`, attaches any novel
    URL alias, and records an import audit event rather than creating a duplicate row. It returns
