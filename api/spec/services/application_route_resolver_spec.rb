@@ -154,5 +154,25 @@ RSpec.describe ApplicationRouteResolver do
       expect(job_post.reload.application_route.route_type).to eq("ashby")
       expect(ApplicationRoute.where(job_post: job_post).count).to eq(1)
     end
+
+    it "registers the stable resolved application URL idempotently" do
+      job_post = job_post_with
+      resolver = described_class.new(
+        job_post,
+        application_url: "https://boards.greenhouse.io/acme/jobs/1?utm_source=alert"
+      )
+
+      resolver.call
+
+      expect(job_post.url_identities.pluck(:role, :original_url, :identity_key)).to eq([
+        [
+          "application",
+          "https://boards.greenhouse.io/acme/jobs/1?utm_source=alert",
+          "url:https://boards.greenhouse.io/acme/jobs/1"
+        ]
+      ])
+
+      expect { resolver.call }.not_to change(JobPostUrlIdentity, :count)
+    end
   end
 end

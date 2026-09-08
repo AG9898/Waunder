@@ -150,7 +150,8 @@ dispatch.
   linkedin/indeed/glassdoor apply, else `unknown`) and records a `recommended_route` using the
   preference order **direct ATS > company careers > job-board external apply > LinkedIn/Indeed/
   Glassdoor apply > manual**, with a `route_confidence`. It performs no network or LLM calls; the
-  LLM is the fallback only when no host pattern matches (`route_type == "unknown"`).
+  LLM is the fallback only when no host pattern matches (`route_type == "unknown"`). It also
+  idempotently records its stable resolved application URL as a `JobPostUrlIdentity` alias.
 - Job import identity is also deterministic and server-owned. `JobUrlIdentity.key(url)` derives
    the key without database, network, or LLM access: LinkedIn `/jobs/view/:id/` URLs use
    `linkedin:<id>`; generic/ATS HTTP(S) URLs use `url:<normalized-url>`, retaining the path plus
@@ -164,6 +165,10 @@ dispatch.
   route resolution and `ScoreJobPostJob`; an exact match writes a `manual_import_matched`
   `JobPostAuditEvent` and never re-scores. Pass a supplied external application URL to
   `ApplicationRouteResolver` as its preferred candidate, but do not fetch or scrape it.
+- `JobPostMaterializer` is the shared deterministic and LLM-fallback inbound path. It reuses a
+  matching stable URL identity before creating a JobPost and idempotently records stable `source`
+  and `posting` aliases before route resolution. Alias registration is local database work only:
+  never fetch a URL or construct an LLM client for it.
 - **Already submitted** is defined by `Application.status == "submitted"`, which is written after
   a successful worker report. `pipeline_status == "applied"` and non-terminal automation states
   must not be used as a submission duplicate signal.

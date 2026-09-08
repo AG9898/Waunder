@@ -1007,3 +1007,7 @@ so exact URL imports reuse the existing JobPost and never enqueue duplicate scor
 `POST /api/job_posts` returns `{job_post, import}` rather than nesting import state inside the job.
 The Go client must decode the top-level `import` envelope into its typed manual-import result before
 the form can render new/tracked/submitted outcomes; keep matching and its status decision in Rails.
+
+### 2026-09-08 — Inbound aliases register at materialization and route resolution
+`JobPostMaterializer` writes stable source/posting aliases before `ApplicationRouteResolver` writes
+the resolved application alias; both use `JobUrlIdentity.key`, so registration is idempotent and never fetches or calls the LLM.

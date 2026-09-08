@@ -44,6 +44,11 @@ RSpec.describe InboundEmailParser do
       expect(first.source_url).to eq("https://www.linkedin.com/jobs/view/3812345678/")
       expect(first.source).to eq("linkedin")
       expect(first.scoring_status).to eq("pending")
+      expect(first.url_identities.pluck(:role, :identity_key)).to contain_exactly(
+        [ "source", "linkedin:3812345678" ],
+        [ "posting", "linkedin:3812345678" ],
+        [ "application", "linkedin:3812345678" ]
+      )
 
       expect(email.reload.raw_payload.dig("parse_result", "needs_llm_fallback")).to be(false)
     end

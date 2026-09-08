@@ -45,6 +45,11 @@ RSpec.describe InboundEmailLlmExtractor do
     expect(result.status).to eq("llm_parsed")
     expect(result.job_posts.first.title).to eq("Data Scientist")
     expect(result.job_posts.first.company.name).to eq("VRIFY")
+    expect(result.job_posts.first.url_identities.pluck(:role, :identity_key)).to contain_exactly(
+      [ "source", "url:https://example.com/jobs/1" ],
+      [ "posting", "url:https://example.com/jobs/1" ],
+      [ "application", "url:https://example.com/jobs/1" ]
+    )
     expect(email.reload.raw_payload.dig("parse_result", "status")).to eq("llm_parsed")
     expect(email.raw_payload.dig("parse_result", "needs_llm_fallback")).to be(false)
   end

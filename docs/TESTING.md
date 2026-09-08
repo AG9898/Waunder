@@ -101,13 +101,19 @@ Be honest about the current state — most of the suite is still to be written.
   model specs for contact-candidate job linkage, relevance-reason validation, outreach-draft
   association, and manual-send message validation.
 - **api/** — `spec/services/inbound_email_parser_spec.rb`: service specs for the deterministic
-  known-sender (LinkedIn/Indeed/Glassdoor) email parser, normalized JobPost persistence, company
-  reuse, and LLM-fallback flagging for unknown senders and empty parses.
+  known-sender (LinkedIn/Indeed/Glassdoor) email parser, normalized JobPost and URL-alias
+  persistence, company reuse, and LLM-fallback flagging for unknown senders and empty parses.
+- **api/** — `spec/services/job_post_materializer_spec.rb`: inbound materialization coverage for
+  stable source/posting/application URL-alias registration and retry-safe identity reuse without
+  LLM calls.
+- **api/** — `spec/services/inbound_email_llm_extractor_spec.rb`: mocked LLM-fallback extraction,
+  no-posting/skip/retry states, and shared URL-alias persistence without live network calls.
 - **api/** — `spec/jobs/parse_inbound_email_job_spec.rb`: job spec wiring the inbound parse job
   to the parser service for both the known-sender and LLM-fallback paths.
 - **api/** — `spec/services/application_route_resolver_spec.rb`: deterministic route-type
   detection from URL fixtures, recommended-route preference ordering, posting/source URL tie-breaks,
-  unknown→manual LLM-fallback flagging, determinism, and ApplicationRoute persistence/idempotency.
+  unknown→manual LLM-fallback flagging, determinism, ApplicationRoute persistence/idempotency, and
+  stable resolved-application URL alias registration.
 - **api/** — `spec/services/job_url_identity_spec.rb`: pure stable URL identity generation for
   LinkedIn listing variants, known tracking-parameter removal, generic/ATS path/query retention,
   malformed/non-HTTP(S) refusal, and no HTTP/LLM construction.
@@ -303,9 +309,11 @@ Keep this table up to date — add a row when adding a new test file.
 | `api/spec/requests/api/profile_spec.rb` | API (Rails) | `POST /api/profile/resume` JSON Resume → Profile + primary ResumeDocument mapping, PDF Active Storage attachment, encrypted-at-rest contact/raw_text check, idempotent re-sync, 401 unauth, 422 invalid/malformed; `GET`/`PATCH /api/profile` structured read/update with PII presence-flags only |
 | `api/spec/requests/api/health_spec.rb` | API (Rails) | `GET /api/health` — 200 status, JSON shape, database connectivity |
 | `api/spec/requests/webhooks/resend_spec.rb` | API (Rails) | Resend inbound webhook Svix verification, raw inbound-email persistence, enabled parse-job enqueueing, paused reference holding with no job, provider-only auth, and PII-safe logging |
-| `api/spec/services/inbound_email_parser_spec.rb` | API (Rails) | Deterministic known-sender (LinkedIn/Indeed/Glassdoor) parsing into normalized JobPosts, company reuse, and LLM-fallback flagging |
+| `api/spec/services/inbound_email_parser_spec.rb` | API (Rails) | Deterministic known-sender (LinkedIn/Indeed/Glassdoor) parsing into normalized JobPosts and URL aliases, company reuse, and LLM-fallback flagging |
+| `api/spec/services/job_post_materializer_spec.rb` | API (Rails) | Shared inbound materialization stable URL-alias registration and retry-safe identity reuse without LLM calls |
+| `api/spec/services/inbound_email_llm_extractor_spec.rb` | API (Rails) | Mocked fallback extraction, URL-alias persistence, skip/empty/retry states, and no live network calls |
 | `api/spec/jobs/parse_inbound_email_job_spec.rb` | API (Rails) | ParseInboundEmailJob wiring to the parser service for known-sender and fallback paths, including deterministic triage filtering and daily scoring-budget deferral |
-| `api/spec/services/application_route_resolver_spec.rb` | API (Rails) | Deterministic ATS route-type detection from URL fixtures, recommended-route preference ranking, confidence, unknown→manual LLM fallback, and ApplicationRoute persistence/idempotency |
+| `api/spec/services/application_route_resolver_spec.rb` | API (Rails) | Deterministic ATS route-type detection from URL fixtures, recommended-route preference ranking, confidence, unknown→manual LLM fallback, ApplicationRoute persistence/idempotency, and resolved-application URL aliases |
 | `api/spec/services/job_url_identity_spec.rb` | API (Rails) | Pure host-aware URL identity keys: LinkedIn job-id canonicalization, tracking-parameter removal, generic/ATS job-component retention, invalid-input safety, and no HTTP/LLM construction |
 | `api/spec/services/job_post_url_identity_backfill_spec.rb` | API (Rails) | Historical URL alias backfill, blank URL skipping, rerun idempotency, deterministic collision ownership, and preserved duplicate audit records |
 | `api/spec/services/manual_job_post_importer_spec.rb` | API (Rails) | Manual import exact-identity lookup, novel alias/audit persistence, new/tracked/submitted result typing, and application-URL validation |

@@ -77,6 +77,7 @@ class ApplicationRouteResolver
       source_url: resolution.source_url
     )
     route.save!
+    register_application_identity!(route.application_url)
 
     resolution
   end
@@ -158,5 +159,14 @@ class ApplicationRouteResolver
     host.downcase.delete_prefix("www.")
   rescue URI::InvalidURIError
     nil
+  end
+
+  def register_application_identity!(original_url)
+    identity_key = JobUrlIdentity.key(original_url)
+    return unless identity_key
+
+    identity = job_post.url_identities.find_or_initialize_by(role: "application", original_url:)
+    identity.identity_key = identity_key
+    identity.save! if identity.new_record? || identity.changed?
   end
 end

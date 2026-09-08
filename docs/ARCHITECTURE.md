@@ -260,9 +260,9 @@ The full topology and the rationale for the `/api` proxy routing decision live i
    from Resend's receiving API (`ResendInboundClient` → `GET /emails/receiving/{email_id}`, using
    `RESEND_API_KEY`), then: parse alert (deterministic known-sender parsers, forward-aware via the
    in-body `From:` header) → if no postings, LLM fallback extraction (`InboundEmailLlmExtractor`)
-   → normalize each into a `JobPost` (shared `JobPostMaterializer`, deduped by stable posting URL
-   identity) →
-   resolve application route → run `JobPostTriage` title/location gating. Eligible inbound posts
+   → normalize each into a `JobPost` (shared `JobPostMaterializer`, deduped by stable URL identity
+   and registering idempotent `source`/`posting` aliases) → resolve application route (which also
+   registers its stable `application` alias) → run `JobPostTriage` title/location gating. Eligible inbound posts
    are automatically enqueued for `ScoreJobPostJob` until `JOB_TRIAGE_AUTO_SCORE_DAILY_LIMIT`
    is reached; rejected posts are marked `scoring_status: "filtered"`, and over-budget eligible
    posts are marked `scoring_status: "deferred"` for later manual scoring from the PWA. To keep the

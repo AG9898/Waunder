@@ -20,32 +20,50 @@ class JobPostMaterializer
     company_name = @posting[:company].to_s.strip
     return nil if title.empty? || company_name.empty?
 
-    existing = find_existing
-    return existing if existing
+    JobPost.transaction do
+      existing = find_existing
+      next existing if existing
 
-    company = Company.find_or_create_by!(name: company_name)
-    job_post = JobPost.create!(
-      company: company,
-      title: title,
-      location: @posting[:location].presence,
-      compensation: @posting[:compensation].presence,
-      posting_url: @posting[:posting_url].presence,
-      source_url: @posting[:source_url].presence,
-      source: @posting[:source].presence || "inbound",
-      scoring_status: "pending"
-    )
-    # Resolve the application route deterministically right after normalization
-    # so downstream scoring/draft jobs have a recommended route.
-    ApplicationRouteResolver.new(job_post).call
-    job_post
+      company = Company.find_or_create_by!(name: company_name)
+      job_post = JobPost.create!(
+        company: company,
+        title: title,
+        location: @posting[:location].presence,
+        compensation: @posting[:compensation].presence,
+        posting_url: @posting[:posting_url].presence,
+        source_url: @posting[:source_url].presence,
+        source: @posting[:source].presence || "inbound",
+        scoring_status: "pending"
+      )
+      register_source_and_posting_identities!(job_post)
+      # Resolve the application route deterministically right after normalization
+      # so downstream scoring/draft jobs have a recommended route.
+      ApplicationRouteResolver.new(job_post).call
+      job_post
+    end
   end
 
   private
 
   def find_existing
     url = @posting[:posting_url].presence
-    return nil if url.nil?
+    existing = JobPost.find_by(posting_url: url) if url
+    return existing if existing
 
-    JobPost.find_by(posting_url: url)
+    identity_keys = [ url, @posting[:source_url].presence ].filter_map { |candidate| JobUrlIdentity.key(candidate) }.uniq
+    return nil if identity_keys.empty?
+
+    JobPostUrlIdentity.includes(:job_post).find_by(identity_key: identity_keys)&.job_post
+  end
+
+  def register_source_and_posting_identities!(job_post)
+    [ [ "source", job_post.source_url ], [ "posting", job_post.posting_url ] ].each do |role, original_url|
+      identity_key = JobUrlIdentity.key(original_url)
+      next unless identity_key
+
+      identity = job_post.url_identities.find_or_initialize_by(role:, original_url:)
+      identity.identity_key = identity_key
+      identity.save! if identity.new_record? || identity.changed?
+    end
   end
 end
