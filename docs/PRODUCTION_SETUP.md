@@ -99,6 +99,26 @@ should be enabled for `api` and `web` so idle deployments can sleep.
 
 ---
 
+## 2026-09-08 Production Fresh Start
+
+A deliberate full reset cleared all persistent application data (including the Profile, inbound
+emails, JobPosts, applications, and Solid Queue/Cache/Cable data). Rails rebuilt every schema via
+the `api` entrypoint before public traffic was restored. A verified, private PostgreSQL archive was
+created before the reset; recovery archives contain personal data and must remain outside the
+repository with owner-only permissions.
+
+Intake is enabled for new alerts. The current non-secret production controls on `api` are:
+
+| Variable | Production value | Effect |
+|---|---:|---|
+| `JOB_INTAKE_DAILY_ACTIVE_LIMIT` | `30` | At most 30 eligible inbound posts per day remain in the Active feed; the rest go to Backlog. |
+| `JOB_TRIAGE_AUTO_SCORE_DAILY_LIMIT` | `0` | Disables automatic inbound LLM scoring; eligible inbound posts are deferred for deliberate manual scoring. |
+
+`api` and `web` each run one replica. Keep the Playwright `worker` stopped (and its
+`API_INTERNAL_URL` unset) while applications are handled manually.
+
+---
+
 ## PWA First Use
 
 Open the public web URL in Safari on iPhone:

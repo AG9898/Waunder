@@ -965,3 +965,9 @@ in-process Active Job thread and a persistent intake toggle: paused Resend event
 body retrieval/parsing/LLM work, and resume requeues them; in-flight async work is intentionally
 retryable rather than durable. Explicitly removed JobPosts use `expires_at` for a 30-day purge
 deadline, but maintenance never purges backlog rows or any post with an Application.
+
+### 2026-09-08 — Production snapshots need a matching PostgreSQL client
+Railway Postgres currently runs PostgreSQL 18 while the `api` Docker image ships PostgreSQL 15
+client tools, so `pg_dump` from `api` fails on the server-version mismatch. Before a production
+reset, run and validate the dump through `railway ssh --service Postgres` (`pg_restore --list`),
+then keep the resulting archive outside the repository with owner-only permissions.
