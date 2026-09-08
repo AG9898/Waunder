@@ -258,7 +258,8 @@ The full topology and the rationale for the `/api` proxy routing decision live i
    from Resend's receiving API (`ResendInboundClient` → `GET /emails/receiving/{email_id}`, using
    `RESEND_API_KEY`), then: parse alert (deterministic known-sender parsers, forward-aware via the
    in-body `From:` header) → if no postings, LLM fallback extraction (`InboundEmailLlmExtractor`)
-   → normalize each into a `JobPost` (shared `JobPostMaterializer`, deduped by `posting_url`) →
+   → normalize each into a `JobPost` (shared `JobPostMaterializer`, deduped by stable posting URL
+   identity) →
    resolve application route → run `JobPostTriage` title/location gating. Eligible inbound posts
    are automatically enqueued for `ScoreJobPostJob` until `JOB_TRIAGE_AUTO_SCORE_DAILY_LIMIT`
    is reached; rejected posts are marked `scoring_status: "filtered"`, and over-budget eligible
@@ -280,15 +281,25 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 4. `DailyDigestJob` remains available for explicit execution, but low-cost production does not
    keep a resident recurring scheduler. The on-screen ingestion history remains the primary view.
 
-**Manual job/link entry**:
-1. The authenticated owner posts a URL and/or pasted posting text to `POST /api/job_posts`
-   through the same-origin web proxy.
-2. Rails deterministically normalizes the input into a `JobPost` with `source: "manual"`.
-   URL-only submissions use the posting host as a fallback title/company label; pasted text
-   uses its first nonblank line as the fallback title.
-3. Rails immediately runs `ApplicationRouteResolver` for the new post and enqueues
-   `ScoreJobPostJob`, so manual entries enter the same route-resolution and scoring path as
-   email-ingested postings.
+**Manual job import and exact-match comparison**:
+1. The authenticated owner uses the PWA's persistent **Import job** action to post a job-board
+   URL, optional external application URL, and/or pasted posting text to `POST /api/job_posts`
+   through the same-origin web proxy. The browser only collects and renders data; Rails owns all
+   identity comparison and persistence.
+2. Rails stores every stable job/posting/application URL as a `JobPost` URL identity. Identity
+   normalization is deterministic and host-aware: it canonicalizes LinkedIn
+   `/jobs/view/:id/` links, removes only known tracking-only components, and preserves
+   job-defining information for other hosts. The original supplied URL remains auditable. This
+   flow never fetches or scrapes a job-board page to discover an external apply link.
+3. Rails checks supplied stable identities against the stored identity set in the same
+   transaction as the import. An exact match reuses the existing `JobPost`, attaches any novel
+   URL alias, and records an import audit event rather than creating a duplicate row. It returns
+   `already_submitted` only when a matching `Application.status` is `submitted`; draft, approved,
+   paused, and failed applications return `already_tracked` with their status. Company/title
+   similarities are non-authoritative possible matches.
+4. When there is no exact identity match, Rails creates a manual `JobPost`, saves its supplied
+   URL identities, runs `ApplicationRouteResolver`, and enqueues `ScoreJobPostJob`, so it enters
+   the same route-resolution and scoring path as email-ingested postings.
 
 **Web push subscription**:
 1. The PWA reads the public VAPID key from `GET /api/push/vapid_public_key`. This value is

@@ -47,6 +47,15 @@ Phase 1 delivers the full plan scenario: forward a job-alert email → Resend in
   view selector: the default pipeline (cards) view, and an all-jobs **table view** — an in-app
   spreadsheet-style tracker listing every job post with a link back to each posting. A stats
   cluster in the header shows totals (total count for now).
+- **Manual job import and duplicate awareness**: a persistent, clearly labelled **Import job**
+  action lets the owner record a job-board listing URL, an optional external application URL,
+  and/or pasted posting text. Before a new record is created, Waunder compares deterministic,
+  normalized URL identities (including LinkedIn's stable `/jobs/view/:id/` identity) with the
+  existing job and application tracker. An exact identity with an `Application` whose automation
+  status is `submitted` is shown as **Already submitted**; another application state is shown as
+  **Already tracked** with its current status. Company/title similarity is only a non-blocking
+  possible match, so a reposted role is never falsely called submitted. A match records newly
+  supplied URL aliases against the existing job rather than creating a duplicate JobPost.
 - **Intake management** (INTAKE): inbound volume exceeds what one owner can apply to, so the Jobs
   landing includes a persistent **Pause intake / Resume intake** control. While paused, verified
   Resend events are acknowledged and retained as lightweight references, but Waunder does not
@@ -71,7 +80,8 @@ Phase 1 delivers the full plan scenario: forward a job-alert email → Resend in
 
 ### Phase 2 — Later
 
-- Richer manual-entry and job-management UX beyond the lightweight Phase 1 fallback.
+- Browser-assisted metadata capture from explicitly supported sources, beyond the deterministic
+  link/pasted-text import path.
 - Broader ATS platform support beyond Greenhouse/Lever/Ashby.
 - A resident durable queue (Solid Queue or Redis/Sidekiq) if volume/delivery needs outgrow the bounded low-cost runtime.
 

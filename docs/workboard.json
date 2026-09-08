@@ -1,7 +1,7 @@
 {
   "$schema": "./workboard.schema.json",
   "schema_version": "1.0.0",
-  "last_updated": "2026-06-23",
+  "last_updated": "2026-09-08",
   "tasks": [
     {
       "id": "INFRA-01",
@@ -1518,6 +1518,213 @@
         "web/components/applications.go",
         "web/components/jobs_test.go",
         "web/components/applications_test.go"
+      ],
+      "commands": [
+        "cd web && go test ./...",
+        "cd web && go vet ./..."
+      ]
+    },
+    {
+      "id": "ROUTE-02",
+      "title": "Normalize stable job URL identities",
+      "description": "Add a pure, deterministic Rails service that derives stable job URL identity keys without database access. Canonicalize LinkedIn `/jobs/view/:id/` URLs and known tracking-only URL components; retain job-defining path/query components for generic and ATS URLs. This task defines no matching policy, persistence, endpoint, or UI work, and it must never fetch a page or invoke an LLM.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "ROUTE",
+      "depends_on": [
+        "ROUTE-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Equivalent LinkedIn job URLs, including tracking-query variants, derive the same stable identity key",
+        "Generic and ATS URL fixtures retain job-defining components and do not over-normalize arbitrary query parameters",
+        "Malformed and non-HTTP(S) input has a safe, deterministic outcome",
+        "Service specs prove no HTTP client or LLM is constructed; Rails specs and RuboCop pass"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "api/app/services/job_url_identity.rb",
+        "api/spec/services/job_url_identity_spec.rb"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "DATA-05",
+      "title": "Add JobPost URL identity persistence",
+      "description": "Add the narrowly scoped Rails migration, JobPost association, and JobPostUrlIdentity model for one JobPost to own source, posting, and application URL aliases. Persist the original URL alongside an identity key and role, with database foreign-key/check/index protections. Do not backfill historical rows or alter import/API behavior in this task.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "DATA",
+      "depends_on": [
+        "DATA-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Migration creates the URL-identity table with JobPost foreign key, original URL, identity key, role, timestamps, and appropriate database constraints/indexes",
+        "Model and JobPost association validate the documented roles and preserve the original URL",
+        "Migration and model specs pass without changing existing import behavior",
+        "Rails specs and RuboCop pass"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "api/db/migrate",
+        "api/app/models/job_post.rb",
+        "api/app/models/job_post_url_identity.rb",
+        "api/spec/models/job_post_url_identity_spec.rb",
+        "api/spec/models/job_post_spec.rb"
+      ],
+      "commands": [
+        "cd api && bin/rails db:migrate",
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "DATA-06",
+      "title": "Backfill and harden JobPost URL identities",
+      "description": "Use the deterministic ROUTE-02 identity service to idempotently backfill source/posting/application aliases from existing JobPost and ApplicationRoute values. Resolve historical exact-identity collisions deterministically without deleting JobPosts, retain an audit trail of the resolution, then enforce the documented one-owner identity invariant. This task is limited to existing data and persistence integrity; it does not change ingest, manual import, or UI behavior.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "DATA",
+      "depends_on": [
+        "ROUTE-02",
+        "DATA-05"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Existing posting, source, canonical-posting, and application URLs are represented as normalized aliases without duplicate rows on a rerun",
+        "A historical identity collision chooses a deterministic canonical owner, preserves the other JobPost, and leaves an auditable record",
+        "The database prevents two JobPosts from claiming the same stable identity after the backfill",
+        "Migration/backfill and model specs cover empty URLs, duplicates, and reruns; Rails specs and RuboCop pass"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "api/db/migrate",
+        "api/app/services/job_post_url_identity_backfill.rb",
+        "api/spec/models/job_post_url_identity_spec.rb",
+        "api/spec/services/job_post_url_identity_backfill_spec.rb"
+      ],
+      "commands": [
+        "cd api && bin/rails db:migrate",
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "INGEST-03",
+      "title": "Register URL identities during inbound ingestion",
+      "description": "Wire stable posting, source, and resolved application URLs into JobPostUrlIdentity whenever email ingestion materializes or resolves a JobPost. Keep the existing deterministic ingestion sequence and source data intact; this task only ensures future inbound records participate in the shared exact-match index.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "INGEST",
+      "depends_on": [
+        "DATA-06"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "New deterministic and LLM-fallback email postings register their stable URL aliases idempotently",
+        "Resolved external application URLs become aliases of the same JobPost when stable",
+        "Inbound retry behavior does not create duplicate identity rows or make network/LLM calls for identity registration",
+        "Focused service specs plus the Rails suite and RuboCop pass"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "api/app/services/job_post_materializer.rb",
+        "api/app/services/application_route_resolver.rb",
+        "api/spec/services/job_post_materializer_spec.rb",
+        "api/spec/services/application_route_resolver_spec.rb"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "MANUAL-02",
+      "title": "Make manual job imports submission-aware",
+      "description": "Extend the authenticated manual JobPost import endpoint to accept an optional external application URL, atomically compare supplied stable identities, and return a typed result for new, already-tracked, or already-submitted records. Exact matches reuse the existing JobPost, attach a new alias and import audit event, and never enqueue duplicate scoring; only Application.status `submitted` yields already-submitted. Company/title candidates remain optional non-authoritative hints. Do not add page scraping or automatic submission.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "MANUAL",
+      "depends_on": [
+        "DATA-06"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "POST /api/job_posts accepts job and optional external-application URLs and returns a stable import/match result shape",
+        "Exact identity imports reuse one existing JobPost, persist a novel alias, and do not enqueue duplicate scoring",
+        "A matching submitted Application reports already_submitted; draft, approved, paused, and failed applications report already_tracked with their status",
+        "Invalid input, authentication, exact match, and no-match request specs pass; Rails suite and RuboCop pass"
+      ],
+      "docs": [
+        "docs/PRD.md",
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "api/app/controllers/api/job_posts_controller.rb",
+        "api/app/services/manual_job_post_importer.rb",
+        "api/app/services/application_route_resolver.rb",
+        "api/spec/requests/api/job_posts_spec.rb",
+        "api/spec/services/manual_job_post_importer_spec.rb"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "WEB-15",
+      "title": "Expose Import job and match outcomes in the PWA",
+      "description": "Make the existing /jobs/new path unmissable by promoting the global Add job action to a clearly labelled Import job entry point and adding a Jobs-screen/empty-state affordance. Extend the form and Rails client for the optional external application URL and typed MANUAL-02 result, then render new, already-tracked, already-submitted, and possible-match outcomes with links to the existing record. Keep the browser as a thin client: no duplicate logic, scraping, or automatic submit; retain the do*/apply* testable action split.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "WEB",
+      "depends_on": [
+        "MANUAL-02"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Import job is visible from the global chrome and the Jobs screen, including an empty-feed path, and links to /jobs/new",
+        "The import form captures an optional external application URL and renders all server-returned match states with an existing-record link",
+        "No import request runs on mount or render; component tests assert zero client mutation calls before explicit submit",
+        "Go component/client tests cover input and all response states; go test ./... and go vet ./... pass"
+      ],
+      "docs": [
+        "docs/PRD.md",
+        "docs/ARCHITECTURE.md",
+        "docs/TESTING.md",
+        "docs/STYLE_GUIDE.md"
+      ],
+      "files": [
+        "web/components/chrome.go",
+        "web/components/jobs.go",
+        "web/components/manual_entry.go",
+        "web/components/client.go",
+        "web/components/chrome_test.go",
+        "web/components/jobs_test.go",
+        "web/components/manual_entry_test.go",
+        "web/web/app.css"
       ],
       "commands": [
         "cd web && go test ./...",

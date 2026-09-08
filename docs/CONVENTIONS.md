@@ -151,6 +151,15 @@ dispatch.
   preference order **direct ATS > company careers > job-board external apply > LinkedIn/Indeed/
   Glassdoor apply > manual**, with a `route_confidence`. It performs no network or LLM calls; the
   LLM is the fallback only when no host pattern matches (`route_type == "unknown"`).
+- Job import identity is also deterministic and server-owned. Retain the owner-supplied URL for
+  auditability, but compare stable, host-aware normalized identities; LinkedIn uses its
+  `/jobs/view/:id/` identity, and generic/ATS URLs preserve job-defining components. Do not use
+  broad query stripping, page scraping, or an LLM for duplicate decisions. Exact identity matches
+  reuse the existing JobPost and append a URL alias/audit event; normalized company/title matches
+  are only possible-match hints.
+- **Already submitted** is defined by `Application.status == "submitted"`, which is written after
+  a successful worker report. `pipeline_status == "applied"` and non-terminal automation states
+  must not be used as a submission duplicate signal.
 - Bulk inbound JobPosts must pass deterministic `JobPostTriage`
   (`app/services/job_post_triage.rb`) before automatic scoring. The triage rules are title/location
   only: target developer/software/AI/ML/platform/data-adjacent titles and prioritize Vancouver,
