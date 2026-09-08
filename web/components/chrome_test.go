@@ -3,6 +3,8 @@ package components
 import (
 	"strings"
 	"testing"
+
+	"github.com/maxence-charriere/go-app/v10/pkg/app"
 )
 
 func TestChromeNavigationAndLayout(t *testing.T) {
@@ -40,5 +42,35 @@ func TestPipelineStageEmptyOption(t *testing.T) {
 	}
 	if PipelineStatusLabel("applied", "") != "Applied" {
 		t.Fatal("an empty stage should not be displayed as a stage")
+	}
+}
+
+func TestAppChromeShowsUpdateBannerOnlyWhenPending(t *testing.T) {
+	c := &AppChrome{Active: "jobs"}
+
+	// No update downloaded: the chrome must stay quiet.
+	var quiet strings.Builder
+	app.PrintHTML(&quiet, c.Render())
+	if strings.Contains(quiet.String(), "app-update") {
+		t.Errorf("update banner rendered with no pending update:\n%s", quiet.String())
+	}
+
+	c.applyAppUpdate(true)
+	if !c.updateReady {
+		t.Fatal("applyAppUpdate(true) should mark an update pending")
+	}
+	var pending strings.Builder
+	app.PrintHTML(&pending, c.Render())
+	for _, want := range []string{"app-update", "A new version of Waunder is ready.", "Reload"} {
+		if !strings.Contains(pending.String(), want) {
+			t.Errorf("update banner missing %q\n%s", want, pending.String())
+		}
+	}
+
+	// A pending update latches: it stays until the page actually reloads, so a
+	// later false reading cannot silently hide the banner.
+	c.applyAppUpdate(false)
+	if !c.updateReady {
+		t.Error("a pending update should not be cleared by a later false reading")
 	}
 }

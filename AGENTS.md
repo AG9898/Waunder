@@ -1045,3 +1045,19 @@ so this follows the selected Auto/Desktop/Mobile layout rather than the viewport
 the desktop display values explicitly rather than `revert` (`revert` on `tbody`/`tr` is
 unreliable across engines here), and a group tint cannot be a `border-left` on a `tr` under
 `border-collapse` — paint it as an inset `box-shadow` on the leading cell instead.
+
+### 2026-09-08 — Shipped PWA changes are invisible until reload; go-app SW is cache-first
+A deployed change appeared to "not work" for the owner while the same URL served the new build to
+a fresh client. Cause: go-app's generated `app-worker.js` is **cache-first with no revalidation**
+(`fetchWithCache` returns any cache hit and never refetches), and `/web/app.wasm` is a constant,
+non-hashed URL. `app.Handler.Version` is unset, so go-app derives it from process start time —
+the version does change per deploy, and the new worker `skipWaiting()`s and claims clients, but
+the **already-loaded page keeps running the old WebAssembly until it is reloaded**. For an
+installed PWA resumed from memory, that reload may never happen on its own. Nothing implemented
+go-app's `AppUpdater`, so the update was fetched and then silently dropped. `AppChrome` now
+implements `OnAppUpdate` (plus `ctx.AppUpdateAvailable()` on mount, since the event can fire
+before the chrome mounts) and shows a Reload banner, and calls the `goappTryUpdate()` JS hook on
+mount so in-app navigation re-checks. **Verification trap:** Playwright's `serviceWorkers: 'block'`
+(used by `web/scripts/layout-smoke.cjs` and any ad-hoc probe) bypasses this entirely, so a
+screenshot can look perfect while every real returning browser shows the old build — use
+`launchPersistentContext` without that option to exercise the real caching path.

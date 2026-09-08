@@ -2056,6 +2056,36 @@ html { scroll-padding-bottom: var(--screen-bottom); }
   font-size: 16px;
 }
 .layout-error { font-size: var(--text-sm); color: var(--color-danger); }
+/* Pending-update banner. The service worker is cache-first, so a downloaded
+   build only runs after an explicit reload — this makes that visible. */
+.app-update {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.app-update-reload {
+  appearance: none;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-accent-strong);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.app-update-reload:hover { background: var(--color-surface-sunken); }
+.app-update-reload:focus-visible { outline: 2px solid var(--color-accent-strong); outline-offset: 3px; }
 .app-chrome .app-tabs {
   position: var(--nav-position);
   left: 50%;

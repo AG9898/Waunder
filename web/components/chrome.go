@@ -8,9 +8,12 @@ const layoutStorageKey = "waunder.layout"
 // CSS resolves Auto from the viewport, including installed PWAs and resized windows.
 type AppChrome struct {
 	app.Compo
-	Active     string
-	layout     string
-	storageErr string
+	Active string
+	layout string
+	// updateReady is set once a newer build has been downloaded in the
+	// background by the service worker but is not yet running on this page.
+	updateReady bool
+	storageErr  string
 }
 
 func normalizeLayout(value string) string {
@@ -29,7 +32,50 @@ func (c *AppChrome) OnMount(ctx app.Context) {
 	}
 	c.layout = normalizeLayout(saved)
 	c.applyLayout()
+	// An update may have landed before this chrome mounted (a background
+	// download during an earlier screen), so adopt the pending state too.
+	c.applyAppUpdate(ctx.AppUpdateAvailable())
+	checkForAppUpdate()
 	ctx.Update()
+}
+
+// OnAppUpdate fires when the service worker has fetched a newer build in the
+// background. go-app's own service worker is cache-first with no revalidation,
+// so the running page keeps the old WebAssembly until it is reloaded — without
+// this the update is downloaded and then silently never applied, which is
+// especially sticky for an installed PWA that is resumed rather than reloaded.
+func (c *AppChrome) OnAppUpdate(ctx app.Context) {
+	c.applyAppUpdate(ctx.AppUpdateAvailable())
+	ctx.Update()
+}
+
+// applyAppUpdate records a pending update. Split from the lifecycle hook so it
+// is testable without an app.Context. It only ever latches on: a downloaded
+// update stays pending until the page actually reloads.
+func (c *AppChrome) applyAppUpdate(available bool) {
+	if available {
+		c.updateReady = true
+	}
+}
+
+// checkForAppUpdate asks the service worker to look for a newer build. The
+// browser only checks automatically on a full page load, so an installed PWA
+// resumed from memory can run a stale build indefinitely; the chrome remounts
+// on every in-app navigation, which makes this a cheap recurring check.
+func checkForAppUpdate() {
+	if !app.IsClient {
+		return
+	}
+	if try := app.Window().Get("goappTryUpdate"); try.Truthy() {
+		app.Window().Call("goappTryUpdate")
+	}
+}
+
+// reloadForUpdate swaps in the downloaded build. It is an explicit user action
+// rather than an automatic reload, so an in-progress form edit is never
+// discarded out from under the owner.
+func (c *AppChrome) reloadForUpdate(ctx app.Context, _ app.Event) {
+	ctx.Reload()
 }
 
 func (c *AppChrome) applyLayout() {
@@ -75,6 +121,12 @@ func (c *AppChrome) Render() app.UI {
 			link("applications", "/applications", "Applications"),
 			link("profile", "/profile", "Profile"),
 		),
+		app.If(c.updateReady, func() app.UI {
+			return app.Div().Class("app-update").Attr("role", "status").Body(
+				app.Span().Class("app-update-text").Text("A new version of Waunder is ready."),
+				app.Button().Class("app-update-reload").OnClick(c.reloadForUpdate).Text("Reload"),
+			)
+		}),
 		app.If(c.storageErr != "", func() app.UI {
 			return app.P().Class("layout-error").Attr("role", "status").Text(c.storageErr)
 		}),
