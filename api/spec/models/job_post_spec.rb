@@ -17,6 +17,18 @@ RSpec.describe JobPost, type: :model do
     expect(job_post.application_route).to eq(route)
   end
 
+  it "has many URL identities" do
+    company = Company.create!(name: "Example Co")
+    job_post = described_class.create!(company:, title: "Product Engineer")
+    identity = job_post.url_identities.create!(
+      role: "posting",
+      original_url: "https://example.com/jobs/123",
+      identity_key: "url:https://example.com/jobs/123"
+    )
+
+    expect(job_post.url_identities).to contain_exactly(identity)
+  end
+
   it "bounds match score to a percentage" do
     company = Company.create!(name: "Example Co")
     job_post = described_class.new(company:, title: "Product Engineer", match_score: 101)

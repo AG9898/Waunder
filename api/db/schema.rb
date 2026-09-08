@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_13_170000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_08_143916) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -172,6 +172,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_13_170000) do
     t.check_constraint "jsonb_typeof(metadata) = 'object'::text", name: "job_post_audit_events_metadata_json_object"
   end
 
+  create_table "job_post_url_identities", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "identity_key", null: false
+    t.bigint "job_post_id", null: false
+    t.text "original_url", null: false
+    t.string "role", null: false
+    t.datetime "updated_at", null: false
+    t.index ["identity_key"], name: "index_job_post_url_identities_on_identity_key"
+    t.index ["job_post_id", "role", "original_url"], name: "index_job_post_url_identities_on_alias", unique: true
+    t.index ["job_post_id"], name: "index_job_post_url_identities_on_job_post_id"
+    t.check_constraint "role::text = ANY (ARRAY['source'::character varying, 'posting'::character varying, 'application'::character varying]::text[])", name: "job_post_url_identities_role_check"
+  end
+
   create_table "job_posts", force: :cascade do |t|
     t.text "application_strategy"
     t.bigint "company_id", null: false
@@ -279,6 +292,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_13_170000) do
   add_foreign_key "audit_events", "applications"
   add_foreign_key "contact_candidates", "job_posts"
   add_foreign_key "job_post_audit_events", "job_posts"
+  add_foreign_key "job_post_url_identities", "job_posts"
   add_foreign_key "job_posts", "companies"
   add_foreign_key "outreach_drafts", "contact_candidates"
   add_foreign_key "resume_documents", "profiles"

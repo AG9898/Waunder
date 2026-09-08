@@ -84,8 +84,9 @@ Be honest about the current state — most of the suite is still to be written.
   webhook, covering Svix signature verification, raw inbound-email persistence, parse-job
   enqueueing, unauthenticated provider auth, missing-secret handling, and PII-safe logging.
 - **api/** — `spec/models/company_spec.rb`, `spec/models/job_post_spec.rb`, and
-  `spec/models/application_route_spec.rb`: model specs for the core job-posting associations,
-  validations, route-type allowlist, and score/confidence bounds.
+  `spec/models/application_route_spec.rb`, and `spec/models/job_post_url_identity_spec.rb`: model
+  specs for the core job-posting associations, validations, route-type and URL-role allowlists,
+  URL-alias preservation/uniqueness, and score/confidence bounds.
 - **api/** — `spec/models/application_spec.rb`, `spec/models/application_draft_spec.rb`, and
   `spec/models/audit_event_spec.rb`: model specs for the application lifecycle, draft JSON
   payload shape, audit payload shape, and associations.
@@ -275,7 +276,8 @@ Keep this table up to date — add a row when adding a new test file.
 | `api/spec/models/audit_event_spec.rb` | API (Rails) | audit event application/status validation plus screenshot/log/metadata JSON shapes |
 | `api/spec/models/company_spec.rb` | API (Rails) | company name validation and job-post association |
 | `api/spec/models/contact_candidate_spec.rb` | API (Rails) | contact candidate job-post association, relevance reason validation, and owned outreach drafts |
-| `api/spec/models/job_post_spec.rb` | API (Rails) | job post company/title validations, application-route association, match-score bounds |
+| `api/spec/models/job_post_spec.rb` | API (Rails) | job post company/title validations, application-route and URL-identity associations, match-score bounds |
+| `api/spec/models/job_post_url_identity_spec.rb` | API (Rails) | URL-identity role allowlist, required original URL/identity key, raw URL preservation, and per-job alias uniqueness |
 | `api/spec/models/outreach_draft_spec.rb` | API (Rails) | outreach draft contact-candidate association and manual-send message validation |
 | `api/spec/models/profile_spec.rb` | API (Rails) | profile name/JSON-shape validation, encrypted-at-rest ciphertext check for email/phone/address, deterministic-email queryability |
 | `api/spec/models/resume_document_spec.rb` | API (Rails) | resume document profile/title validation, parsed_structure default, encrypted-at-rest ciphertext check for raw_text/parsed_structure |

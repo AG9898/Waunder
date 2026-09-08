@@ -1559,7 +1559,7 @@
       "id": "DATA-05",
       "title": "Add JobPost URL identity persistence",
       "description": "Add the narrowly scoped Rails migration, JobPost association, and JobPostUrlIdentity model for one JobPost to own source, posting, and application URL aliases. Persist the original URL alongside an identity key and role, with database foreign-key/check/index protections. Do not backfill historical rows or alter import/API behavior in this task.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "DATA",
       "depends_on": [

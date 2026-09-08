@@ -292,6 +292,10 @@ dispatch.
   lifecycle (`interested`, `drafting`, `applied`, `interviewing`, `offer`, `rejected`,
   `withdrawn`, `archived`, `needs_review`), with optional slug-style `pipeline_stage`. Keep model
   validations and database check constraints in sync whenever status values change.
+- `JobPostUrlIdentity::ROLES` is the canonical URL-alias role list: `source`, `posting`, and
+  `application`. Each alias retains its `original_url` and deterministic `identity_key`; roles are
+  validated in the model and database, while duplicate raw aliases are prevented per JobPost and
+  role. Do not make `identity_key` globally unique until historical collisions are reconciled.
 - Sensitive resume/profile fields use Active Record Encryption (`encrypts :field`) so they are
   encrypted at rest.
 - `DATABASE_URL` comes from the environment only — never hardcode connection strings.
