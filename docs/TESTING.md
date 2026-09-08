@@ -104,6 +104,9 @@ Be honest about the current state — most of the suite is still to be written.
 - **api/** — `spec/services/application_route_resolver_spec.rb`: deterministic route-type
   detection from URL fixtures, recommended-route preference ordering, posting/source URL tie-breaks,
   unknown→manual LLM-fallback flagging, determinism, and ApplicationRoute persistence/idempotency.
+- **api/** — `spec/services/job_url_identity_spec.rb`: pure stable URL identity generation for
+  LinkedIn listing variants, known tracking-parameter removal, generic/ATS path/query retention,
+  malformed/non-HTTP(S) refusal, and no HTTP/LLM construction.
 - **api/** — `spec/services/openrouter_client_spec.rb`: OpenRouter client specs covering missing/blank
   API-key typed error, env model default/override, structured-JSON parsing, parse fallback for
   prose/code-fence-wrapped JSON, retry on 429/5xx then exhaustion, and PII-safe logging — all against
@@ -292,6 +295,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `api/spec/services/inbound_email_parser_spec.rb` | API (Rails) | Deterministic known-sender (LinkedIn/Indeed/Glassdoor) parsing into normalized JobPosts, company reuse, and LLM-fallback flagging |
 | `api/spec/jobs/parse_inbound_email_job_spec.rb` | API (Rails) | ParseInboundEmailJob wiring to the parser service for known-sender and fallback paths, including deterministic triage filtering and daily scoring-budget deferral |
 | `api/spec/services/application_route_resolver_spec.rb` | API (Rails) | Deterministic ATS route-type detection from URL fixtures, recommended-route preference ranking, confidence, unknown→manual LLM fallback, and ApplicationRoute persistence/idempotency |
+| `api/spec/services/job_url_identity_spec.rb` | API (Rails) | Pure host-aware URL identity keys: LinkedIn job-id canonicalization, tracking-parameter removal, generic/ATS job-component retention, invalid-input safety, and no HTTP/LLM construction |
 | `api/spec/services/openrouter_client_spec.rb` | API (Rails) | OpenRouter client: missing-key typed error, env model default/override, structured-JSON parse, prose/code-fence parse fallback, retry/exhaustion, and PII-safe logging via injected fake transport (no live calls) |
 | `api/spec/jobs/score_job_post_job_spec.rb` | API (Rails) | JobScorer/ScoreJobPostJob: scoring-field population from mocked LLM JSON, match_score clamping, string-list coercion, fallback-posting scoring, graceful skip with no API key, failed-on-error, PII-safe logging (mocked client) |
 | `api/spec/jobs/generate_application_draft_job_spec.rb` | API (Rails) | ApplicationDraftGenerator/GenerateApplicationDraftJob: draft generation from mocked LLM JSON, ATS-shaped autofill payload keyed to the resolved route (manual fallback for unknown), Profile data merged into autofill answers, malformed-answer dropping, graceful skip with no API key, failed-on-error, PII-safe logging (mocked client) |

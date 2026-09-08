@@ -286,11 +286,13 @@ The full topology and the rationale for the `/api` proxy routing decision live i
    URL, optional external application URL, and/or pasted posting text to `POST /api/job_posts`
    through the same-origin web proxy. The browser only collects and renders data; Rails owns all
    identity comparison and persistence.
-2. Rails stores every stable job/posting/application URL as a `JobPost` URL identity. Identity
-   normalization is deterministic and host-aware: it canonicalizes LinkedIn
-   `/jobs/view/:id/` links, removes only known tracking-only components, and preserves
-   job-defining information for other hosts. The original supplied URL remains auditable. This
-   flow never fetches or scrapes a job-board page to discover an external apply link.
+2. Rails stores every stable job/posting/application URL as a `JobPost` URL identity. The pure
+   `JobUrlIdentity` service derives deterministic, host-aware keys without database or network
+   access: LinkedIn `/jobs/view/:id/` variants become `linkedin:<id>`; other HTTP(S) URLs become
+   `url:<normalized-url>`, removing only known tracking parameters while retaining paths and
+   non-tracking query/fragment components. Invalid or non-HTTP(S) URLs have no identity key. The
+   original supplied URL remains auditable. This flow never fetches or scrapes a job-board page to
+   discover an external apply link.
 3. Rails checks supplied stable identities against the stored identity set in the same
    transaction as the import. An exact match reuses the existing `JobPost`, attaches any novel
    URL alias, and records an import audit event rather than creating a duplicate row. It returns

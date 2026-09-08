@@ -1528,7 +1528,7 @@
       "id": "ROUTE-02",
       "title": "Normalize stable job URL identities",
       "description": "Add a pure, deterministic Rails service that derives stable job URL identity keys without database access. Canonicalize LinkedIn `/jobs/view/:id/` URLs and known tracking-only URL components; retain job-defining path/query components for generic and ATS URLs. This task defines no matching policy, persistence, endpoint, or UI work, and it must never fetch a page or invoke an LLM.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "ROUTE",
       "depends_on": [

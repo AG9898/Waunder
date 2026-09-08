@@ -151,12 +151,14 @@ dispatch.
   preference order **direct ATS > company careers > job-board external apply > LinkedIn/Indeed/
   Glassdoor apply > manual**, with a `route_confidence`. It performs no network or LLM calls; the
   LLM is the fallback only when no host pattern matches (`route_type == "unknown"`).
-- Job import identity is also deterministic and server-owned. Retain the owner-supplied URL for
-  auditability, but compare stable, host-aware normalized identities; LinkedIn uses its
-  `/jobs/view/:id/` identity, and generic/ATS URLs preserve job-defining components. Do not use
-  broad query stripping, page scraping, or an LLM for duplicate decisions. Exact identity matches
-  reuse the existing JobPost and append a URL alias/audit event; normalized company/title matches
-  are only possible-match hints.
+- Job import identity is also deterministic and server-owned. `JobUrlIdentity.key(url)` derives
+   the key without database, network, or LLM access: LinkedIn `/jobs/view/:id/` URLs use
+   `linkedin:<id>`; generic/ATS HTTP(S) URLs use `url:<normalized-url>`, retaining the path plus
+   every non-tracking query/fragment component (only the explicit tracking allowlist is removed).
+   Invalid or non-HTTP(S) input returns no key. Retain the owner-supplied URL for auditability. Do
+   not use broad query stripping, page scraping, or an LLM for duplicate decisions. Exact identity
+   matches reuse the existing JobPost and append a URL alias/audit event; normalized company/title
+   matches are only possible-match hints.
 - **Already submitted** is defined by `Application.status == "submitted"`, which is written after
   a successful worker report. `pipeline_status == "applied"` and non-terminal automation states
   must not be used as a submission duplicate signal.

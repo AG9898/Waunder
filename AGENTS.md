@@ -985,3 +985,9 @@ follow-up dates to preserve them, and an empty stage uses the `none` select sent
 go-app omits empty option values.
 Stage-change handlers read the current tracker at click time: go-app compares handler function
 pointers and can retain a closure across renders, including its stale captured status.
+
+### 2026-09-08 — URL identity keys preserve unknown job parameters
+`JobUrlIdentity.key(url)` is a pure Rails service with no persistence or network access: LinkedIn
+listing variants resolve to `linkedin:<id>`, while other HTTP(S) URLs use `url:<normalized-url>`.
+It strips only its explicit tracking-parameter allowlist; preserve every other path, query, and
+fragment component so an ATS's job-defining parameters cannot be over-normalized.
