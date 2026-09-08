@@ -343,8 +343,7 @@ button { font-family: inherit; }
 /* empty feed/list states — quiet sunken well, not an error */
 .digest-empty,
 .job-list-empty,
-.applications-empty,
-.jobs-table-empty,
+.tracker-empty,
 .contacts-empty {
   margin: var(--space-2) 0 0;
   padding: var(--space-5);
@@ -986,60 +985,6 @@ button { font-family: inherit; }
   flex-basis: 100%;
 }
 
-.applications-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-.application-row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4) var(--space-5);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-}
-.application-row-main,
-.application-row-meta,
-.application-status-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2) var(--space-3);
-}
-.application-title {
-  font-size: var(--text-md);
-  font-weight: 700;
-  color: var(--color-ink);
-}
-.application-company,
-.application-automation-status,
-.application-submitted-at {
-  font-size: var(--text-sm);
-  color: var(--color-ink-soft);
-}
-.application-status-pill {
-  display: inline-flex;
-  padding: 4px 10px;
-  border-radius: var(--radius-pill);
-  background: var(--color-accent-soft);
-  color: var(--color-accent-strong);
-  font-size: var(--text-xs);
-  font-weight: 700;
-}
-.application-failure {
-  font-size: var(--text-sm);
-  color: var(--color-danger-ink);
-}
-.application-review-link {
-  font-size: var(--text-sm);
-  font-weight: 700;
-}
 .pipeline-select-label {
   display: flex;
   flex-direction: column;
@@ -1112,38 +1057,99 @@ button { font-family: inherit; }
   color: var(--color-ink-faint);
 }
 
-/* Segmented view selector — applications cards vs all-jobs table */
-.applications-view-selector {
-  display: inline-flex;
+/* Application tracker — group tabs (All / Not applied / Applied / …).
+   Horizontally scrollable so five tabs stay reachable on a phone. */
+.tracker-tabs {
+  display: flex;
   gap: 2px;
-  margin: 0 0 var(--space-5);
+  margin: 0 0 var(--space-4);
   padding: 3px;
+  overflow-x: auto;
   background: var(--color-surface-sunken);
   border-radius: var(--radius-md);
+  scrollbar-width: none;
 }
-.view-selector-option {
+.tracker-tabs::-webkit-scrollbar { display: none; }
+.tracker-tab {
   appearance: none;
   border: none;
   background: transparent;
-  padding: 7px 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 7px 13px;
   border-radius: calc(var(--radius-md) - 3px);
   color: var(--color-ink-soft);
   font-family: inherit;
   font-size: var(--text-sm);
   font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
   transition: background .14s ease, color .14s ease;
 }
-.view-selector-option:hover { color: var(--color-ink); }
-.view-selector-option-active {
+.tracker-tab:hover { color: var(--color-ink); }
+.tracker-tab.view-selector-option-active {
   background: var(--color-surface);
   color: var(--color-accent-strong);
   box-shadow: var(--shadow-sm);
 }
-.view-selector-option:focus-visible {
+.tracker-tab:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+.tracker-tab-count {
+  color: var(--color-ink-faint);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+.tracker-tab.view-selector-option-active .tracker-tab-count {
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+}
+
+/* Tracker secondary controls — lifecycle bin and row order */
+.tracker-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-4);
+}
+.tracker-control {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-ink-faint);
+}
+.tracker-bin-select,
+.tracker-sort-select,
+.tracker-status-select {
+  min-height: 44px;
+  padding: 9px 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.tracker-bin-select:focus,
+.tracker-sort-select:focus,
+.tracker-status-select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: var(--focus-ring);
+}
+.tracker-status-select:disabled { opacity: .6; cursor: wait; }
 
 /* Jobs feed — lifecycle bin tabs (Active / Backlog / Removed) */
 .job-bin-tabs {
@@ -1313,7 +1319,9 @@ button { font-family: inherit; }
   margin: var(--space-5) 0 0;
 }
 .job-page-prev,
-.job-page-next {
+.job-page-next,
+.tracker-page-prev,
+.tracker-page-next {
   appearance: none;
   border: 1px solid var(--color-border);
   background: var(--color-surface);
@@ -1327,12 +1335,16 @@ button { font-family: inherit; }
   transition: background .14s ease, border-color .14s ease;
 }
 .job-page-prev:hover:not(:disabled),
-.job-page-next:hover:not(:disabled) {
+.job-page-next:hover:not(:disabled),
+.tracker-page-prev:hover:not(:disabled),
+.tracker-page-next:hover:not(:disabled) {
   border-color: var(--color-accent);
   background: var(--color-surface-sunken);
 }
 .job-page-prev:disabled,
-.job-page-next:disabled {
+.job-page-next:disabled,
+.tracker-page-prev:disabled,
+.tracker-page-next:disabled {
   opacity: .5;
   cursor: default;
 }
@@ -1347,73 +1359,108 @@ button { font-family: inherit; }
   color: var(--color-ink-soft);
 }
 
-/* All-jobs table — in-app spreadsheet tracker */
-.jobs-table-wrap {
-  width: 100%;
-  overflow-x: auto;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-sm);
-}
-.jobs-table {
+/* Application tracker rows.
+   Mobile-first: each job is a card whose cells carry their own labels. The
+   desktop container query below turns the same markup back into a real table. */
+.tracker-wrap { width: 100%; }
+.tracker-table {
+  display: block;
   width: 100%;
   border-collapse: collapse;
   font-size: var(--text-sm);
 }
-.jobs-table th {
-  text-align: left;
-  padding: 10px var(--space-4);
+/* Each cell labels itself on mobile, so the header row is visually redundant
+   while staying available to assistive tech. */
+.tracker-table thead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.tracker-table tbody,
+.tracker-row,
+.tracker-cell { display: block; }
+.tracker-row {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+/* The left edge carries the tracker group, so applied and closed rows separate
+   at a glance without spending a column on it. */
+.tracker-row--applied { border-left-color: var(--color-accent); }
+.tracker-row--in_progress { border-left-color: var(--color-warning); }
+.tracker-row--closed { border-left-color: var(--color-ink-faint); }
+.tracker-cell {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 3px 0;
+}
+.tracker-cell::before {
+  content: attr(data-label);
+  flex: none;
   font-size: var(--text-xs);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--color-ink-faint);
-  background: var(--color-surface-sunken);
-  border-bottom: 1px solid var(--color-border);
-  white-space: nowrap;
 }
-.jobs-table td {
-  padding: 11px var(--space-4);
-  border-bottom: 1px solid var(--color-border);
-  vertical-align: middle;
+/* The title leads the card, so it spans the width without a label. */
+.tracker-cell-job {
+  display: block;
+  padding: 0 0 var(--space-2);
 }
-.jobs-table-row:last-child td { border-bottom: none; }
-.jobs-table-row:hover td { background: var(--color-surface-sunken); }
-.jobs-table-title a {
-  font-weight: 600;
+.tracker-cell-job::before { content: none; }
+.tracker-job-link {
+  font-size: var(--text-md);
+  font-weight: 700;
+  line-height: 1.3;
   color: var(--color-ink);
 }
-.jobs-table-title a:hover { color: var(--color-accent-strong); }
-.jobs-table-company { color: var(--color-ink-soft); }
-.jobs-table-score-col,
-.jobs-table-score { white-space: nowrap; }
-.jobs-table-action-col { width: 1%; }
-.jobs-table-view {
-  font-weight: 700;
-  white-space: nowrap;
+.tracker-job-link:hover { color: var(--color-accent-strong); }
+.tracker-cell-company { color: var(--color-ink-soft); }
+.tracker-cell-date {
+  color: var(--color-ink-faint);
+  font-variant-numeric: tabular-nums;
 }
-/* source/score pills inside the table reuse the feed pill idiom */
-.jobs-table .job-source {
-  display: inline-flex;
+.tracker-cell-status { align-items: center; padding-top: var(--space-2); }
+.tracker-status {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 5px;
-  padding: 2px 9px;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+.tracker-stage {
+  padding: 3px 9px;
   border-radius: var(--radius-pill);
-  background: var(--color-surface-sunken);
+  background: var(--color-success-soft);
   color: var(--color-ink-soft);
   font-size: var(--text-xs);
   font-weight: 600;
   white-space: nowrap;
 }
-.jobs-table .job-score {
-  display: inline-flex;
-  padding: 4px 10px;
-  border-radius: var(--radius-pill);
+.tracker-saving {
   font-size: var(--text-xs);
+  color: var(--color-ink-faint);
+}
+.tracker-status-error {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-soft);
+  color: var(--color-danger-ink);
+  font-size: var(--text-sm);
   font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 
 /* --------------------------------------------------------------------------
@@ -2081,7 +2128,7 @@ html { scroll-padding-bottom: var(--screen-bottom); }
 .copy-status { font-size: var(--text-sm); color: var(--color-ink-soft); }
 .draft-materials > * { min-width: 0; }
 .draft-manual-intro { margin-bottom: 24px; }
-.jobs-table-wrap { max-width: 100%; }
+.tracker-wrap { max-width: 100%; }
 .job-list-link, .digest-link { min-width: 0; grid-template-columns: minmax(0, 1fr) auto; }
 
 @container (min-width: 800px) {
@@ -2099,7 +2146,68 @@ html { scroll-padding-bottom: var(--screen-bottom); }
   .job-workspace-actions { display: block; grid-column: 2; grid-row: 1; position: sticky; top: 24px; max-height: calc(100dvh - 48px); overflow-y: auto; padding: 20px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
   .manual-application { padding: 0; border: 0; background: transparent; }
   .digest-items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .applications-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  /* Wide enough for real columns: the same markup becomes a table again. */
+  .tracker-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-sm);
+  }
+  .tracker-table { display: table; }
+  .tracker-table thead {
+    position: static;
+    display: table-header-group;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip-path: none;
+  }
+  .tracker-table tbody { display: table-row-group; }
+  .tracker-table th {
+    text-align: left;
+    padding: 10px var(--space-4);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-ink-faint);
+    background: var(--color-surface-sunken);
+    border-bottom: 1px solid var(--color-border);
+    white-space: nowrap;
+  }
+  .tracker-col-date { width: 1%; }
+  .tracker-row {
+    display: table-row;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .tracker-row:hover .tracker-cell { background: var(--color-surface-sunken); }
+  .tracker-cell {
+    display: table-cell;
+    padding: 11px var(--space-4);
+    border-bottom: 1px solid var(--color-border);
+    vertical-align: middle;
+  }
+  .tracker-row:last-child .tracker-cell { border-bottom: none; }
+  .tracker-cell::before { content: none; }
+  /* A table row cannot carry the group's left border with collapsed borders,
+     so the leading cell paints it instead. */
+  .tracker-cell-job {
+    box-shadow: inset 3px 0 0 var(--color-border-strong);
+    padding-left: calc(var(--space-4) + 3px);
+  }
+  .tracker-row--applied .tracker-cell-job { box-shadow: inset 3px 0 0 var(--color-accent); }
+  .tracker-row--in_progress .tracker-cell-job { box-shadow: inset 3px 0 0 var(--color-warning); }
+  .tracker-row--closed .tracker-cell-job { box-shadow: inset 3px 0 0 var(--color-ink-faint); }
+  .tracker-job-link { font-size: var(--text-sm); font-weight: 600; }
+  .tracker-cell-status { padding-top: 11px; }
+  .tracker-status { justify-content: flex-start; }
+  .tracker-cell-date { white-space: nowrap; }
   .draft-materials { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 40px; align-items: start; }
   .draft-resume-emphasis { grid-column: 1 / -1; }
   .profile-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }

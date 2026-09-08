@@ -203,6 +203,17 @@ dispatch.
   return the standard envelope `{<collection>: [...], page: {number, size, total, has_next}}`. Page
   size is the `JOBS_PAGE_SIZE` constant (default 30). Do not slice client-side — the point is to cap
   the payload of a multi-hundred-row feed.
+- Application-tracker grouping (TRACK-01) is a Rails concern, not a client one. The tracker
+  groups of `Application#pipeline_status` live in one place —
+  `Api::JobPostsController::APPLICATION_GROUPS` — and the feed exposes them as the `application`
+  query param plus an `application_counts` tally in the response. Attach the job's latest
+  Application with the controller's `LATEST_APPLICATION_JOIN` (`LEFT JOIN LATERAL … LIMIT 1`)
+  rather than a `has_many` filter, so a job post with several applications is filtered, sorted,
+  and counted by its most recent one only, and pagination totals stay exact. `not_applied`
+  deliberately spans both "no `Application` row" and the pre-apply statuses; never reimplement
+  that mapping in the Go client — mirror it there only for row styling, and let the server decide
+  membership. When a client needs "every intaked job" it must pass `status=all`: the feed default
+  is scored-only and deterministic triage leaves most inbound postings unscored.
 - The OpenRouter LLM gateway is reached only through `OpenrouterClient`
   (`app/services/openrouter_client.rb`) — never inlined in controllers or jobs. It reads
   `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` (default `google/gemma-4-31b-it:free`), requests
@@ -332,7 +343,12 @@ dispatch.
   separate: successful submit/report moves the tracker to `applied`/`waiting`, while paused/failed
   worker reports move it to `needs_review`. Manual tracker updates use
   `PATCH /api/applications/:id/status` or `PATCH /api/job_posts/:id/application_status`; those
-  endpoints must never enqueue worker jobs. The worker enforces the matching guard on its side
+  endpoints must never enqueue worker jobs. The Applications tracker screen uses the job-post
+  variant for every row write, because it creates the `Application` on first use and therefore
+  works for a posting the owner has never touched. There is deliberately no transition back to
+  "not applied": clearing a tracked application would destroy its draft and audit history, so the
+  tracker's "Not applied" `<option>` is an inert placeholder shown only while no Application
+  exists. The worker enforces the matching guard on its side
   (see below).
 
 ---

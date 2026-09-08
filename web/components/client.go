@@ -86,15 +86,6 @@ type RailsClient interface {
 	// user action; Rails dispatches the trusted submit task to the worker.
 	SubmitApplication(ctx context.Context, id int) (SubmitResult, error)
 
-	// Applications fetches the user-facing application tracker
-	// (GET /api/applications). This is distinct from the worker task queue: it
-	// lists pipeline status/stage for jobs the owner is tracking.
-	Applications(ctx context.Context) ([]ApplicationTracker, error)
-
-	// UpdateApplicationStatus changes a tracked application's user-facing
-	// pipeline state (PATCH /api/applications/:id/status). It never submits.
-	UpdateApplicationStatus(ctx context.Context, id int, update ApplicationStatusUpdate) (ApplicationTracker, error)
-
 	// UpdateJobApplicationStatus changes or creates the tracked application
 	// state for a job post (PATCH /api/job_posts/:id/application_status). It is
 	// used by job-detail status controls and never submits.
@@ -285,6 +276,11 @@ type JobSummary struct {
 	TriageReasons  []string `json:"triage_reasons"`
 	LifecycleState string   `json:"lifecycle_state"`
 	Summary        string   `json:"summary"`
+	// CreatedAt is when the posting was intaked, as an RFC 3339 timestamp.
+	CreatedAt string `json:"created_at"`
+	// Application is the job's most recent tracked application, or nil when the
+	// owner has not tracked this posting yet. Rails decides which one is latest.
+	Application *ApplicationTracker `json:"application"`
 }
 
 // JobFeedParams is the owner-selected feed query carried to GET /api/job_posts.
@@ -292,12 +288,16 @@ type JobSummary struct {
 // state=active, sort=oldest, page=1). All filtering/sorting/paging is server-
 // side; the web layer only serializes these into query params.
 type JobFeedParams struct {
-	// Status is "scored" (default) or "unscored".
+	// Status is "scored" (default), "unscored", or "all".
 	Status string
-	// State is the lifecycle bin: "active" (default), "backlog", or "removed".
+	// State is the lifecycle bin: "active" (default), "open" (active +
+	// backlog), "backlog", or "removed".
 	State string
-	// Sort is "oldest" (default) or "score".
+	// Sort is "oldest" (default), "score", "newest", or "activity".
 	Sort string
+	// Application narrows to one tracker group: "not_applied", "applied",
+	// "in_progress", or "closed"; empty = every group.
+	Application string
 	// ScoreBand filters to "high", "mid", "low", or "unscored"; empty = all.
 	ScoreBand string
 	// Source filters to one ingestion source (e.g. "linkedin"); empty = all.
@@ -323,6 +323,7 @@ func (p JobFeedParams) query() url.Values {
 	set("status", p.Status)
 	set("state", p.State)
 	set("sort", p.Sort)
+	set("application", p.Application)
 	set("score_band", p.ScoreBand)
 	set("source", p.Source)
 	set("location", p.Location)
@@ -339,6 +340,20 @@ func (p JobFeedParams) query() url.Values {
 type JobPage struct {
 	Jobs []JobSummary `json:"job_posts"`
 	Page PageMeta     `json:"page"`
+	// Counts tallies every tracker group over the same filters except the
+	// application group itself, so the tracker tabs show totals without the
+	// client recomputing them.
+	Counts ApplicationCounts `json:"application_counts"`
+}
+
+// ApplicationCounts is Rails' per-group tally of the current feed query. A job
+// post with no tracked application counts toward NotApplied.
+type ApplicationCounts struct {
+	All        int `json:"all"`
+	NotApplied int `json:"not_applied"`
+	Applied    int `json:"applied"`
+	InProgress int `json:"in_progress"`
+	Closed     int `json:"closed"`
 }
 
 // PageMeta is the pagination envelope Rails returns alongside the feed rows.
@@ -812,27 +827,6 @@ func (c *httpRailsClient) SubmitApplication(ctx context.Context, id int) (Submit
 		return SubmitResult{}, err
 	}
 	return out, nil
-}
-
-func (c *httpRailsClient) Applications(ctx context.Context) ([]ApplicationTracker, error) {
-	var out struct {
-		Applications []ApplicationTracker `json:"applications"`
-	}
-	if err := c.get(ctx, "/api/applications", &out); err != nil {
-		return nil, err
-	}
-	return out.Applications, nil
-}
-
-func (c *httpRailsClient) UpdateApplicationStatus(ctx context.Context, id int, update ApplicationStatusUpdate) (ApplicationTracker, error) {
-	body := map[string]any{"application": update}
-	var out struct {
-		Application ApplicationTracker `json:"application"`
-	}
-	if err := c.sendJSON(ctx, http.MethodPatch, fmt.Sprintf("/api/applications/%d/status", id), body, &out); err != nil {
-		return ApplicationTracker{}, err
-	}
-	return out.Application, nil
 }
 
 func (c *httpRailsClient) UpdateJobApplicationStatus(ctx context.Context, jobID int, update ApplicationStatusUpdate) (ApplicationTracker, error) {

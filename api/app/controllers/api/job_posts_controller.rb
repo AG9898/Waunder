@@ -6,6 +6,32 @@ module Api
     DEFAULT_PAGE_SIZE = 30
     PAGE_SIZE_ENV = "JOBS_PAGE_SIZE".freeze
 
+    # Application-tracker groupings over Application#pipeline_status. The feed
+    # exposes them as one `application` filter so the PWA tracker can answer
+    # "what have I applied to, and what haven't I" without client-side logic.
+    # UNTRACKED_GROUP additionally matches job posts with no Application at all.
+    UNTRACKED_GROUP = "not_applied".freeze
+    APPLICATION_GROUPS = {
+      UNTRACKED_GROUP => %w[interested drafting needs_review],
+      "applied" => %w[applied],
+      "in_progress" => %w[interviewing offer],
+      "closed" => %w[rejected withdrawn archived]
+    }.freeze
+
+    # Attaches each job post's most recent Application so the feed can filter,
+    # sort, and count by tracker state in one query. LEFT JOIN LATERAL keeps one
+    # row per job post, so counts and pagination stay exact.
+    LATEST_APPLICATION_JOIN = <<~SQL.squish.freeze
+      LEFT JOIN LATERAL (
+        SELECT applications.pipeline_status,
+               applications.last_status_change_at
+        FROM applications
+        WHERE applications.job_post_id = job_posts.id
+        ORDER BY applications.created_at DESC, applications.id DESC
+        LIMIT 1
+      ) latest_application ON TRUE
+    SQL
+
     # Server-side page size for the paginated job feed; env-overridable.
     def self.page_size
       raw = ENV.fetch(PAGE_SIZE_ENV, DEFAULT_PAGE_SIZE).to_s.strip
@@ -15,17 +41,23 @@ module Api
       size.positive? ? size.clamp(1, 1_000) : DEFAULT_PAGE_SIZE
     end
 
-    # Scored job feed for the PWA. Server-side filter/sort/paginate.
-    # Read-only; never triggers scoring or the LLM.
+    # Job feed for the PWA, also backing the application tracker. Server-side
+    # filter/sort/paginate. Read-only; never triggers scoring or the LLM.
+    #
+    # `application_counts` are computed over every filter EXCEPT `application`,
+    # so the tracker's group tabs can show how many rows each one holds without
+    # the client running its own tallies.
     def index
-      relation = filtered_job_posts.includes(:company)
+      scoped = filtered_job_posts
+      counts = application_counts(scoped)
+      relation = application_scoped(scoped)
       total = relation.count
 
       page_size = self.class.page_size
       page_number = requested_page
       offset = (page_number - 1) * page_size
 
-      rows = ordered(relation).limit(page_size).offset(offset)
+      rows = ordered(relation).includes(:company, :applications).limit(page_size).offset(offset)
 
       render json: {
         job_posts: rows.map { |job_post| serialize_summary(job_post) },
@@ -34,7 +66,8 @@ module Api
           size: page_size,
           total: total,
           has_next: offset + rows.length < total
-        }
+        },
+        application_counts: counts
       }
     end
 
@@ -166,8 +199,10 @@ module Api
       )
     end
 
+    # Every filter except `application`, which is applied separately so the
+    # tracker's group counts can be taken over the same base relation.
     def filtered_job_posts
-      relation = status_scoped(JobPost.all)
+      relation = status_scoped(JobPost.joins(LATEST_APPLICATION_JOIN))
       relation = state_scoped(relation)
       relation = score_band_scoped(relation)
       relation = source_scoped(relation)
@@ -177,6 +212,8 @@ module Api
 
     def status_scoped(relation)
       case params[:status].to_s
+      when "all"
+        relation
       when "unscored"
         relation.where.not(scoring_status: JobScorer::STATUS_SCORED)
       else
@@ -186,12 +223,43 @@ module Api
 
     def state_scoped(relation)
       case params[:state].to_s
+      when "open"
+        relation.where(lifecycle_state: %w[active backlog])
       when "backlog"
         relation.backlog
       when "removed"
         relation.removed
       else
         relation.active
+      end
+    end
+
+    # Narrows to one tracker group (see APPLICATION_GROUPS). Unknown or blank
+    # values mean "every group", matching the tracker's All tab.
+    def application_scoped(relation)
+      group = params[:application].to_s
+      statuses = APPLICATION_GROUPS[group]
+      return relation if statuses.nil?
+
+      if group == UNTRACKED_GROUP
+        relation.where(
+          "latest_application.pipeline_status IS NULL OR latest_application.pipeline_status IN (:statuses)",
+          statuses: statuses
+        )
+      else
+        relation.where("latest_application.pipeline_status IN (:statuses)", statuses: statuses)
+      end
+    end
+
+    # Tally of matching job posts per tracker group, plus "all". A job post with
+    # no Application counts toward UNTRACKED_GROUP.
+    def application_counts(relation)
+      tallies = relation.reorder(nil).group(Arel.sql("latest_application.pipeline_status")).count
+
+      APPLICATION_GROUPS.each_with_object("all" => tallies.values.sum) do |(group, statuses), counts|
+        total = statuses.sum { |status| tallies[status].to_i }
+        total += tallies[nil].to_i if group == UNTRACKED_GROUP
+        counts[group] = total
       end
     end
 
@@ -237,6 +305,13 @@ module Api
           Arel.sql("match_score DESC NULLS LAST"),
           Arel.sql("triage_score DESC NULLS LAST"),
           created_at: :desc
+        )
+      when "newest"
+        relation.order(created_at: :desc, id: :desc)
+      when "activity"
+        relation.order(
+          Arel.sql("COALESCE(latest_application.last_status_change_at, job_posts.created_at) DESC"),
+          id: :desc
         )
       else
         relation.order(created_at: :asc)
@@ -285,6 +360,8 @@ module Api
         title: job_post.title,
         company: job_post.company&.name,
         source: job_post.source,
+        created_at: job_post.created_at,
+        application: serialize_application(latest_application(job_post)),
         match_score: job_post.match_score,
         scoring_status: job_post.scoring_status,
         triage_status: job_post.triage_status,
@@ -325,6 +402,12 @@ module Api
           application_url: route&.application_url
         }
       }
+    end
+
+    # Most recent Application for a job post, read from the loaded association
+    # so a feed page never issues one query per row.
+    def latest_application(job_post)
+      job_post.applications.max_by { |application| [ application.created_at, application.id ] }
     end
 
     def tracked_application_for(job_post)

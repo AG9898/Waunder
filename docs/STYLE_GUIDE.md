@@ -109,22 +109,31 @@ figures where possible.
   baked into the fill — no live CDN dependency, matching the self-hosted-font policy). Sources
   without a brand logo (manual entry, generic email alert) use an emoji marker instead. The
   logo/emoji sits inline before the source label via `flex` + `gap` on the pill.
-- The Applications screen pairs its title with a stats cluster in the top-right
-  (`.applications-header` / `.applications-stats` — a value + small uppercase caption per stat;
-  total count for now) and a segmented `.applications-view-selector` that toggles between the
-  pipeline cards (`.applications-list`) and the all-jobs `.jobs-table`. The table is a quiet
-  spreadsheet-style tracker (sunken header row, hairline row dividers, hover row tint) listing
-  every job post; the title and a trailing "View" link both route to the job posting. Score and
-  source cells reuse the feed's color-coded score pill and source pill idioms.
+- The Applications screen is one unified tracker (TRACK-01), not a two-view toggle: every
+  intaked job post gets a row, and its application status is set inline on that row. Its title
+  pairs with a stats cluster in the top-right (`.applications-header` / `.applications-stats` —
+  a value + small uppercase caption per stat: applied-to and jobs-tracked). Below it, group tabs
+  (`.tracker-tabs` / `.tracker-tab`, sharing the segmented `.view-selector-option-active` idiom
+  with the Jobs bin tabs) select All / Not applied / Applied / In progress / Closed, each with a
+  count badge; the strip scrolls horizontally so five tabs stay reachable on a phone. Lifecycle
+  bin and sort sit under them as plain labelled selects (`.tracker-controls`).
+- The tracker rows (`.tracker-table`) are one responsive markup, not two: on mobile each row is a
+  card whose cells label themselves via `data-label` + `::before`, and inside the 800px container
+  query the same table reverts to real `table` display with a sunken header row, hairline
+  dividers, and a hover tint. The tracker group is carried by a colored left edge (a border on the
+  mobile card; an inset `box-shadow` on the leading cell in table mode, since a collapsed-border
+  table row cannot paint one) — sage for applied, amber for in progress, faint for closed. Empty
+  states name the active tab ("No applications submitted yet.") rather than a generic "no rows".
 - The Jobs feed's filter + sort controls live in a collapsed-by-default `.job-filters-panel`
   (`<details>`/`<summary>` "Filters & sort") so they don't push the feed down on mobile; the
   summary carries a small count badge of how many filters are active, and the controls lay out
-  in a 2-up grid (auto-fit on wide screens). *Planned (stubbed, not yet built): filter/sort
-  controls for the all-jobs table on the Applications screen.*
+  in a 2-up grid (auto-fit on wide screens). The Applications tracker has its own leaner
+  controls (group tabs + bin + sort) and does not reuse this panel.
 - Job detail, draft review, profile, and route sections use top hairlines plus spacing.
 - Desktop workspaces use the available width: Jobs has a filter sidebar and compact rows;
-  job detail pairs the assessment with a sticky application panel; ingestion batches, tracked
-  applications, contacts, profile fields, and draft materials use two columns where useful.
+  job detail pairs the assessment with a sticky application panel; ingestion batches, contacts,
+  profile fields, and draft materials use two columns where useful, and the Applications tracker
+  becomes a real table.
   Container queries at 800px of content width keep these layouts tied to the selected layout,
   including forced Mobile on a wide monitor and narrow windows in Desktop mode.
 - Manual application is the primary job-detail flow: open the resolved application link in a
@@ -141,7 +150,7 @@ figures where possible.
 - Inputs and textareas use warm surface fill, strong hairline border, 12px radius, and a
   visible sage focus ring.
 - Error and success messages use soft status pills. Loading uses a gentle opacity pulse.
-- Empty feed/list states (`.digest-empty`, `.job-list-empty`, `.jobs-table-empty`,
+- Empty feed/list states (`.digest-empty`, `.job-list-empty`, `.tracker-empty`,
   `.contacts-empty`) render as a
   quiet sunken well with centered faint-ink text — visually distinct from the danger-toned
   `.load-error` so "nothing here yet" never reads as a failure.

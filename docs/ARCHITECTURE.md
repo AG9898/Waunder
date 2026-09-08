@@ -111,8 +111,9 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   with no backend. The read shapes the client expects are `GET /api/job_posts` (the unified feed:
   `RailsClient.Jobs(ctx, JobFeedParams)` carries the `status`/`state`/`sort`/`score_band`/
   `source`/`location`/`date_from`/`date_to`/`page` query params and decodes the
-  `{job_posts, page}` envelope into a `JobPage`; the unscored view is just `Status: "unscored"`,
-  so there is no separate `UnscoredJobs` method — INTAKE-07),
+  `{job_posts, page, application_counts}` envelope into a `JobPage`; the unscored view is just
+  `Status: "unscored"`, so there is no separate `UnscoredJobs` method — INTAKE-07; the
+  application tracker is the same call with `Status: "all"` and an `Application` group — TRACK-01),
   `GET /api/job_posts/:id` (detail), `GET /api/digest` (digest), and
   `GET /api/ingestion_batches` (ingestion history — postings grouped into source+arrival-time
   batches by `IngestionBatchBuilder`, derived without any persisted batch link or migration;
@@ -121,14 +122,32 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   Rails now serves all of these
   (READ-01): session-guarded, read-only, exposing only client-safe fields. The feed returns
   compact rows (`id`, `title`, `company`, `match_score`, `scoring_status`, `lifecycle_state`,
-  triage metadata, `summary`). The feed is filterable and paginated (INTAKE-01): query params are
-  `status` (scored default | unscored), `state` (`active` default | `backlog` | `removed`),
+  triage metadata, `summary`, `created_at`, and the latest `application`). The feed is filterable and paginated (INTAKE-01): query params are
+  `status` (scored default | unscored | `all`), `state` (`active` default | `open` (active +
+  backlog) | `backlog` | `removed`),
   `sort` (`oldest` default — ingestion ascending — | `score`, i.e. `match_score DESC NULLS LAST`,
-  `triage_score DESC NULLS LAST`, then recency), `score_band` (`high`≥75 | `mid` 50–74 | `low`<50 |
-  `unscored`), `source`, `location`, `date_from`/`date_to` (ingestion-date range), and `page`
+  `triage_score DESC NULLS LAST`, then recency | `newest` — ingestion descending — | `activity`,
+  i.e. `COALESCE(latest application's last_status_change_at, job_posts.created_at) DESC`),
+  `score_band` (`high`≥75 | `mid` 50–74 | `low`<50 |
+  `unscored`), `source`, `location`, `date_from`/`date_to` (ingestion-date range), `application`
+  (the tracker group, below), and `page`
   (1-based, **30 rows/page**). The response wraps the rows in a pagination envelope
   `{job_posts: [...], page: {number, size, total, has_next}}`. Filters AND-combine; `active` is the
-  default `state`, so backlog/removed are opt-in views. `GET /api/ingestion_batches` is likewise
+  default `state`, so backlog/removed are opt-in views.
+- **Application-tracker query surface (TRACK-01).** The feed doubles as the application tracker,
+  so each row carries `created_at` and `application` (the job's most recent tracked `Application`,
+  or `null`), and the response adds `application_counts`. A `LEFT JOIN LATERAL` attaches exactly
+  one latest Application per job post, so filtering, sorting, and counting by tracker state all
+  happen in one exact query. `application` groups over `Application#pipeline_status`
+  (`Api::JobPostsController::APPLICATION_GROUPS`): `not_applied` (`interested`, `drafting`,
+  `needs_review`, **and job posts with no Application at all**), `applied`, `in_progress`
+  (`interviewing`, `offer`), and `closed` (`rejected`, `withdrawn`, `archived`); a blank or
+  unknown value means every group. `application_counts` (`{all, not_applied, applied,
+  in_progress, closed}`) is computed over every other filter but **not** the `application` filter
+  itself, so the PWA's group tabs can show their totals without the client tallying anything.
+  Note `status=all` matters here: the feed default is scored-only, and deterministic triage leaves
+  most intaked postings `deferred`/`filtered`, so a tracker asking for "everything I intaked" must
+  pass it explicitly. `GET /api/ingestion_batches` is likewise
   paginated at 30 batches/page with the same envelope. Detail adds the scored arrays/notes
   (`relevant_requirements`, `missing_requirements`, `red_flags`, `resume_alignment_notes`,
   `application_strategy`) plus the resolved `route` (`route_type`, `recommended_route`,
@@ -150,10 +169,16 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   `draft_ready`, `autofill_warnings`, and latest worker failure context) and can persist reviewed
   autofill answer edits via `PATCH /api/applications/:id/draft` before submit. It submits via
   `POST /api/applications/:id/submit` (already served; returns `{status: "dispatched", ...}` or
-  an error). The applications tracker reads `GET /api/applications` and updates user-facing
-  pipeline state with `PATCH /api/applications/:id/status`; job detail can create/reuse the
-  tracker application for a job with `PATCH /api/job_posts/:id/application_status`. These tracker
-  updates never submit or enqueue worker jobs. The submit is fired only on an explicit user click — never on mount/render — and is
+  an error). The Applications screen (`components.ApplicationsView`) is the application tracker:
+  one row per intaked job post, read from `GET /api/job_posts` with `status=all` and `state=open`
+  so postings triage never scored, and backlogged ones, still appear. Its group tabs, lifecycle
+  bin, sort, and paging are all server-side (see the tracker query surface above); the row's
+  inline status control writes through `PATCH /api/job_posts/:id/application_status`, which
+  creates the `Application` on first use, and the screen then refetches so Rails stays the
+  authority on group membership and counts. Rails still serves `GET /api/applications` and
+  `PATCH /api/applications/:id/status` (the application-scoped tracker read/write), but no PWA
+  screen consumes them since TRACK-01, so the Go client no longer declares them. These tracker
+  updates never submit, never generate a draft, and never enqueue worker jobs. The submit is fired only on an explicit user click — never on mount/render — and is
   disabled until a draft/autofill payload is ready and Rails reports no manual-review warnings,
   which upholds the per-application approval rule; the dispatched ATS from the submit response is
   surfaced as the audit result. The apply flow's front door is `POST /api/applications`

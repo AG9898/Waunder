@@ -1011,3 +1011,37 @@ the form can render new/tracked/submitted outcomes; keep matching and its status
 ### 2026-09-08 — Inbound aliases register at materialization and route resolution
 `JobPostMaterializer` writes stable source/posting aliases before `ApplicationRouteResolver` writes
 the resolved application alias; both use `JobUrlIdentity.key`, so registration is idempotent and never fetches or calls the LLM.
+
+### 2026-09-08 — The Applications table was empty because the feed defaults to scored-only
+`Api::JobPostsController#index`'s `status_scoped` had no "all" branch: its `else` forced
+`scoring_status = 'scored'`. `ApplicationsView.tableParams()` left `Status` unset on purpose,
+with a comment claiming that meant "every job" — it actually got the scored-only default. Since
+deterministic triage leaves most inbound postings `deferred`/`filtered` (production had 5 active
+jobs, **0** scored), the all-jobs table rendered "No jobs yet." while the API answered 200. A
+green request spec masked it because every fixture set `scoring_status: "scored"`. Lesson: when a
+client relies on a server default meaning "no filter", assert that default in a spec — a param the
+client omits is invisible in both the request log and the response.
+
+### 2026-09-08 — Application tracker is one feed query, not a second endpoint
+TRACK-01 replaced the Applications/All-jobs toggle with one table over `GET /api/job_posts`
+(`status=all`, `state=open`). Rails attaches each job's latest Application through
+`LATEST_APPLICATION_JOIN` (`LEFT JOIN LATERAL … ORDER BY created_at DESC LIMIT 1`) — one row per
+job post, so `application` group filtering, `sort=activity`, `page.total`, and the new
+`application_counts` tally all stay exact even when a job has several applications. Counts are
+taken over every filter EXCEPT `application`, so the group tabs can show their own totals.
+Group membership lives only in `APPLICATION_GROUPS` (Rails); the Go `TrackerGroup` mirrors it for
+row tinting only. Row writes go through `PATCH /api/job_posts/:id/application_status` (it creates
+the Application on first use, so an untouched posting can be marked applied) and are followed by a
+refetch rather than a local patch, because a status change can move the row out of the active tab.
+`GET /api/applications` + `PATCH /api/applications/:id/status` still exist in Rails but no screen
+consumes them, so `RailsClient.Applications`/`UpdateApplicationStatus` were removed.
+
+### 2026-09-08 — One table markup, two layouts, via the existing container query
+The tracker renders a single `<table>` that is a stack of self-labelling cards on mobile
+(`thead` visually hidden, `tr`/`td` set to `display: block`, each cell's `data-label` painted by
+`::before`) and reverts to real `table`/`table-row`/`table-cell` display inside the existing
+`@container (min-width: 800px)` block — the workspaces already set `container-type: inline-size`,
+so this follows the selected Auto/Desktop/Mobile layout rather than the viewport. Two gotchas: set
+the desktop display values explicitly rather than `revert` (`revert` on `tbody`/`tr` is
+unreliable across engines here), and a group tint cannot be a `border-left` on a `tr` under
+`border-collapse` — paint it as an inset `box-shadow` on the leading cell instead.

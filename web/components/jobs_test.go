@@ -80,14 +80,6 @@ type mockClient struct {
 	gotSubmitID  int
 	submitCalls  int
 
-	applications []ApplicationTracker
-	appsErr      error
-
-	updateAppStatus      ApplicationTracker
-	updateAppStatusErr   error
-	gotUpdateAppStatusID int
-	gotUpdateAppStatus   ApplicationStatusUpdate
-	updateAppStatusCalls int
 	updateJobStatus      ApplicationTracker
 	updateJobStatusErr   error
 	gotUpdateJobStatusID int
@@ -115,6 +107,8 @@ type mockClient struct {
 	gotOutreachID   int
 	gotOutreachTmpl string
 	generateCalls   int
+
+	jobsCounts ApplicationCounts
 
 	createResult ManualJobResult
 	createErr    error
@@ -160,7 +154,7 @@ func (m *mockClient) Jobs(_ context.Context, params JobFeedParams) (JobPage, err
 		m.unscoredJobsCalls++
 		rows = m.unscoredJobs
 	}
-	return JobPage{Jobs: rows, Page: m.jobsPage}, nil
+	return JobPage{Jobs: rows, Page: m.jobsPage, Counts: m.jobsCounts}, nil
 }
 
 func (m *mockClient) ScoreJobPost(_ context.Context, id int) (JobSummary, error) {
@@ -228,17 +222,6 @@ func (m *mockClient) SubmitApplication(_ context.Context, id int) (SubmitResult,
 	m.gotSubmitID = id
 	m.submitCalls++
 	return m.submitResult, m.submitErr
-}
-
-func (m *mockClient) Applications(context.Context) ([]ApplicationTracker, error) {
-	return m.applications, m.appsErr
-}
-
-func (m *mockClient) UpdateApplicationStatus(_ context.Context, id int, update ApplicationStatusUpdate) (ApplicationTracker, error) {
-	m.gotUpdateAppStatusID = id
-	m.gotUpdateAppStatus = update
-	m.updateAppStatusCalls++
-	return m.updateAppStatus, m.updateAppStatusErr
 }
 
 func (m *mockClient) UpdateJobApplicationStatus(_ context.Context, jobID int, update ApplicationStatusUpdate) (ApplicationTracker, error) {

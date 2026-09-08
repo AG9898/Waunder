@@ -1730,6 +1730,49 @@
         "cd web && go test ./...",
         "cd web && go vet ./..."
       ]
+    },
+    {
+      "id": "TRACK-01",
+      "title": "Fix and overhaul the Applications tracker",
+      "description": "The Applications tab's all-jobs table rendered empty in production: GET /api/job_posts had no status=all option, so the table's omitted status param silently got the scored-only default while triage leaves most intaked postings unscored. Add status=all, state=open (active + backlog), an application tracker-group filter with an application_counts tally, sort=newest/activity, and the latest application plus created_at on each feed row, all attached with one LEFT JOIN LATERAL. Replace the two-view Applications screen with a single tracker table: one row per intaked job, group tabs with counts, bin and sort controls, and an inline per-row status control writing through PATCH /api/job_posts/:id/application_status.",
+      "status": "done",
+      "priority": "high",
+      "group_id": "TRACK",
+      "depends_on": [
+        "INTAKE-09"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "GET /api/job_posts supports status=all, state=open, the application group filter, and sort=newest/activity, and returns created_at, the latest application, and application_counts",
+        "Group membership and counts are computed server-side over exactly one latest Application per job post, so a job with several applications is filtered and counted by its most recent one",
+        "The Applications screen renders one row per intaked job with its tracker status, including postings that were never scored and never touched",
+        "A row status change writes through the job-post application_status endpoint, creating the Application on first use, and never generates a draft or submits",
+        "Request specs cover the tracker query surface; Go component tests assert zero status writes, draft creations, and submits after a full render lifecycle",
+        "cd api && bundle exec rspec and bin/rubocop pass; cd web && go test ./... and go vet ./... pass"
+      ],
+      "docs": [
+        "docs/PRD.md",
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md",
+        "docs/TESTING.md",
+        "docs/STYLE_GUIDE.md"
+      ],
+      "files": [
+        "api/app/controllers/api/job_posts_controller.rb",
+        "api/spec/requests/api/job_posts_spec.rb",
+        "web/components/applications.go",
+        "web/components/applications_test.go",
+        "web/components/client.go",
+        "web/components/client_test.go",
+        "web/components/jobs_test.go",
+        "web/web/app.css"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop",
+        "cd web && go test ./...",
+        "cd web && go vet ./..."
+      ]
     }
   ]
 }

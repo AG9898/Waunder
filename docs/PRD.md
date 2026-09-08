@@ -43,10 +43,17 @@ Phase 1 delivers the full plan scenario: forward a job-alert email → Resend in
   optional stage independent of the worker automation status. The owner can mark jobs as
   interested, drafting, applied/waiting, interviewing, offer, rejected, withdrawn, archived, or
   needing review from the PWA. Successful trusted submit/report moves the tracker to
-  applied/waiting; worker pauses/failures move it to needs review. The Applications screen has a
-  view selector: the default pipeline (cards) view, and an all-jobs **table view** — an in-app
-  spreadsheet-style tracker listing every job post with a link back to each posting. A stats
-  cluster in the header shows totals (total count for now).
+  applied/waiting; worker pauses/failures move it to needs review. The Applications screen is a
+  single unified tracker (TRACK-01): one row per intaked job post — including postings never
+  scored and never touched — so it directly answers what has been applied to and what has not.
+  Rows are grouped by tracker state (All / Not applied / Applied / In progress / Closed, each tab
+  carrying its count), default to the open bins (active + backlog, removed behind its own
+  filter), sort by newest intake / recent activity / highest match, and page at 30. Each row
+  shows the job, company, its status, when it was intaked, and when its status last moved, and
+  the status is editable **inline on the row** — creating the tracked application on first use,
+  without ever generating a draft or submitting. A header stats cluster shows how many jobs have
+  been applied to out of the total tracked. Untracking is deliberately unsupported, since it
+  would destroy an application's draft and audit history.
 - **Manual job import and duplicate awareness**: a persistent, clearly labelled **Import job**
   action in the shared header and Jobs screen (including its empty state) lets the owner record a
   job-board listing URL, an optional external application URL, and/or pasted posting text. Before
@@ -68,7 +75,7 @@ Phase 1 delivers the full plan scenario: forward a job-alert email → Resend in
   (default, in the working feed), **backlog** (parked "maybe later", kept and restorable), or
   **removed** (soft-deleted: hidden everywhere but retained so repeat alerts stay deduped, with a
   Removed bin for restore). The owner moves jobs between bins from the job row/detail, including a
-  **bulk multi-select** action. The Jobs feed and the all-jobs table are **filterable** (score band,
+  **bulk multi-select** action. The Jobs feed and the Applications tracker are **filterable** (score band,
   source, location/remote, ingestion-date range, lifecycle state) and **paginated** at 30 rows/page;
   the feed defaults to scored, active, **oldest-ingestion-first** (so the owner drains the backlog
   from the bottom up) with a highest-score-first sort toggle. The ingestion-batches landing also

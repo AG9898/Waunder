@@ -212,6 +212,147 @@ RSpec.describe "Api job posts", type: :request do
       )
     end
 
+    context "application tracker query surface" do
+      # The PWA tracker asks for every intaked job regardless of scoring, over
+      # the open (active + backlog) bins, grouped by what has been applied to.
+      def tracker_fixture
+        company = Company.create!(name: "Acme")
+        untouched = JobPost.create!(company: company, title: "Untouched", scoring_status: "deferred",
+          created_at: 3.days.ago)
+        interested = JobPost.create!(company: company, title: "Interested", scoring_status: "deferred",
+          created_at: 2.days.ago)
+        applied = JobPost.create!(company: company, title: "Applied", match_score: 80,
+          scoring_status: "scored", created_at: 1.day.ago)
+        backlogged = JobPost.create!(company: company, title: "Backlogged", scoring_status: "filtered",
+          lifecycle_state: "backlog")
+        removed = JobPost.create!(company: company, title: "Removed", scoring_status: "deferred",
+          lifecycle_state: "removed")
+
+        Application.create!(job_post: interested, status: "draft", pipeline_status: "interested")
+        Application.create!(job_post: applied, status: "draft", pipeline_status: "applied",
+          pipeline_stage: "waiting", last_status_change_at: Time.current)
+
+        { untouched: untouched, interested: interested, applied: applied,
+          backlogged: backlogged, removed: removed }
+      end
+
+      it "returns unscored jobs too when status=all" do
+        sign_in!
+        jobs = tracker_fixture
+
+        get "/api/job_posts", params: { status: "all" }
+
+        ids = JSON.parse(response.body)["job_posts"].map { |jp| jp["id"] }
+        expect(ids).to contain_exactly(jobs[:untouched].id, jobs[:interested].id, jobs[:applied].id)
+      end
+
+      it "spans active and backlog when state=open, still excluding removed" do
+        sign_in!
+        jobs = tracker_fixture
+
+        get "/api/job_posts", params: { status: "all", state: "open" }
+
+        ids = JSON.parse(response.body)["job_posts"].map { |jp| jp["id"] }
+        expect(ids).to include(jobs[:backlogged].id)
+        expect(ids).not_to include(jobs[:removed].id)
+      end
+
+      it "embeds the job post's latest application so the tracker can show its status" do
+        sign_in!
+        jobs = tracker_fixture
+
+        get "/api/job_posts", params: { status: "all", state: "open" }
+
+        rows = JSON.parse(response.body)["job_posts"].index_by { |jp| jp["id"] }
+        expect(rows[jobs[:untouched].id]["application"]).to be_nil
+        expect(rows[jobs[:applied].id]["application"]).to include(
+          "pipeline_status" => "applied",
+          "pipeline_stage" => "waiting"
+        )
+        expect(rows[jobs[:untouched].id]["created_at"]).to be_present
+      end
+
+      it "serializes only the newest application when a job post has several" do
+        sign_in!
+        company = Company.create!(name: "Acme")
+        job_post = JobPost.create!(company: company, title: "Reapplied", scoring_status: "deferred")
+        Application.create!(job_post: job_post, status: "failed", pipeline_status: "withdrawn",
+          created_at: 2.days.ago)
+        newest = Application.create!(job_post: job_post, status: "draft", pipeline_status: "interviewing",
+          created_at: 1.hour.ago)
+
+        get "/api/job_posts", params: { status: "all", application: "in_progress" }
+
+        body = JSON.parse(response.body)
+        expect(body["job_posts"].map { |jp| jp["id"] }).to eq([ job_post.id ])
+        expect(body["job_posts"].first["application"]).to include(
+          "application_id" => newest.id,
+          "pipeline_status" => "interviewing"
+        )
+      end
+
+      it "groups by tracker state, counting untracked job posts as not applied" do
+        sign_in!
+        jobs = tracker_fixture
+
+        get "/api/job_posts", params: { status: "all", state: "open", application: "not_applied" }
+
+        body = JSON.parse(response.body)
+        ids = body["job_posts"].map { |jp| jp["id"] }
+        expect(ids).to contain_exactly(jobs[:untouched].id, jobs[:interested].id, jobs[:backlogged].id)
+        expect(body["page"]["total"]).to eq(3)
+      end
+
+      it "narrows to the applied group" do
+        sign_in!
+        jobs = tracker_fixture
+
+        get "/api/job_posts", params: { status: "all", state: "open", application: "applied" }
+
+        ids = JSON.parse(response.body)["job_posts"].map { |jp| jp["id"] }
+        expect(ids).to eq([ jobs[:applied].id ])
+      end
+
+      it "counts every group over the other filters, ignoring the application filter itself" do
+        sign_in!
+        tracker_fixture
+
+        get "/api/job_posts", params: { status: "all", state: "open", application: "applied" }
+
+        expect(JSON.parse(response.body)["application_counts"]).to eq(
+          "all" => 4,
+          "not_applied" => 3,
+          "applied" => 1,
+          "in_progress" => 0,
+          "closed" => 0
+        )
+      end
+
+      it "orders newest intake first when sort=newest" do
+        sign_in!
+        jobs = tracker_fixture
+
+        get "/api/job_posts", params: { status: "all", sort: "newest" }
+
+        ids = JSON.parse(response.body)["job_posts"].map { |jp| jp["id"] }
+        expect(ids).to eq([ jobs[:applied].id, jobs[:interested].id, jobs[:untouched].id ])
+      end
+
+      it "orders by last tracker activity when sort=activity, falling back to intake time" do
+        sign_in!
+        jobs = tracker_fixture
+        # The oldest-intaked job was just moved, so activity ordering lifts it
+        # above the untouched newer rows.
+        jobs[:untouched].applications.create!(status: "draft", pipeline_status: "interested",
+          last_status_change_at: Time.current + 1.minute)
+
+        get "/api/job_posts", params: { status: "all", sort: "activity" }
+
+        ids = JSON.parse(response.body)["job_posts"].map { |jp| jp["id"] }
+        expect(ids.first).to eq(jobs[:untouched].id)
+      end
+    end
+
     it "ranks by match score when sort=score" do
       sign_in!
       company = Company.create!(name: "Acme")
