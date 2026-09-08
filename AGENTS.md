@@ -1002,3 +1002,8 @@ cross-post collisions and records each discarded loser alias in `JobPostAuditEve
 `ManualJobPostImporter` locks `JobPostUrlIdentity` rows and writes aliases in the same transaction,
 so exact URL imports reuse the existing JobPost and never enqueue duplicate scoring. A supplied
 `application_url` is an alias plus the preferred deterministic route candidate only; it is never fetched or scraped.
+
+### 2026-09-08 — Manual import envelope is separate from the JobPost payload
+`POST /api/job_posts` returns `{job_post, import}` rather than nesting import state inside the job.
+The Go client must decode the top-level `import` envelope into its typed manual-import result before
+the form can render new/tracked/submitted outcomes; keep matching and its status decision in Rails.

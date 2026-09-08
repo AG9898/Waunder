@@ -225,6 +225,41 @@ func TestClientJobDecodesFullDetail(t *testing.T) {
 	}
 }
 
+func TestClientCreateJobPostSendsExternalApplicationURLAndDecodesImport(t *testing.T) {
+	var gotInput ManualJobInput
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/job_posts" {
+			t.Fatalf("request = %s %s, want POST /api/job_posts", r.Method, r.URL.Path)
+		}
+		var body struct {
+			JobPost ManualJobInput `json:"job_post"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		gotInput = body.JobPost
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"job_post":{"id":42,"title":"Staff Engineer","company":"Acme","scoring_status":"pending"},"import":{"status":"already_tracked","application_status":"approved"}}`))
+	}))
+	defer srv.Close()
+
+	c := &httpRailsClient{http: srv.Client(), base: srv.URL}
+	result, err := c.CreateJobPost(context.Background(), ManualJobInput{
+		URL:            "https://www.linkedin.com/jobs/view/42",
+		ApplicationURL: "https://careers.acme.com/jobs/42",
+		Text:           "Build systems",
+	})
+	if err != nil {
+		t.Fatalf("CreateJobPost: %v", err)
+	}
+	if gotInput.ApplicationURL != "https://careers.acme.com/jobs/42" {
+		t.Errorf("application URL = %q", gotInput.ApplicationURL)
+	}
+	if result.ID != 42 || result.Import.Status != manualImportAlreadyTracked || result.Import.ApplicationStatus != "approved" {
+		t.Errorf("unexpected import result: %+v", result)
+	}
+}
+
 func TestClientUpdateApplicationDraftSendsAnswers(t *testing.T) {
 	var gotPath string
 	var gotAnswers []StructuredAnswer

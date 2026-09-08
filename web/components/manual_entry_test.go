@@ -13,8 +13,8 @@ func TestManualEntryRendersForm(t *testing.T) {
 	html := renderHTML(t, c)
 
 	for _, want := range []string{
-		"Add a job", "Job URL", "Posting text", "manual-entry-form",
-		"manual-entry-url", "manual-entry-text", "Add job", "/jobs",
+		"Import a job", "Job URL", "External application URL (optional)", "Posting text", "manual-entry-form",
+		"manual-entry-url", "manual-entry-application-url", "manual-entry-text", "Import job", "/jobs",
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("manual entry HTML missing %q\n%s", want, html)
@@ -30,10 +30,11 @@ func TestManualEntrySubmitPostsInputAndSurfacesJob(t *testing.T) {
 		ScoringStatus: "pending",
 	}}
 	c := &ManualEntry{
-		Client: m,
-		url:    "  https://boards.greenhouse.io/acme/jobs/42  ",
-		text:   "  Build platforms.  ",
-		title:  " Staff Engineer ",
+		Client:         m,
+		url:            "  https://boards.greenhouse.io/acme/jobs/42  ",
+		applicationURL: "  https://careers.acme.com/apply/42  ",
+		text:           "  Build platforms.  ",
+		title:          " Staff Engineer ",
 	}
 
 	c.doSubmit(context.Background())
@@ -44,6 +45,9 @@ func TestManualEntrySubmitPostsInputAndSurfacesJob(t *testing.T) {
 	// Fields are trimmed before sending; Rails owns the rest of normalization.
 	if m.createInput.URL != "https://boards.greenhouse.io/acme/jobs/42" {
 		t.Errorf("URL = %q, not trimmed", m.createInput.URL)
+	}
+	if m.createInput.ApplicationURL != "https://careers.acme.com/apply/42" {
+		t.Errorf("ApplicationURL = %q, not trimmed", m.createInput.ApplicationURL)
 	}
 	if m.createInput.Text != "Build platforms." {
 		t.Errorf("Text = %q, not trimmed", m.createInput.Text)
@@ -103,31 +107,68 @@ func TestManualEntryApplyCreateResultErrors(t *testing.T) {
 	}
 }
 
-func TestCreatedMessage(t *testing.T) {
+func TestImportMessageAndLinkLabel(t *testing.T) {
 	cases := []struct {
-		name string
-		r    ManualJobResult
-		want string
+		name     string
+		r        ManualJobResult
+		want     string
+		wantLink string
 	}{
-		{"title+company pending", ManualJobResult{ID: 1, Title: "Eng", Company: "Acme", ScoringStatus: "pending"}, "Added Eng — Acme. It is being scored and will appear in your feed."},
-		{"title only scored", ManualJobResult{ID: 2, Title: "Eng", ScoringStatus: "scored"}, "Added Eng."},
-		{"no title falls back to id", ManualJobResult{ID: 3, ScoringStatus: "scored"}, "Added Job #3."},
-		{"empty status treated pending", ManualJobResult{ID: 4, Title: "Eng"}, "Added Eng. It is being scored and will appear in your feed."},
+		{"new pending", ManualJobResult{ID: 1, Title: "Eng", Company: "Acme", ScoringStatus: "pending", Import: ManualJobImportResult{Status: manualImportNew}}, "Imported Eng — Acme. It is being scored and will appear in your feed.", "View job"},
+		{"tracked", ManualJobResult{ID: 2, Title: "Eng", Import: ManualJobImportResult{Status: manualImportAlreadyTracked, ApplicationStatus: "approved"}}, "Already tracked: Eng. Current application status: approved.", "View tracked job"},
+		{"submitted", ManualJobResult{ID: 3, Title: "Eng", Import: ManualJobImportResult{Status: manualImportAlreadySubmitted}}, "Already submitted: Eng.", "View submitted job"},
+		{"possible match", ManualJobResult{ID: 4, Title: "Eng", Import: ManualJobImportResult{Status: manualImportPossibleMatch}}, "Possible match: Eng. Review the existing job before importing another.", "Review possible match"},
+		{"missing import defaults new", ManualJobResult{ID: 5, ScoringStatus: "scored"}, "Imported Job #5.", "View job"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := createdMessage(tc.r); got != tc.want {
-				t.Errorf("createdMessage = %q, want %q", got, tc.want)
+			if got := importMessage(tc.r); got != tc.want {
+				t.Errorf("importMessage = %q, want %q", got, tc.want)
+			}
+			if got := importLinkLabel(tc.r); got != tc.wantLink {
+				t.Errorf("importLinkLabel = %q, want %q", got, tc.wantLink)
 			}
 		})
 	}
 }
 
+func TestManualEntryRendersAllImportResults(t *testing.T) {
+	cases := []struct {
+		name    string
+		result  ManualJobResult
+		message string
+		link    string
+	}{
+		{"new", ManualJobResult{ID: 42, Title: "Staff Engineer", Import: ManualJobImportResult{Status: manualImportNew}}, "Imported Staff Engineer", "View job"},
+		{"tracked", ManualJobResult{ID: 42, Title: "Staff Engineer", Import: ManualJobImportResult{Status: manualImportAlreadyTracked}}, "Already tracked", "View tracked job"},
+		{"submitted", ManualJobResult{ID: 42, Title: "Staff Engineer", Import: ManualJobImportResult{Status: manualImportAlreadySubmitted}}, "Already submitted", "View submitted job"},
+		{"possible match", ManualJobResult{ID: 42, Title: "Staff Engineer", Import: ManualJobImportResult{Status: manualImportPossibleMatch}}, "Possible match", "Review possible match"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			html := renderHTML(t, &ManualEntry{Client: &mockClient{}, state: entryDone, result: tc.result})
+			for _, want := range []string{tc.message, tc.link, `href="/jobs/42"`} {
+				if !strings.Contains(html, want) {
+					t.Errorf("result HTML missing %q\n%s", want, html)
+				}
+			}
+		})
+	}
+}
+
+func TestManualEntryNeverImportsOnRender(t *testing.T) {
+	m := &mockClient{}
+	_ = renderHTML(t, &ManualEntry{Client: m})
+	if m.createCalls != 0 {
+		t.Fatalf("CreateJobPost called on render: %d", m.createCalls)
+	}
+}
+
 func TestEntryButtonLabel(t *testing.T) {
-	if got := entryButtonLabel(entrySubmitting); got != "Adding…" {
+	if got := entryButtonLabel(entrySubmitting); got != "Importing…" {
 		t.Errorf("submitting label = %q", got)
 	}
-	if got := entryButtonLabel(entryIdle); got != "Add job" {
+	if got := entryButtonLabel(entryIdle); got != "Import job" {
 		t.Errorf("idle label = %q", got)
 	}
 }

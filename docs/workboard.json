@@ -1697,7 +1697,7 @@
       "id": "WEB-15",
       "title": "Expose Import job and match outcomes in the PWA",
       "description": "Make the existing /jobs/new path unmissable by promoting the global Add job action to a clearly labelled Import job entry point and adding a Jobs-screen/empty-state affordance. Extend the form and Rails client for the optional external application URL and typed MANUAL-02 result, then render new, already-tracked, already-submitted, and possible-match outcomes with links to the existing record. Keep the browser as a thin client: no duplicate logic, scraping, or automatic submit; retain the do*/apply* testable action split.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "WEB",
       "depends_on": [

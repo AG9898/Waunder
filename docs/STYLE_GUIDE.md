@@ -90,9 +90,10 @@ figures where possible.
 - Every signed-in screen shares navigation and an Auto / Desktop / Mobile layout selector.
   Auto uses a 960px viewport breakpoint; PWA installation and user-agent strings do not affect
   layout. The override is saved locally per browser under `waunder.layout` and survives navigation
-  and reloads. Mobile uses a centered 560px maximum column and bottom navigation with iPhone safe
-  area padding. Desktop uses up to 1280px with in-flow top navigation; narrow desktop windows still
-  wrap safely. Add job is available from the shared header. Intake is the ingestion-history tab.
+   and reloads. Mobile uses a centered 560px maximum column and bottom navigation with iPhone safe
+   area padding. Desktop uses up to 1280px with in-flow top navigation; narrow desktop windows still
+   wrap safely. **Import job** is available from the shared header and the Jobs screen, including a
+   clear empty-feed action. Intake is the ingestion-history tab.
 - Feed and digest rows are soft list cards with the color-coded score pill and a lifecycle
   status pill (Active / Backlog / Removed — `.job-status--active|backlog|removed`, tinted
   success-soft / warning-soft / danger-soft) stacked top-right of the card in a `.job-pills`
@@ -134,6 +135,9 @@ figures where possible.
   Existing notes/follow-up dates survive status-only edits; clearing a stage uses a real select
   sentinel mapped back to an empty API value (Rails still defaults Applied to Waiting).
 - Primary actions use sage filled buttons; secondary actions use outline/surface buttons.
+- The Jobs-screen import action is a compact sage-soft outline control; empty-feed import is a
+  text action inside the quiet empty-state well. Manual import results name the outcome plainly
+  (new, already tracked, already submitted, or possible match) and link to the returned record.
 - Inputs and textareas use warm surface fill, strong hairline border, 12px radius, and a
   visible sage focus ring.
 - Error and success messages use soft status pills. Loading uses a gentle opacity pulse.

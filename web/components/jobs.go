@@ -243,6 +243,7 @@ func (j *JobList) Render() app.UI {
 	return app.Div().Class("job-list").Body(
 		renderAppTabs("jobs"),
 		app.H1().Text("Jobs"),
+		app.A().Class("job-list-import").Href("/jobs/new").Text("Import job"),
 		app.Div().Class("job-feed-workspace").Body(
 			app.Div().Class("job-feed-controls").Body(
 				j.renderViewSelector(),
@@ -251,7 +252,10 @@ func (j *JobList) Render() app.UI {
 			),
 			renderLoad(j.state, j.err, func() app.UI {
 				if len(j.jobs) == 0 {
-					return app.P().Class("job-list-empty").Text(j.emptyText())
+					return app.Div().Class("job-list-empty").Body(
+						app.P().Text(j.emptyText()),
+						app.A().Class("job-list-empty-action").Href("/jobs/new").Text("Import a job"),
+					)
 				}
 				return app.Div().Class("job-list-results").Body(
 					j.renderBulkActions(),

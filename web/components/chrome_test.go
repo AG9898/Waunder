@@ -7,7 +7,7 @@ import (
 
 func TestChromeNavigationAndLayout(t *testing.T) {
 	html := renderHTML(t, &AppChrome{Active: "jobs"})
-	for _, want := range []string{`aria-label="Main navigation"`, `aria-current="page"`, `href="/jobs/new"`, `value="auto"`, `value="desktop"`, `value="mobile"`} {
+	for _, want := range []string{`aria-label="Main navigation"`, `aria-current="page"`, `href="/jobs/new"`, "Import job", `value="auto"`, `value="desktop"`, `value="mobile"`} {
 		if !strings.Contains(html, want) {
 			t.Errorf("missing %s", want)
 		}

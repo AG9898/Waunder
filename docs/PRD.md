@@ -48,8 +48,9 @@ Phase 1 delivers the full plan scenario: forward a job-alert email → Resend in
   spreadsheet-style tracker listing every job post with a link back to each posting. A stats
   cluster in the header shows totals (total count for now).
 - **Manual job import and duplicate awareness**: a persistent, clearly labelled **Import job**
-  action lets the owner record a job-board listing URL, an optional external application URL,
-  and/or pasted posting text. Before a new record is created, Waunder compares deterministic,
+  action in the shared header and Jobs screen (including its empty state) lets the owner record a
+  job-board listing URL, an optional external application URL, and/or pasted posting text. Before
+  a new record is created, Waunder compares deterministic,
   normalized URL identities (including LinkedIn's stable `/jobs/view/:id/` identity) with the
   existing job and application tracker. An exact identity with an `Application` whose automation
   status is `submitted` is shown as **Already submitted**; another application state is shown as

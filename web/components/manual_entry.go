@@ -32,10 +32,11 @@ type ManualEntry struct {
 	// same-origin HTTP client on mount.
 	Client RailsClient
 
-	url     string
-	text    string
-	title   string
-	company string
+	url            string
+	applicationURL string
+	text           string
+	title          string
+	company        string
 
 	state  entryState
 	err    string
@@ -53,6 +54,10 @@ func (m *ManualEntry) ensureClient() {
 
 func (m *ManualEntry) onURLInput(ctx app.Context, _ app.Event) {
 	m.url = ctx.JSSrc().Get("value").String()
+}
+
+func (m *ManualEntry) onApplicationURLInput(ctx app.Context, _ app.Event) {
+	m.applicationURL = ctx.JSSrc().Get("value").String()
 }
 
 func (m *ManualEntry) onTextInput(ctx app.Context, _ app.Event) {
@@ -123,10 +128,11 @@ func (m *ManualEntry) applyCreateResult(res ManualJobResult, err error) {
 // input snapshots the trimmed form fields into the request shape.
 func (m *ManualEntry) input() ManualJobInput {
 	return ManualJobInput{
-		URL:     strings.TrimSpace(m.url),
-		Text:    strings.TrimSpace(m.text),
-		Title:   strings.TrimSpace(m.title),
-		Company: strings.TrimSpace(m.company),
+		URL:            strings.TrimSpace(m.url),
+		ApplicationURL: strings.TrimSpace(m.applicationURL),
+		Text:           strings.TrimSpace(m.text),
+		Title:          strings.TrimSpace(m.title),
+		Company:        strings.TrimSpace(m.company),
 	}
 }
 
@@ -142,9 +148,9 @@ func (m *ManualEntry) Render() app.UI {
 	return app.Div().Class("manual-entry").Body(
 		renderAppTabs("jobs"),
 		app.A().Class("manual-entry-back").Href("/jobs").Text("← Jobs"),
-		app.H1().Text("Add a job"),
+		app.H1().Text("Import a job"),
 		app.P().Class("manual-entry-note").
-			Text("Paste a job link and/or the posting text. It is scored and added to your feed."),
+			Text("Paste a listing link and/or the posting text. Add an external application link when you have one."),
 		app.Form().Class("manual-entry-form").OnSubmit(m.submit).Body(
 			app.Label().Class("manual-entry-label").Body(
 				app.Span().Text("Job URL"),
@@ -154,6 +160,15 @@ func (m *ManualEntry) Render() app.UI {
 					Placeholder("https://…").
 					Value(m.url).
 					OnInput(m.onURLInput),
+			),
+			app.Label().Class("manual-entry-label").Body(
+				app.Span().Text("External application URL (optional)"),
+				app.Input().
+					Class("manual-entry-application-url").
+					Type("url").
+					Placeholder("https://careers.example.com/apply").
+					Value(m.applicationURL).
+					OnInput(m.onApplicationURLInput),
 			),
 			app.Label().Class("manual-entry-label").Body(
 				app.Span().Text("Posting text"),
@@ -199,11 +214,11 @@ func (m *ManualEntry) Render() app.UI {
 func (m *ManualEntry) renderResult() app.UI {
 	r := m.result
 	return app.Div().Class("manual-entry-result").Body(
-		app.P().Class("manual-entry-result-msg").Text(createdMessage(r)),
+		app.P().Class("manual-entry-result-msg").Text(importMessage(r)),
 		app.A().
 			Class("manual-entry-result-link").
 			Href("/jobs/"+strconv.Itoa(r.ID)).
-			Text("View job"),
+			Text(importLinkLabel(r)),
 	)
 }
 
@@ -211,9 +226,9 @@ func (m *ManualEntry) renderResult() app.UI {
 
 func entryButtonLabel(s entryState) string {
 	if s == entrySubmitting {
-		return "Adding…"
+		return "Importing…"
 	}
-	return "Add job"
+	return "Import job"
 }
 
 // createErrorStatus maps a failed create to the message shown to the user. A
@@ -229,9 +244,17 @@ func createErrorStatus(err error) string {
 	return "Could not add the job. Please try again."
 }
 
-// createdMessage describes the created post, preferring its title/company and
-// noting that scoring is still in progress when it is.
-func createdMessage(r ManualJobResult) string {
+const (
+	manualImportNew              = "new"
+	manualImportAlreadyTracked   = "already_tracked"
+	manualImportAlreadySubmitted = "already_submitted"
+	manualImportPossibleMatch    = "possible_match"
+)
+
+// importMessage renders the outcome Rails reported without inferring whether a
+// record is a duplicate. A possible-match status is supported as a non-blocking
+// review state should Rails surface one later.
+func importMessage(r ManualJobResult) string {
 	label := r.Title
 	if r.Title != "" && r.Company != "" {
 		label = r.Title + " — " + r.Company
@@ -239,10 +262,34 @@ func createdMessage(r ManualJobResult) string {
 	if label == "" {
 		label = "Job #" + strconv.Itoa(r.ID)
 	}
-	if r.ScoringStatus == "pending" || r.ScoringStatus == "" {
-		return "Added " + label + ". It is being scored and will appear in your feed."
+	switch r.Import.Status {
+	case manualImportAlreadyTracked:
+		if r.Import.ApplicationStatus != "" {
+			return "Already tracked: " + label + ". Current application status: " + r.Import.ApplicationStatus + "."
+		}
+		return "Already tracked: " + label + "."
+	case manualImportAlreadySubmitted:
+		return "Already submitted: " + label + "."
+	case manualImportPossibleMatch:
+		return "Possible match: " + label + ". Review the existing job before importing another."
 	}
-	return "Added " + label + "."
+	if r.ScoringStatus == "pending" || r.ScoringStatus == "" {
+		return "Imported " + label + ". It is being scored and will appear in your feed."
+	}
+	return "Imported " + label + "."
+}
+
+func importLinkLabel(r ManualJobResult) string {
+	switch r.Import.Status {
+	case manualImportAlreadyTracked:
+		return "View tracked job"
+	case manualImportAlreadySubmitted:
+		return "View submitted job"
+	case manualImportPossibleMatch:
+		return "Review possible match"
+	default:
+		return "View job"
+	}
 }
 
 // isUnprocessable reports whether err is an APIError carrying a 422, so the

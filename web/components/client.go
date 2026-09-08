@@ -133,11 +133,11 @@ type RailsClient interface {
 	// is returned for copy/manual sending only.
 	GenerateOutreach(ctx context.Context, candidateID int, looseTemplate string) (OutreachDraft, error)
 
-	// CreateJobPost submits a manual job entry (a URL and/or pasted posting
-	// text) to POST /api/job_posts. Rails deterministically normalizes it into
-	// a JobPost with source "manual" and runs it through the same route-resolve
-	// and scoring pipeline as email ingestion; the created post then appears in
-	// the feed once scored. All normalization and scoring happen in Rails.
+	// CreateJobPost submits a manual job import (a listing URL and/or pasted
+	// posting text, plus an optional external application URL) to POST
+	// /api/job_posts. Rails owns normalization, URL identity matching, route
+	// resolution, and scoring; the typed result reports whether it created a new
+	// post or matched an existing tracked/submitted post.
 	CreateJobPost(ctx context.Context, input ManualJobInput) (ManualJobResult, error)
 }
 
@@ -146,10 +146,11 @@ type RailsClient interface {
 // of URL or Text and validates the URL is HTTP(S). The web layer carries no
 // validation logic of its own beyond a "needs URL or text" client hint.
 type ManualJobInput struct {
-	URL     string `json:"url"`
-	Text    string `json:"text"`
-	Title   string `json:"title"`
-	Company string `json:"company"`
+	URL            string `json:"url"`
+	ApplicationURL string `json:"application_url"`
+	Text           string `json:"text"`
+	Title          string `json:"title"`
+	Company        string `json:"company"`
 }
 
 // IntakeStatus is the owner-visible state of inbound job-alert processing.
@@ -164,10 +165,9 @@ type IntakeStatus struct {
 	QueuedCount     int    `json:"queued_count"`
 }
 
-// ManualJobResult is the created JobPost as the manual-entry endpoint returns
-// it (HTTP 201). It carries enough to confirm creation and link to the new
-// post in the feed; scoring runs asynchronously, so ScoringStatus starts
-// "pending".
+// ManualJobResult is the returned JobPost plus Rails' typed manual-import
+// outcome. New imports arrive with status "new" (HTTP 201); exact identity
+// matches return "already_tracked" or "already_submitted" (HTTP 200).
 type ManualJobResult struct {
 	ID            int      `json:"id"`
 	Title         string   `json:"title"`
@@ -176,6 +176,16 @@ type ManualJobResult struct {
 	Source        string   `json:"source"`
 	ScoringStatus string   `json:"scoring_status"`
 	Route         JobRoute `json:"route"`
+	Import        ManualJobImportResult
+}
+
+// ManualJobImportResult mirrors the top-level import envelope returned with a
+// manual JobPost import. ApplicationStatus is present for an exact match that
+// has an Application; it is Rails' automation status, not a browser-derived
+// tracking decision.
+type ManualJobImportResult struct {
+	Status            string `json:"status"`
+	ApplicationStatus string `json:"application_status"`
 }
 
 // ContactCandidate is a person worth reaching out to about a job posting, as
@@ -904,11 +914,13 @@ func (c *httpRailsClient) GenerateOutreach(ctx context.Context, candidateID int,
 func (c *httpRailsClient) CreateJobPost(ctx context.Context, input ManualJobInput) (ManualJobResult, error) {
 	body := map[string]any{"job_post": input}
 	var out struct {
-		JobPost ManualJobResult `json:"job_post"`
+		JobPost ManualJobResult       `json:"job_post"`
+		Import  ManualJobImportResult `json:"import"`
 	}
 	if err := c.sendJSON(ctx, http.MethodPost, "/api/job_posts", body, &out); err != nil {
 		return ManualJobResult{}, err
 	}
+	out.JobPost.Import = out.Import
 	return out.JobPost, nil
 }
 

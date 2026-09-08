@@ -182,14 +182,14 @@ Be honest about the current state — most of the suite is still to be written.
   send affordance — only copy/manual-send guidance. Error-mapping (`applyGenerateResult`:
   503 → not-configured, 401 → session-expired, generic) and the `contactRole`/`generateButtonLabel`/
   `contactsJobIDFromPath` helpers are table-tested.
-- **web/** — `components/manual_entry_test.go`: render and unit tests for the manual job entry
-  screen (WEB-06). They assert the form renders (URL/text/title/company inputs, submit, back link),
-  the explicit `doSubmit` path posts the **trimmed** input via the mocked `RailsClient` and then
-  surfaces the created `JobPost` with a `/jobs/:id` link, that an empty form (no URL or text) never
-  reaches the API (`inputPresent` gate), and the `applyCreateResult` error mapping (401 →
-  session-expired, 422 → invalid-input, generic → transient). The `createdMessage` (title/company
-  vs id fallback, pending/empty status → "being scored") and `entryButtonLabel` helpers are
-  table-tested.
+- **web/** — `components/manual_entry_test.go`: render and unit tests for the manual job import
+  screen (WEB-06/WEB-15). They assert the form renders (listing URL, optional external application
+  URL, text/title/company inputs, submit, back link), the explicit `doSubmit` path posts the
+  **trimmed** input via the mocked `RailsClient` and then surfaces the returned `/jobs/:id` link,
+  that an empty form (no URL or text) never reaches the API (`inputPresent` gate), and that a full
+  render lifecycle makes zero `CreateJobPost` calls. The new/tracked/submitted/possible-match
+  result messages and links plus the `applyCreateResult` error mapping (401 → session-expired,
+  422 → invalid-input, generic → transient) are table-tested.
 - **web/** — `components/jobs_test.go` (INTAKE-08 intake actions): render tests assert the Jobs
   feed exposes per-row select checkboxes, per-row Backlog/Remove (Active bin) and Restore
   (Backlog/Removed bins), and the multi-select bulk bar (Backlog/Remove selected, or Restore
@@ -317,16 +317,16 @@ Keep this table up to date — add a row when adding a new test file.
 | `workers/src/worker.test.ts` | Worker orchestration | config loading, bearer-auth task fetch/report calls, clean idle without `API_INTERNAL_URL`, one-cycle poll orchestration, and unsupported-ATS safe failure |
 | `workers/src/ats/handlers.test.ts` | Worker ATS handlers | Playwright fixture coverage for Greenhouse/Lever/Ashby registration, approved field fill/submit, unknown required field pauses, and sensitive-field pauses |
 | `web/components/pwa_test.go` | Web (go-app PWA) | iOS/iPadOS detection + version parsing, iOS 16.4+ Web Push threshold, and the install/notification-permission gate decision |
-| `web/components/chrome_test.go` | Web (go-app PWA) | Shared navigation accessibility, layout choices, invalid-preference fallback, copy-control initial state, and empty-stage handling |
+| `web/components/chrome_test.go` | Web (go-app PWA) | Shared navigation accessibility, persistent Import job entry, layout choices, invalid-preference fallback, copy-control initial state, and empty-stage handling |
 | `web/scripts/layout-smoke.cjs` | Web (Playwright Chromium) | Eight screens at 320/390/768/960/1440px, layout persistence/resize, overflow, explicit manual tracking success/failure, stage clearing, copy success/blocked feedback, and no application writes on navigation; all API calls use local fixtures |
-| `web/components/jobs_test.go` | Web (go-app PWA) | Job list / detail / ingestion batches, lifecycle/filter/pagination behavior, manual application link fallback and safe URL handling, no regression of later tracking statuses, explicit intake pause/resume state and error paths, held count, and no intake mutation on render via a mocked `RailsClient` |
+| `web/components/jobs_test.go` | Web (go-app PWA) | Job list / detail / ingestion batches, visible Import job actions (including empty feed), lifecycle/filter/pagination behavior, manual application link fallback and safe URL handling, no regression of later tracking statuses, explicit intake pause/resume state and error paths, held count, and no intake mutation on render via a mocked `RailsClient` |
 | `web/components/applications_test.go` | Web (go-app PWA) | Applications tracker render tests, empty/error/401 states, explicit no-status-update-on-render assertion, direct status-update state tests, and the all-jobs table (lazy load default active bin, bin filter, Prev/Next pagination, header total from the page envelope — INTAKE-09) |
 | `web/components/login_test.go` | Web (go-app PWA) | Login form render and `loginErrorStatus`/`loginButtonText` status mapping (401 → "Incorrect passphrase") |
-| `web/components/client_test.go` | Web (go-app PWA) | `httpRailsClient` against `httptest`: `/api` paths, intake GET/PATCH, Jobs filters/page decode, scoring/tracker/draft payloads, session-cookie carry, and API errors |
+| `web/components/client_test.go` | Web (go-app PWA) | `httpRailsClient` against `httptest`: `/api` paths, intake GET/PATCH, Jobs filters/page decode, manual import application URL + typed result decode, scoring/tracker/draft payloads, session-cookie carry, and API errors |
 | `web/components/profile_test.go` | Web (go-app PWA) | Profile/resume render (editable fields, contact presence flags with no PII leak, resume metadata/empty) and `doSave` write path (reseed/error/401) via a mocked `RailsClient` |
 | `web/components/push_test.go` | Web (go-app PWA) | Push toggle subscribe/unsubscribe flow via a mocked `PushSubscriber` (public VAPID key fetched then persisted; browser cancel before Rails), state-mapping helpers, and no-auto-subscribe-on-render |
 | `web/components/contacts_test.go` | Web (go-app PWA) | Contacts/outreach render (candidate fields, empty/error/401), explicit `doGenerate` draft path, no-auto-generate-on-mount and no-send-affordance safety tests, and `applyGenerateResult`/`contactRole`/`generateButtonLabel`/`contactsJobIDFromPath` helpers, via a mocked `RailsClient` |
-| `web/components/manual_entry_test.go` | Web (go-app PWA) | Manual job entry render (URL/text/title/company form), explicit `doSubmit` posting trimmed input via the mocked `RailsClient` and surfacing the created `/jobs/:id` link, empty-form no-API-call gate, `applyCreateResult` error mapping (401/422/transient), and `createdMessage`/`entryButtonLabel` helpers |
+| `web/components/manual_entry_test.go` | Web (go-app PWA) | Manual job import render (listing URL, optional external application URL, text/title/company form), explicit `doSubmit` posting trimmed input via the mocked `RailsClient` and surfacing the returned `/jobs/:id` link, new/tracked/submitted/possible-match messages, empty-form and render no-API-call gates, error mapping (401/422/transient), and label helpers |
 
 ---
 

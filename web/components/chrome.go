@@ -59,7 +59,7 @@ func (c *AppChrome) Render() app.UI {
 	return app.Header().Class("app-chrome").Body(
 		app.Div().Class("app-toolbar").Body(
 			app.A().Class("app-brand").Href("/").Text("Waunder"),
-			app.A().Class("app-add-job").Href("/jobs/new").Text("+ Add job"),
+			app.A().Class("app-add-job").Href("/jobs/new").Text("Import job"),
 			app.Label().Class("layout-control").Body(
 				app.Span().Text("Layout"),
 				app.Select().Class("layout-select").OnChange(c.selectLayout).Body(

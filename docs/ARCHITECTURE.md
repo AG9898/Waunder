@@ -81,10 +81,10 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   envelope; explicit score requests on unscored rows; INTAKE-07; plus per-row and multi-select
   bulk intake actions — Backlog/Remove in the Active bin and Restore in the Backlog/Removed bins —
   calling `PATCH /api/job_posts/:id/lifecycle` and bulk `PATCH /api/job_posts/lifecycle` via
-  `RailsClient.SetJobLifecycle`; INTAKE-08), the manual job
-  entry form (`/jobs/new`, `components.ManualEntry` — a URL and/or pasted posting text plus
-  optional title/company hints, posting to `POST /api/job_posts`; on success it surfaces the
-  created post with a `/jobs/:id` link to follow it into the feed once Rails scores it), a single
+   `RailsClient.SetJobLifecycle`; INTAKE-08), the manual job import form (`/jobs/new`,
+   `components.ManualEntry` — a listing URL and/or pasted posting text, optional external
+   application URL, and optional title/company hints, posting to `POST /api/job_posts`; it renders
+   Rails' typed new/tracked/submitted result with a `/jobs/:id` link to the returned record), a single
   job's scored detail (`/jobs/:id`, `components.JobDetailView` — summary, match score,
   relevant/missing requirements, red flags, alignment/strategy notes, the resolved
   application route, and an intake block exposing Backlog/Remove (or Restore) via
@@ -197,7 +197,7 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   exposes **no send action**: outreach is prefilled for manual sending only, upholding the
   never-auto-send-LinkedIn-outreach rule. (Outreach drafts are generated on demand; there is no
   list-drafts read endpoint.)
-- The manual job entry screen (WEB-06) writes a posting with `POST /api/job_posts`
+- The manual job import screen (WEB-06/WEB-15) writes a posting with `POST /api/job_posts`
   (MANUAL-01/MANUAL-02): the client sends a `job_post` object carrying a listing `url` and/or
   `text`, optional `application_url`, and optional `title`/`company` hints. Rails returns
   `{job_post: {...}, import: {status, application_status}}`: a no-match is `status: "new"`

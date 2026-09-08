@@ -354,6 +354,13 @@ button { font-family: inherit; }
   font-size: var(--text-base);
   text-align: center;
 }
+.job-list-empty p { margin: 0; }
+.job-list-empty-action {
+  display: inline-flex;
+  margin-top: var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
 
 .digest-items,
 .job-list-items {
@@ -1280,6 +1287,23 @@ button { font-family: inherit; }
   box-shadow: var(--focus-ring);
 }
 
+/* The Jobs screen keeps import visible even when the current filters have no
+   results, complementing the shared-header entry point. */
+.job-list-import {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: calc(-1 * var(--space-2)) 0 var(--space-5);
+  padding: 9px 14px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.job-list-import:hover { background: var(--color-accent); color: #fff; }
+
 /* Jobs feed — Prev/Next pagination */
 .job-pagination {
   display: flex;
@@ -1427,6 +1451,7 @@ button { font-family: inherit; }
 .profile-github,
 .profile-portfolio,
 .manual-entry-url,
+.manual-entry-application-url,
 .manual-entry-title,
 .manual-entry-company,
 .manual-entry-text,
@@ -1474,6 +1499,7 @@ textarea::placeholder { color: var(--color-ink-faint); }
 .profile-github:focus,
 .profile-portfolio:focus,
 .manual-entry-url:focus,
+.manual-entry-application-url:focus,
 .manual-entry-title:focus,
 .manual-entry-company:focus,
 .manual-entry-text:focus,

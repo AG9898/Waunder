@@ -802,8 +802,20 @@ func TestJobListUnscoredBinEmptyText(t *testing.T) {
 func TestJobListEmpty(t *testing.T) {
 	c := &JobList{Client: &mockClient{jobs: nil}}
 	html := renderHTML(t, c)
-	if !strings.Contains(html, "No scored jobs yet.") {
-		t.Errorf("expected empty state, got:\n%s", html)
+	for _, want := range []string{"No scored jobs yet.", "job-list-empty-action", "Import a job", `href="/jobs/new"`} {
+		if !strings.Contains(html, want) {
+			t.Errorf("expected empty-state import affordance %q, got:\n%s", want, html)
+		}
+	}
+}
+
+func TestJobListRendersImportJobAction(t *testing.T) {
+	c := &JobList{Client: &mockClient{jobs: []JobSummary{{ID: 1, Title: "Eng", Company: "Acme"}}}}
+	html := renderHTML(t, c)
+	for _, want := range []string{"job-list-import", "Import job", `href="/jobs/new"`} {
+		if !strings.Contains(html, want) {
+			t.Errorf("jobs import action missing %q, got:\n%s", want, html)
+		}
 	}
 }
 
