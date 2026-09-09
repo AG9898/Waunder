@@ -31,7 +31,8 @@ If any other doc mentions a variable, it should link here rather than restate it
 | `SESSION_SECRET` | Yes | none | Server-side key used to sign/verify the session cookie issued by `POST /api/session`. | `api` runtime (secret) |
 | `WORKER_SERVICE_TOKEN` | Yes | none | Static bearer token the `worker` presents to authenticate its task-pull/report calls to Rails (RESOLVED-14). Set identically on `api` and `worker`. | `api` + `worker` runtime (secret) |
 | `OPENROUTER_API_KEY` | Conditional | none | OpenRouter LLM gateway API key; required for scoring, summaries, and drafts. | `api` runtime (secret) |
-| `OPENROUTER_MODEL` | No | `google/gemma-4-31b-it:free` | Model id used for **all** LLM calls (scoring, summaries, application/outreach drafts, focused cover letters) — single model, no per-task tiers (RESOLVED-17). The free default is volatile and subject to OpenRouter's free request limit; configurable to any OpenRouter model id. | `api` runtime |
+| `OPENROUTER_MODEL` | No | `nex-agi/nex-n2.5-pro:free` | Model id used for **all** LLM calls (scoring, summaries, application/outreach drafts, focused cover letters) — single model, no per-task tiers (RESOLVED-17). The free default is volatile and subject to OpenRouter's free request limit; configurable to any OpenRouter model id. | `api` runtime |
+| `OPENROUTER_REASONING_EFFORT` | No | `none` for the default Nex model; unset for another model | Optional OpenRouter reasoning effort (`none`, `medium`, or `high` for Nex). The client sends it only when configured, except that it defaults to `none` for the Nex model so short structured generation does not inherit Nex's high-reasoning latency. | `api` runtime |
 | `JOB_TRIAGE_AUTO_SCORE_DAILY_LIMIT` | No | `20` | Maximum number of inbound, triage-eligible JobPosts Rails automatically sends to OpenRouter scoring per day. Manual entries and explicit score requests bypass this budget; set `0` to keep all inbound jobs unscored until manually requested. | `api` runtime |
 | `JOBS_PAGE_SIZE` | No | `30` | Server-side page size (rows/page) for paginated list reads (`GET /api/job_posts`, `GET /api/ingestion_batches`). See RESOLVED-20. | `api` runtime |
 | `JOB_INTAKE_DAILY_ACTIVE_LIMIT` | No | `30` | Maximum number of inbound, triage-eligible JobPosts that stay `lifecycle_state: active` per day (top-ranked by triage); the rest auto-park in `backlog` so the working feed stays drainable (RESOLVED-20). | `api` runtime |
@@ -109,6 +110,7 @@ There is no staging environment — only Local dev and Production (Railway).
 | `WORKER_SERVICE_TOKEN` | Required | Required |
 | `OPENROUTER_API_KEY` | Conditional | Conditional |
 | `OPENROUTER_MODEL` | Optional | Optional |
+| `OPENROUTER_REASONING_EFFORT` | Optional | Optional |
 | `JOB_TRIAGE_AUTO_SCORE_DAILY_LIMIT` | Optional | Optional |
 | `RESEND_WEBHOOK_SECRET` | Conditional | Conditional |
 | `RESEND_API_KEY` | Conditional | Conditional |

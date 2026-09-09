@@ -5,11 +5,13 @@ require "json"
 #
 # Owns every outbound LLM call for the api/ service. Reads OPENROUTER_API_KEY
 # and OPENROUTER_MODEL from the environment (model defaults to the free-tier
-# `google/gemma-4-31b-it:free`, RESOLVED-17). Free-model availability changes
-# over time, so the client requests JSON where supported and still degrades
-# gracefully: it retries transient/rate-limit responses and, when a model wraps
-# JSON in prose, extracts the first balanced JSON object/array (parse fallback)
-# rather than assuming strict schema enforcement.
+# `nex-agi/nex-n2.5-pro:free`, RESOLVED-17). That model defaults to expensive,
+# high-effort reasoning, so short structured calls explicitly disable reasoning
+# unless OPENROUTER_REASONING_EFFORT overrides it. Free-model availability
+# changes over time, so the client requests JSON where supported and still
+# degrades gracefully: it retries transient/rate-limit responses and, when a
+# model wraps JSON in prose, extracts the first balanced JSON object/array
+# (parse fallback) rather than assuming strict schema enforcement.
 #
 # Guardrails:
 # - Raises MissingApiKeyError (a typed error) when OPENROUTER_API_KEY is absent
@@ -17,7 +19,9 @@ require "json"
 # - Never logs prompt or completion contents, which may contain PII. Only
 #   non-content metadata (model, status, attempt) is logged.
 class OpenrouterClient
-  DEFAULT_MODEL = "google/gemma-4-31b-it:free".freeze
+  DEFAULT_MODEL = "nex-agi/nex-n2.5-pro:free".freeze
+  REASONING_EFFORT_ENV = "OPENROUTER_REASONING_EFFORT".freeze
+  DEFAULT_REASONING_EFFORT = "none".freeze
   ENDPOINT = "https://openrouter.ai/api/v1/chat/completions".freeze
   DEFAULT_MAX_RETRIES = 2
   RETRYABLE_STATUSES = [ 408, 429, 500, 502, 503, 504 ].freeze
@@ -38,9 +42,11 @@ class OpenrouterClient
   # Raised when no parseable JSON can be recovered from the completion.
   class ResponseError < Error; end
 
-  def initialize(api_key: ENV["OPENROUTER_API_KEY"], model: nil, max_retries: DEFAULT_MAX_RETRIES, http: nil)
+  def initialize(api_key: ENV["OPENROUTER_API_KEY"], model: nil, reasoning_effort: nil,
+                 max_retries: DEFAULT_MAX_RETRIES, http: nil)
     @api_key = api_key.to_s.strip
     @model = model.presence || ENV["OPENROUTER_MODEL"].presence || DEFAULT_MODEL
+    @reasoning_effort = reasoning_effort.presence || ENV[REASONING_EFFORT_ENV].presence || default_reasoning_effort
     @max_retries = max_retries
     @http = http
     raise MissingApiKeyError, "OPENROUTER_API_KEY is not configured" if @api_key.empty?
@@ -60,6 +66,7 @@ class OpenrouterClient
       temperature: temperature,
       response_format: { type: "json_object" }
     }
+    body[:reasoning] = { effort: @reasoning_effort } if @reasoning_effort.present?
 
     raw = request(body)
     content = extract_content(raw)
@@ -67,6 +74,10 @@ class OpenrouterClient
   end
 
   private
+
+  def default_reasoning_effort
+    DEFAULT_REASONING_EFFORT if @model == DEFAULT_MODEL
+  end
 
   def request(body)
     payload = JSON.generate(body)

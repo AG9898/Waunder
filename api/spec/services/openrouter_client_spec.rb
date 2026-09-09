@@ -52,7 +52,7 @@ RSpec.describe OpenrouterClient do
       allow(ENV).to receive(:[]).with("OPENROUTER_MODEL").and_return(nil)
 
       client = described_class.new(api_key: "sk-test")
-      expect(client.model).to eq("google/gemma-4-31b-it:free")
+      expect(client.model).to eq("nex-agi/nex-n2.5-pro:free")
     end
 
     it "uses OPENROUTER_MODEL from env when set" do
@@ -88,6 +88,29 @@ RSpec.describe OpenrouterClient do
       body = JSON.parse(transport.requests.first.body)
       expect(body["model"]).to eq("meta/llama-3")
       expect(body.dig("response_format", "type")).to eq("json_object")
+      expect(body).not_to have_key("reasoning")
+    end
+
+    it "disables Nex's default high reasoning effort" do
+      transport = FakeTransport.new(FakeResponse.new(200, completion('{"ok":true}')))
+      client = described_class.new(api_key: "sk-test", model: described_class::DEFAULT_MODEL, http: transport)
+
+      client.complete_json([ { role: "user", content: "hi" } ])
+
+      body = JSON.parse(transport.requests.first.body)
+      expect(body.dig("reasoning", "effort")).to eq("none")
+    end
+
+    it "uses OPENROUTER_REASONING_EFFORT when it is explicitly configured" do
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with(described_class::REASONING_EFFORT_ENV).and_return("medium")
+      transport = FakeTransport.new(FakeResponse.new(200, completion('{"ok":true}')))
+      client = described_class.new(api_key: "sk-test", model: "meta/llama-3", http: transport)
+
+      client.complete_json([ { role: "user", content: "hi" } ])
+
+      body = JSON.parse(transport.requests.first.body)
+      expect(body.dig("reasoning", "effort")).to eq("medium")
     end
 
     it "sends a bearer authorization header" do

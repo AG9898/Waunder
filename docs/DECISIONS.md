@@ -303,11 +303,11 @@ What existing code or docs does this affect?>
 
 ---
 
-### RESOLVED-17 — Single OpenRouter model; default `google/gemma-4-31b-it:free`
+### RESOLVED-17 — Single OpenRouter model; default `nex-agi/nex-n2.5-pro:free`
 
 **Resolved:** 2026-06-09 (default model revised 2026-06-22 and 2026-09-09)
 
-**Decision:** Use a single `OPENROUTER_MODEL` for all LLM calls (scoring, summaries, drafts, and focused cover letters) — no per-task model tiers. This resolves the former OPEN-05 to its Option 1. On 2026-09-09 the live OpenRouter catalog again listed `google/gemma-4-31b-it:free`: it is free, has a 262K context window, accepts `response_format` JSON output, and had materially better recent availability than the other viable structured-output free candidates. It therefore replaces the no-longer-listed `openai/gpt-oss-120b:free` default. Free models remain volatile and request-limited; the client retains retry and balanced-JSON parse fallback, and the model is revisited when real generation starts failing.
+**Decision:** Use a single `OPENROUTER_MODEL` for all LLM calls (scoring, summaries, drafts, and focused cover letters) — no per-task model tiers. This resolves the former OPEN-05 to its Option 1. On 2026-09-09 Gemma's free endpoint exhausted its retries with HTTP 429 during a real cover-letter evaluation. The live OpenRouter catalog listed `nex-agi/nex-n2.5-pro:free` as a free 262K-context model supporting JSON response format and structured outputs. A bounded probe using the local portfolio resume and a live Waunder job returned valid cover-letter JSON in 13.8 seconds only when Nex's default high reasoning was disabled, so it replaces Gemma and the client defaults its reasoning effort to `none`. `OPENROUTER_REASONING_EFFORT` remains available when a deliberate override is needed. Free models remain volatile and request-limited; the client retains retry and balanced-JSON parse fallback, and the model is revisited when real generation starts failing.
 
 **Why:** Single-user, cost-sensitive app; one model keeps configuration and routing simple, and a working free model keeps spend at zero. OpenRouter's free tier is volatile, so the choice is revisited when the configured free model starts failing.
 

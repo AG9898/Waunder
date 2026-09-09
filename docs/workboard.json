@@ -1866,6 +1866,39 @@
         "cd web && go test ./...",
         "cd web && go vet ./..."
       ]
+    },
+    {
+      "id": "LLM-05",
+      "title": "Use Nex N2.5 Pro free for bounded cover-letter generation",
+      "description": "Replace the unreliable Gemma free default with nex-agi/nex-n2.5-pro:free. Configure OpenrouterClient to disable Nex's default high reasoning effort for the shared short-form structured generation path, while retaining a documented environment override and preserving JSON parsing/retry/error behavior. Do not make live network calls from automated tests.",
+      "status": "done",
+      "priority": "high",
+      "group_id": "LLM",
+      "depends_on": [
+        "LLM-01",
+        "LLM-04"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "The shared default and docs use nex-agi/nex-n2.5-pro:free, which is listed by OpenRouter as a free 262K-context model with structured-output support",
+        "Requests for the Nex default include reasoning effort none so short cover letters avoid its default high-reasoning latency; an explicit supported environment override remains possible",
+        "OpenRouter client unit tests cover the default model, Nex reasoning payload, override behavior, JSON parse fallback, and no-live-network seam",
+        "API RSpec and RuboCop pass"
+      ],
+      "docs": [
+        "docs/DECISIONS.md",
+        "docs/ENV_VARS.md",
+        "docs/CONVENTIONS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "api/app/services/openrouter_client.rb",
+        "api/spec/services/openrouter_client_spec.rb"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
     }
   ]
 }

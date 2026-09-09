@@ -1091,3 +1091,10 @@ private/loopback addresses: it is the one place the API requests a user-supplied
 from its process environment; it does not load `.env.local`. When running it from the portfolio
 checkout, source Waunder's ignored `api/.env` using an absolute path and never print the secret.
 A successful sync reports only the parse status and whether the PDF was attached.
+
+### 2026-09-09 — Nex N2.5 Pro must disable its high-reasoning default for short drafts
+OpenRouter lists `nex-agi/nex-n2.5-pro:free` as a free 262K structured-output model, but its
+metadata defaults to `high` reasoning. A real resume-plus-live-job cover-letter probe timed out
+with that default and returned valid JSON in 13.8 seconds with `reasoning.effort: "none"`; keep
+that default in `OpenrouterClient` and use `OPENROUTER_REASONING_EFFORT` only for a deliberate
+override.

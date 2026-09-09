@@ -134,9 +134,9 @@ Be honest about the current state — most of the suite is still to be written.
   blank-only description/location/compensation fills, unavailable/skipped results leaving the
   record untouched, and no LLM use — with a stubbed fetcher.
 - **api/** — `spec/services/openrouter_client_spec.rb`: OpenRouter client specs covering missing/blank
-  API-key typed error, env model default/override, structured-JSON parsing, parse fallback for
-  prose/code-fence-wrapped JSON, retry on 429/5xx then exhaustion, and PII-safe logging — all against
-  an injected fake transport with no live network calls.
+  API-key typed error, Nex default model and disabled high-reasoning payload, environment model/reasoning
+  overrides, structured-JSON parsing, parse fallback for prose/code-fence-wrapped JSON, retry on 429/5xx
+  then exhaustion, and PII-safe logging — all against an injected fake transport with no live network calls.
 - **api/** — `spec/models/cover_letter_draft_spec.rb`,
   `spec/services/cover_letter_generator_spec.rb`, and
   `spec/requests/api/cover_letter_drafts_spec.rb`: encrypted-at-rest cover-letter storage,
@@ -345,7 +345,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `api/spec/services/posting_metadata_fetcher_spec.rb` | API (Rails) | Deterministic posting metadata: LinkedIn guest top card (incl. `/comm/` URLs), Greenhouse/Lever/Ashby public endpoints, JSON-LD `JobPosting`, OpenGraph/`<title>` fallback, bounded redirects, non-HTTP + private-address refusal, unavailable-not-raising failures, and no LLM construction (injected fake transport, no live calls) |
 | `api/spec/services/job_post_enricher_spec.rb` | API (Rails) | Placeholder title/company backfill, owner-supplied fields preserved, blank-only description/location/compensation fills, unavailable/skipped no-ops, and no LLM use (stubbed fetcher) |
 | `api/spec/jobs/enrich_job_post_job_spec.rb` | API (Rails) | EnrichJobPostJob enqueues `ScoreJobPostJob` after enrichment, including when the posting could not be read |
-| `api/spec/services/openrouter_client_spec.rb` | API (Rails) | OpenRouter client: missing-key typed error, env model default/override, structured-JSON parse, prose/code-fence parse fallback, retry/exhaustion, and PII-safe logging via injected fake transport (no live calls) |
+| `api/spec/services/openrouter_client_spec.rb` | API (Rails) | OpenRouter client: missing-key typed error, Nex default plus reasoning-none payload, env model/reasoning override, structured-JSON parse, prose/code-fence parse fallback, retry/exhaustion, and PII-safe logging via injected fake transport (no live calls) |
 | `api/spec/services/cover_letter_generator_spec.rb` | API (Rails) | mocked job/profile/primary-resume grounding, one-current-letter replacement, malformed/missing-key handling, no Application side effect, and PII-safe logging |
 | `api/spec/jobs/score_job_post_job_spec.rb` | API (Rails) | JobScorer/ScoreJobPostJob: scoring-field population from mocked LLM JSON, match_score clamping, string-list coercion, fallback-posting scoring, graceful skip with no API key, failed-on-error, PII-safe logging (mocked client) |
 | `api/spec/jobs/generate_application_draft_job_spec.rb` | API (Rails) | ApplicationDraftGenerator/GenerateApplicationDraftJob: draft generation from mocked LLM JSON, ATS-shaped autofill payload keyed to the resolved route (manual fallback for unknown), Profile data merged into autofill answers, malformed-answer dropping, graceful skip with no API key, failed-on-error, PII-safe logging (mocked client) |

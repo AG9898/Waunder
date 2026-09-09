@@ -230,10 +230,12 @@ dispatch.
   is scored-only and deterministic triage leaves most inbound postings unscored.
 - The OpenRouter LLM gateway is reached only through `OpenrouterClient`
   (`app/services/openrouter_client.rb`) — never inlined in controllers or jobs. It reads
-  `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` (default `google/gemma-4-31b-it:free`), requests
+  `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` (default `nex-agi/nex-n2.5-pro:free`), requests
   structured JSON (`response_format: json_object`), and degrades gracefully for free-tier limits:
   it retries transient/rate-limit responses (408/429/5xx) and, when a model wraps JSON in prose or
-  code fences, recovers the first balanced JSON value (parse fallback). It raises the typed
+  code fences, recovers the first balanced JSON value (parse fallback). Nex defaults to high
+  reasoning, so its shared short-form path sends `reasoning: { effort: "none" }`; set
+  `OPENROUTER_REASONING_EFFORT` only to intentionally override that behavior. It raises the typed
   `OpenrouterClient::MissingApiKeyError` when no key is configured so callers can guard/skip, and
   never logs prompt/completion contents or the API key (PII safety).
 - Job scoring is isolated in `JobScorer` (`app/services/job_scorer.rb`) and dispatched by
