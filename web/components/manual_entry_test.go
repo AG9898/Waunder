@@ -194,13 +194,13 @@ func TestManualEntryLookupPrefillsEmptyFields(t *testing.T) {
 		t.Errorf("looked up %q, not trimmed", m.gotLookupURL)
 	}
 	if c.title != "MCP/AI Developer" {
-		t.Errorf("title = %q, want the posting's title", c.title)
+		t.Errorf("title = %q, want the listing title", c.title)
 	}
 	if c.company != "Autodesk" {
-		t.Errorf("company = %q, want the posting's company", c.company)
+		t.Errorf("company = %q, want the listing company", c.company)
 	}
 	if c.text != "Build the agentic platform." {
-		t.Errorf("text = %q, want the posting's description", c.text)
+		t.Errorf("text = %q, want the listing description", c.text)
 	}
 	if c.lookupState != lookupDone {
 		t.Fatalf("lookupState = %v, want lookupDone", c.lookupState)

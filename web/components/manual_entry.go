@@ -184,10 +184,10 @@ func (m *ManualEntry) applyLookupResult(url string, res PostingLookup, err error
 
 	m.lookupState = lookupDone
 	if len(filled) == 0 {
-		m.lookupNote = "Read the posting; your entries were kept."
+		m.lookupNote = "Read the listing; your entries were kept."
 		return
 	}
-	m.lookupNote = "Filled in " + joinFields(filled) + " from the posting."
+	m.lookupNote = "Filled in " + joinFields(filled) + " from the listing."
 }
 
 // submit is wired to the form's OnSubmit. It validates a minimal client hint
@@ -282,6 +282,22 @@ func (m *ManualEntry) Render() app.UI {
 			),
 			m.renderLookup(),
 			app.Label().Class("manual-entry-label").Body(
+				app.Span().Text("Title"),
+				app.Input().
+					Class("manual-entry-title").
+					Type("text").
+					Value(m.title).
+					OnInput(m.onTitleInput),
+			),
+			app.Label().Class("manual-entry-label").Body(
+				app.Span().Text("Company"),
+				app.Input().
+					Class("manual-entry-company").
+					Type("text").
+					Value(m.company).
+					OnInput(m.onCompanyInput),
+			),
+			app.Label().Class("manual-entry-label").Body(
 				app.Span().Text("External application URL (optional)"),
 				app.Input().
 					Class("manual-entry-application-url").
@@ -297,22 +313,6 @@ func (m *ManualEntry) Render() app.UI {
 					Placeholder("Paste the job description…").
 					Text(m.text).
 					OnInput(m.onTextInput),
-			),
-			app.Label().Class("manual-entry-label").Body(
-				app.Span().Text("Title"),
-				app.Input().
-					Class("manual-entry-title").
-					Type("text").
-					Value(m.title).
-					OnInput(m.onTitleInput),
-			),
-			app.Label().Class("manual-entry-label").Body(
-				app.Span().Text("Company"),
-				app.Input().
-					Class("manual-entry-company").
-					Type("text").
-					Value(m.company).
-					OnInput(m.onCompanyInput),
 			),
 			app.Button().
 				Class("manual-entry-submit").

@@ -1773,6 +1773,49 @@
         "cd web && go test ./...",
         "cd web && go vet ./..."
       ]
+    },
+    {
+      "id": "MANUAL-03",
+      "title": "Autofill manual job imports from the posting",
+      "description": "Manual entry documented title and company as optional, but with no way to read the posting the fallback was the humanized URL host, so a LinkedIn import landed as \"Linkedin / Linkedin\" with an empty description and then scored failed for lack of a body. Add PostingMetadataFetcher as the single place that fetches an owner-supplied URL, extracting title/company/location/compensation/description deterministically (LinkedIn guest top card, Greenhouse/Lever/Ashby public board APIs, then JSON-LD JobPosting, OpenGraph, and <title> shapes) and never via the LLM. Expose it as POST /api/job_posts/lookup, which persists nothing, for the PWA to prefill on URL commit, and as EnrichJobPostJob for imports submitted without those fields. ManualJobPostImporter stays offline and deterministic.",
+      "status": "done",
+      "priority": "high",
+      "group_id": "MANUAL",
+      "depends_on": [
+        "MANUAL-02"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "PostingMetadataFetcher extracts title/company/location/compensation/description deterministically and never constructs an LLM client",
+        "Fetches are HTTP(S)-only, refuse addresses resolving into private/loopback/link-local ranges, and bound redirects, timeouts, and body size",
+        "POST /api/job_posts/lookup persists nothing and answers 200 with status unavailable for an unreadable posting, so manual entry stays usable",
+        "The PWA prefills only fields the owner has not typed into, never looks up on mount/render, and still imports only on an explicit submit",
+        "An import with no owner title/company/text runs EnrichJobPostJob, which fills blank or host-placeholder fields only and then enqueues scoring",
+        "cd api && bundle exec rspec and bin/rubocop pass; cd web && go test ./... and go vet ./... pass"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md",
+        "docs/DECISIONS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "api/app/services/posting_metadata_fetcher.rb",
+        "api/app/services/job_post_enricher.rb",
+        "api/app/jobs/enrich_job_post_job.rb",
+        "api/app/controllers/api/job_posts_controller.rb",
+        "api/app/services/manual_job_post_importer.rb",
+        "api/config/routes.rb",
+        "web/components/manual_entry.go",
+        "web/components/client.go",
+        "web/web/app.css"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop",
+        "cd web && go test ./...",
+        "cd web && go vet ./..."
+      ]
     }
   ]
 }
