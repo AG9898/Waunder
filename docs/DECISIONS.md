@@ -374,3 +374,45 @@ What existing code or docs does this affect?>
 **Why:** The owner wants clearly discarded postings to stop accumulating while retaining a recovery window and protecting every posting with application history. Losing the old posting URL dedup after 30 days is acceptable for an explicitly removed, unapplied post.
 
 **Affects:** `JobPost`, `Api::JobPostsController`, `ExpireStaleJobPostsJob`, `REMOVED_JOB_RETENTION_DAYS`, [`PRD.md`](PRD.md), [`ARCHITECTURE.md`](ARCHITECTURE.md), [`CONVENTIONS.md`](CONVENTIONS.md).
+
+### RESOLVED-23 — Read owner-supplied posting URLs deterministically to autofill title and company
+
+**Resolved:** 2026-09-09
+
+**Decision:** Manual entry prefills title, company, and posting text by reading the posting behind
+the supplied URL. `PostingMetadataFetcher` is the only place in the app that fetches an
+owner-supplied URL, and extraction is deterministic — known job hosts through their own public,
+unauthenticated endpoints (LinkedIn's guest top card, the Greenhouse/Lever/Ashby board APIs), then
+schema.org `JobPosting` JSON-LD, OpenGraph, and conventional `<title>` shapes. The LLM is never
+used to read a posting. `POST /api/job_posts/lookup` runs the fetch on demand and persists
+nothing; the PWA calls it when the URL field is committed and fills only fields the owner has not
+typed into. `EnrichJobPostJob`/`JobPostEnricher` apply the same fetch in the background after an
+import that arrived without those fields, filling only blank or host-placeholder values, then
+enqueue scoring. `ManualJobPostImporter` and `JobUrlIdentity` stay offline and deterministic.
+
+**Why:** Title and company are documented as optional, but with no fetch the fallback was the
+humanized URL host — a real LinkedIn import was filed as "Linkedin / Linkedin" with an empty
+description, which then scored `failed` because the scorer had no posting body. Retyping what the
+posting already states is exactly the manual work this app exists to remove. Doing the read in a
+separate service keeps MANUAL-01's guarantee that import normalization and identity matching never
+touch the network, so duplicate decisions stay pure and reproducible.
+
+**Tradeoff accepted:** The API now makes outbound requests to owner-supplied hosts. This is
+bounded: HTTP(S) only, addresses resolving into private/loopback/link-local ranges are refused so
+the endpoint cannot probe Railway's private network, and redirects, timeouts, and body size are
+capped. A posting that cannot be read is never an error — the lookup answers 200 with
+`status: "unavailable"` and the owner types the fields, so manual entry never depends on the fetch
+succeeding. Host-specific readers will need maintenance when a job board changes its public
+endpoints; the generic JSON-LD/OpenGraph fallback limits the blast radius.
+
+**Alternatives rejected:** Sending the page to the LLM to extract fields — violates the
+prefer-deterministic rule, costs tokens per import, and is less reliable than the structured data
+these hosts already publish. Fetching inside `ManualJobPostImporter` — would put a network call in
+the identity/dedup transaction and make imports slow and non-deterministic. Leaving the fields
+manual — the placeholder rows it produces are unscoreable and unsearchable.
+
+**Affects:** `api/` (`PostingMetadataFetcher`, `JobPostEnricher`, `EnrichJobPostJob`,
+`Api::JobPostsController#lookup` + import follow-up, `ManualJobPostImporter#enrichable?`, routes),
+`web/` (`components.ManualEntry` lookup prefill, `RailsClient.LookupPosting`, `app.css`),
+[`ARCHITECTURE.md`](ARCHITECTURE.md), [`CONVENTIONS.md`](CONVENTIONS.md), [`TESTING.md`](TESTING.md).
+See also MANUAL-01, MANUAL-02, RESOLVED-20.

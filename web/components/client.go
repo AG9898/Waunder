@@ -130,7 +130,33 @@ type RailsClient interface {
 	// resolution, and scoring; the typed result reports whether it created a new
 	// post or matched an existing tracked/submitted post.
 	CreateJobPost(ctx context.Context, input ManualJobInput) (ManualJobResult, error)
+
+	// LookupPosting reads a job posting URL through Rails
+	// (POST /api/job_posts/lookup) and returns the title, company, location, and
+	// description the posting itself advertises, so manual entry can prefill
+	// them. Rails owns the fetch and the deterministic extraction; nothing is
+	// persisted, so the owner still reviews and edits before importing.
+	LookupPosting(ctx context.Context, url string) (PostingLookup, error)
 }
+
+// PostingLookup is what a posting URL advertises about itself, as Rails
+// extracted it. Status is "ok" when at least one field was read, "unsupported"
+// for a URL Rails will not fetch, and "unavailable" when the posting could not
+// be read — the last two are not errors, they just leave the form for the owner
+// to fill in by hand.
+type PostingLookup struct {
+	Status       string `json:"status"`
+	Provider     string `json:"provider"`
+	Error        string `json:"error"`
+	Title        string `json:"title"`
+	Company      string `json:"company"`
+	Location     string `json:"location"`
+	Compensation string `json:"compensation"`
+	Description  string `json:"description"`
+}
+
+// OK reports whether the lookup returned usable fields.
+func (l PostingLookup) OK() bool { return l.Status == "ok" }
 
 // ManualJobInput is the owner-submitted manual entry: a URL and/or pasted
 // posting text, with optional title/company hints. Rails requires at least one
@@ -921,6 +947,17 @@ func (c *httpRailsClient) CreateJobPost(ctx context.Context, input ManualJobInpu
 // sendJSON marshals body as JSON, sends it with the given method, and decodes
 // the response into dst when dst is non-nil. The same-origin session cookie is
 // carried automatically by the browser fetch stack.
+func (c *httpRailsClient) LookupPosting(ctx context.Context, url string) (PostingLookup, error) {
+	body := map[string]any{"url": url}
+	var out struct {
+		Lookup PostingLookup `json:"lookup"`
+	}
+	if err := c.sendJSON(ctx, http.MethodPost, "/api/job_posts/lookup", body, &out); err != nil {
+		return PostingLookup{}, err
+	}
+	return out.Lookup, nil
+}
+
 func (c *httpRailsClient) sendJSON(ctx context.Context, method, path string, body, dst any) error {
 	payload, err := json.Marshal(body)
 	if err != nil {

@@ -242,7 +242,10 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   preferred route candidate for a new post. The post is created only on an explicit form submit -
   never on mount/render - and the client does no validation beyond a "URL or text present" hint
   (Rails owns normalization, the HTTP(S)-URL check, identity matching, route resolution, and
-  scoring). On success the screen links to `/jobs/:id` so the new post can be followed into the
+  scoring). Committing the Job URL field (or pressing **Look up details**) first calls
+  `POST /api/job_posts/lookup` to prefill title, company, and posting text from the posting
+  itself; the lookup persists nothing, never fires on mount/render, and never overwrites a field
+  the owner typed into. On success the screen links to `/jobs/:id` so the new post can be followed into the
   feed once Rails finishes scoring it (`scoring_status` starts `pending`).
 - Holds **no business logic** — it never reads the database, never calls the LLM, never scores
   or resolves routes (it only renders fields Rails owns), and stores no secrets beyond the
@@ -345,8 +348,34 @@ The full topology and the rationale for the `/api` proxy routing decision live i
    paused, and failed applications return `already_tracked` with their status. Company/title
    similarities are non-authoritative possible matches.
 4. When there is no exact identity match, Rails creates a manual `JobPost`, saves its supplied
-   URL identities, runs `ApplicationRouteResolver`, and enqueues `ScoreJobPostJob`, so it enters
-   the same route-resolution and scoring path as email-ingested postings.
+   URL identities, runs `ApplicationRouteResolver`, and enqueues scoring, so it enters the same
+   route-resolution and scoring path as email-ingested postings. When the import carried no
+   owner-supplied title/company and no pasted text, `EnrichJobPostJob` runs first and enqueues
+   `ScoreJobPostJob` itself, so the scorer never sees a host-derived placeholder.
+
+**Posting metadata lookup (title/company autofill)**:
+1. Title and company stay optional on manual entry. Rather than filing a URL-only import under a
+   placeholder derived from the URL host, `PostingMetadataFetcher` reads the posting itself and
+   extracts title, company, location, compensation, and description **deterministically — never
+   via the LLM**. It is the only place in the app that fetches an owner-supplied URL.
+2. `POST /api/job_posts/lookup` runs that fetch on demand and **persists nothing**; it returns
+   `{lookup: {status, provider, error, title, company, location, compensation, description}}`.
+   `status` is `ok`, `unsupported` (not an HTTP(S) URL, or an address that resolves into a
+   private/loopback/link-local range), or `unavailable` (fetch failed, or nothing extractable).
+   The last two are not HTTP errors — the form stays usable and the owner types the fields.
+3. The PWA calls it when the Job URL field is committed (and from an explicit **Look up details**
+   button) and prefills only the fields the owner has not typed into, so a lookup never overwrites
+   owner input. The import itself is unchanged and still requires an explicit submit.
+4. Known job hosts are read through their own public, unauthenticated endpoints, which return
+   structured data: LinkedIn `/jobs/view/:id` maps onto the guest `jobs-guest/jobs/api/jobPosting/
+   :id` top card (the signed-in page redirects anonymous fetches to the authwall), Greenhouse to
+   `boards-api.greenhouse.io`, Lever to `api.lever.co`, and Ashby to its board posting API. Any
+   other host falls back to the page itself: schema.org `JobPosting` JSON-LD, then OpenGraph, then
+   the `<title>` split on the conventional "<job title> at <company>" shapes.
+5. `EnrichJobPostJob` (`JobPostEnricher`) applies the same fetch in the background after an import
+   that lacked those fields. It fills only blank or placeholder values — an owner-supplied title
+   or company, recorded in `source_payload.manual_entry`, is never overwritten — then enqueues
+   `ScoreJobPostJob`. `ManualJobPostImporter` itself remains offline and deterministic.
 
 **Web push subscription**:
 1. The PWA reads the public VAPID key from `GET /api/push/vapid_public_key`. This value is

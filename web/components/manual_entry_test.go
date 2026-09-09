@@ -172,3 +172,130 @@ func TestEntryButtonLabel(t *testing.T) {
 		t.Errorf("idle label = %q", got)
 	}
 }
+
+func TestManualEntryLookupPrefillsEmptyFields(t *testing.T) {
+	m := &mockClient{lookup: PostingLookup{
+		Status:      "ok",
+		Provider:    "linked_in",
+		Title:       "MCP/AI Developer",
+		Company:     "Autodesk",
+		Location:    "Canada",
+		Description: "Build the agentic platform.",
+	}}
+	c := &ManualEntry{Client: m, url: "  https://www.linkedin.com/jobs/view/4435267449  "}
+
+	c.doLookup(context.Background())
+
+	if m.lookupCalls != 1 {
+		t.Fatalf("LookupPosting called %d times, want 1", m.lookupCalls)
+	}
+	// The URL is trimmed before it reaches Rails, like every other field.
+	if m.gotLookupURL != "https://www.linkedin.com/jobs/view/4435267449" {
+		t.Errorf("looked up %q, not trimmed", m.gotLookupURL)
+	}
+	if c.title != "MCP/AI Developer" {
+		t.Errorf("title = %q, want the posting's title", c.title)
+	}
+	if c.company != "Autodesk" {
+		t.Errorf("company = %q, want the posting's company", c.company)
+	}
+	if c.text != "Build the agentic platform." {
+		t.Errorf("text = %q, want the posting's description", c.text)
+	}
+	if c.lookupState != lookupDone {
+		t.Fatalf("lookupState = %v, want lookupDone", c.lookupState)
+	}
+	if !strings.Contains(c.lookupNote, "title, company, and posting text") {
+		t.Errorf("lookupNote = %q, want the filled fields named", c.lookupNote)
+	}
+}
+
+func TestManualEntryLookupNeverOverwritesOwnerInput(t *testing.T) {
+	m := &mockClient{lookup: PostingLookup{
+		Status:      "ok",
+		Title:       "Fetched title",
+		Company:     "Fetched company",
+		Description: "Fetched description",
+	}}
+	c := &ManualEntry{
+		Client:         m,
+		url:            "https://www.linkedin.com/jobs/view/1",
+		title:          "My title",
+		company:        "My company",
+		text:           "My notes",
+		titleTouched:   true,
+		companyTouched: true,
+		textTouched:    true,
+	}
+
+	c.doLookup(context.Background())
+
+	if c.title != "My title" || c.company != "My company" || c.text != "My notes" {
+		t.Fatalf("lookup overwrote owner input: %q / %q / %q", c.title, c.company, c.text)
+	}
+	if !strings.Contains(c.lookupNote, "kept") {
+		t.Errorf("lookupNote = %q, want it to say the entries were kept", c.lookupNote)
+	}
+}
+
+func TestManualEntryUnreadablePostingLeavesFormUsable(t *testing.T) {
+	m := &mockClient{lookup: PostingLookup{Status: "unavailable", Error: "Could not read the posting"}}
+	c := &ManualEntry{Client: m, url: "https://careers.example.com/roles/9"}
+
+	c.doLookup(context.Background())
+
+	if c.lookupState != lookupFailed {
+		t.Fatalf("lookupState = %v, want lookupFailed", c.lookupState)
+	}
+	if c.title != "" || c.company != "" {
+		t.Errorf("fields were filled from an unusable lookup: %q / %q", c.title, c.company)
+	}
+	// A failed lookup must not block the import; the submit path is untouched.
+	if c.state != entryIdle {
+		t.Errorf("state = %v, want the form still idle and submittable", c.state)
+	}
+}
+
+func TestManualEntryLookupSurfacesExpiredSession(t *testing.T) {
+	m := &mockClient{lookupErr: &APIError{Status: http.StatusUnauthorized}}
+	c := &ManualEntry{Client: m, url: "https://www.linkedin.com/jobs/view/1"}
+
+	c.doLookup(context.Background())
+
+	if !strings.Contains(c.lookupNote, "session expired") {
+		t.Errorf("lookupNote = %q, want the expired-session message", c.lookupNote)
+	}
+}
+
+// The lookup is an explicit user action: rendering the form must never fetch a
+// posting on its own.
+func TestManualEntryNeverLooksUpOnRender(t *testing.T) {
+	m := &mockClient{}
+	c := &ManualEntry{Client: m, url: "https://www.linkedin.com/jobs/view/1"}
+
+	html := renderHTML(t, c)
+
+	if m.lookupCalls != 0 {
+		t.Fatalf("LookupPosting called %d times during render, want 0", m.lookupCalls)
+	}
+	if !strings.Contains(html, "manual-entry-lookup-button") {
+		t.Errorf("lookup control missing from the form\n%s", html)
+	}
+}
+
+func TestManualEntryLookupSkipsRepeatOfSameURL(t *testing.T) {
+	m := &mockClient{lookup: PostingLookup{Status: "ok", Title: "Dev"}}
+	c := &ManualEntry{Client: m, url: "https://www.linkedin.com/jobs/view/1"}
+
+	c.doLookup(context.Background())
+	c.doLookup(context.Background())
+
+	// doLookup itself always fetches; the skip lives in startLookup, which the
+	// URL field commits into. Guard the recorded URL so the skip has a basis.
+	if c.lookedUpURL != "https://www.linkedin.com/jobs/view/1" {
+		t.Fatalf("lookedUpURL = %q, want the fetched URL recorded", c.lookedUpURL)
+	}
+	if m.lookupCalls != 2 {
+		t.Fatalf("LookupPosting called %d times, want 2", m.lookupCalls)
+	}
+}

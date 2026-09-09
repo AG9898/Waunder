@@ -79,6 +79,25 @@ module Api
       render json: { job_post: serialize_detail(job_post) }
     end
 
+    # POST /api/job_posts/lookup
+    # Reads a posting URL and returns the title/company/location/description it
+    # advertises, so manual entry can prefill instead of asking the owner to
+    # retype what the posting already states. Extraction is deterministic (never
+    # the LLM) and this endpoint PERSISTS NOTHING — the owner reviews and edits
+    # the values before the separate import call.
+    def lookup
+      result = PostingMetadataFetcher.new(lookup_url).call
+
+      render json: {
+        lookup: {
+          status: result.status,
+          provider: result.provider,
+          error: result.error,
+          **result.fields
+        }
+      }
+    end
+
     def create
       result = ManualJobPostImporter.new(job_post_params).call
 
@@ -94,7 +113,7 @@ module Api
       job_post = result.job_post
       resolution = if result.new?
         ApplicationRouteResolver.new(job_post, application_url: result.application_url).call.tap do
-          ScoreJobPostJob.perform_later(job_post)
+          enqueue_import_followup(job_post, result)
         end
       else
         job_post.application_route
@@ -345,6 +364,24 @@ module Api
         triaged_at: Time.current
       )
       ScoreJobPostJob.perform_later(job_post)
+    end
+
+    # A manual import that arrived without the owner's own title/company (they
+    # skipped the optional fields, or submitted before the lookup returned)
+    # would otherwise be filed under a placeholder derived from the URL host.
+    # Enrichment reads the posting first and scores afterwards, so the scorer
+    # sees the real title and description rather than an empty record.
+    def enqueue_import_followup(job_post, result)
+      if result.enrichable?
+        EnrichJobPostJob.perform_later(job_post)
+      else
+        ScoreJobPostJob.perform_later(job_post)
+      end
+    end
+
+    def lookup_url
+      source = params[:job_post].presence || params
+      source[:url].presence || source[:posting_url]
     end
 
     def job_post_params

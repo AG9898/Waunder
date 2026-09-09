@@ -1061,3 +1061,27 @@ mount so in-app navigation re-checks. **Verification trap:** Playwright's `servi
 (used by `web/scripts/layout-smoke.cjs` and any ad-hoc probe) bypasses this entirely, so a
 screenshot can look perfect while every real returning browser shows the old build — use
 `launchPersistentContext` without that option to exercise the real caching path.
+
+### 2026-09-09 — LinkedIn's guest endpoint is the only anonymous read of a job page
+`https://www.linkedin.com/jobs/view/<id>` redirects an anonymous fetch to the authwall, but
+`https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/<id>` returns the full top card (title in
+`.topcard__title`, company in `.topcard__org-name-link`, location in `.topcard__flavor--bullet`,
+body in `.show-more-less-html__markup`) with no session — so `PostingMetadataFetcher` maps the job
+id onto it. That markup block contains nested `<div>`s, so a non-greedy `(.*?)</div>` truncates the
+description; cut at the following `<section>` instead. Greenhouse/Lever/Ashby are read through
+their public board APIs rather than their pages (Ashby's job page is entirely client-rendered — no
+`og:` tags, `<title>` is just "Jobs"), and the Ashby board listing can exceed 2 MB, so the response
+size cap has to clear that. Greenhouse returns its description as entity-escaped HTML inside JSON:
+unescape before stripping tags, or the "text" comes back full of literal markup.
+
+### 2026-09-09 — Manual entry's optional title/company were host placeholders, not autofill
+`ManualJobPostImporter` falls back to the humanized URL host for both title and company, so a
+URL-only import became "Linkedin / Linkedin" with an empty description and then scored `failed`
+(the scorer had no body). The fetch could not go into the importer — MANUAL-01 guarantees identity
+matching and normalization never touch the network — so it lives in `PostingMetadataFetcher`, used
+from `POST /api/job_posts/lookup` (prefill, persists nothing) and from `EnrichJobPostJob` after an
+import the owner did not fill in. `Result#enrichable?` is the hand-off: true when a URL was
+supplied but title (and pasted text), company, or body were not. When it fires the controller
+enqueues `EnrichJobPostJob` INSTEAD of `ScoreJobPostJob`, and the enrich job enqueues scoring
+itself — otherwise the scorer races ahead and scores the placeholder. Guard the fetch against
+private/loopback addresses: it is the one place the API requests a user-supplied host.

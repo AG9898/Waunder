@@ -33,6 +33,59 @@ RSpec.describe "Api job posts", type: :request do
     expect(response).to have_http_status(:ok)
   end
 
+  describe "POST /api/job_posts/lookup" do
+    # The endpoint reads a posting so manual entry can prefill title/company; it
+    # must never persist anything, and never reach the LLM.
+    def stub_lookup(result)
+      allow(PostingMetadataFetcher).to receive(:new).and_return(instance_double(PostingMetadataFetcher, call: result))
+    end
+
+    it "returns the posting's advertised fields without creating a record" do
+      sign_in!
+      stub_lookup(
+        PostingMetadataFetcher::Result.new(
+          status: "ok",
+          provider: "linked_in",
+          title: "MCP/AI Developer",
+          company: "Autodesk",
+          location: "Canada",
+          description: "Build it."
+        )
+      )
+
+      expect do
+        post "/api/job_posts/lookup", params: { url: "https://www.linkedin.com/jobs/view/4435267449" }
+      end.not_to change(JobPost, :count)
+
+      expect(response).to have_http_status(:ok)
+      lookup = JSON.parse(response.body).fetch("lookup")
+      expect(lookup["status"]).to eq("ok")
+      expect(lookup["title"]).to eq("MCP/AI Developer")
+      expect(lookup["company"]).to eq("Autodesk")
+      expect(lookup["location"]).to eq("Canada")
+      expect(lookup["description"]).to eq("Build it.")
+    end
+
+    it "reports an unreadable posting as a 200 with an unavailable status so the form stays usable" do
+      sign_in!
+      stub_lookup(PostingMetadataFetcher::Result.new(status: "unavailable", error: "Could not read the posting"))
+
+      post "/api/job_posts/lookup", params: { job_post: { url: "https://jobs.example.com/1" } }
+
+      expect(response).to have_http_status(:ok)
+      lookup = JSON.parse(response.body).fetch("lookup")
+      expect(lookup["status"]).to eq("unavailable")
+      expect(lookup["error"]).to be_present
+      expect(lookup).not_to have_key("title")
+    end
+
+    it "requires a session" do
+      post "/api/job_posts/lookup", params: { url: "https://www.linkedin.com/jobs/view/1" }
+
+      expect(response).to have_http_status(:unauthorized)
+    end
+  end
+
   describe "POST /api/job_posts" do
     it "creates a normalized manual JobPost, resolves its external application route, and enqueues scoring" do
       sign_in!
@@ -62,6 +115,22 @@ RSpec.describe "Api job posts", type: :request do
       expect(body.fetch("import")).to eq("status" => "new", "application_status" => nil)
       expect(post.description).to include("Build Rails APIs.")
       expect(post.scoring_status).to eq("pending")
+    end
+
+    it "enriches before scoring when the owner supplied only a URL" do
+      sign_in!
+
+      expect do
+        post "/api/job_posts", params: {
+          job_post: { url: "https://www.linkedin.com/jobs/view/4435267449" }
+        }
+      end.to change(JobPost, :count).by(1)
+        .and have_enqueued_job(EnrichJobPostJob)
+
+      expect(response).to have_http_status(:created)
+      # Scoring is enqueued by EnrichJobPostJob once the real posting is read,
+      # so the scorer never sees the host-derived placeholder.
+      expect(enqueued_jobs.map { |job| job[:job] }).not_to include(ScoreJobPostJob)
     end
 
     it "reuses an exact identity without enqueueing duplicate scoring" do

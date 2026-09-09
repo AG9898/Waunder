@@ -162,9 +162,23 @@ dispatch.
    matches are only possible-match hints.
 - `ManualJobPostImporter` performs URL-identity lookup and alias writes in one transaction. Its
   result has one of `new`, `already_tracked`, or `already_submitted`: only a new record proceeds to
-  route resolution and `ScoreJobPostJob`; an exact match writes a `manual_import_matched`
+  route resolution and scoring — via `EnrichJobPostJob` when the result is `enrichable?` (a URL was
+  supplied but title/company/text were not), otherwise straight to `ScoreJobPostJob`; an exact
+  match writes a `manual_import_matched`
   `JobPostAuditEvent` and never re-scores. Pass a supplied external application URL to
   `ApplicationRouteResolver` as its preferred candidate, but do not fetch or scrape it.
+- `PostingMetadataFetcher` is the ONLY place that fetches an owner-supplied URL. Identity
+  resolution, alias registration, and `ManualJobPostImporter` normalization stay offline — do not
+  move a fetch into them. Extraction is deterministic (host-specific public endpoints, then
+  JSON-LD `JobPosting`, OpenGraph, and `<title>` shapes); never fall back to the LLM to read a
+  posting. Guard every fetch: HTTP(S) only, reject addresses resolving into private/loopback/
+  link-local ranges, bound redirects/timeouts/body size, and return an `unavailable` result rather
+  than raising so callers degrade to manual entry.
+- `POST /api/job_posts/lookup` persists nothing and answers 200 for an unreadable posting
+  (`status: "unavailable"`), because prefill is advisory: manual entry must stay usable when a
+  posting cannot be read. `JobPostEnricher`/`EnrichJobPostJob` apply the same fetch after an import
+  and fill only blank or host-placeholder fields — read `source_payload.manual_entry`'s
+  `title_provided`/`company_provided` flags before writing, and never overwrite owner input.
 - `JobPostMaterializer` is the shared deterministic and LLM-fallback inbound path. It reuses a
   matching stable URL identity before creating a JobPost and idempotently records stable `source`
   and `posting` aliases before route resolution. Alias registration is local database work only:

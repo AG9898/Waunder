@@ -60,6 +60,11 @@ type mockClient struct {
 	batchesCalls   int
 	gotBatchesPage int
 
+	lookup       PostingLookup
+	lookupErr    error
+	gotLookupURL string
+	lookupCalls  int
+
 	createApp      CreateApplicationResult
 	createAppErr   error
 	gotCreateAppID int
@@ -274,6 +279,12 @@ func (m *mockClient) CreateJobPost(_ context.Context, input ManualJobInput) (Man
 	m.createInput = input
 	m.createCalls++
 	return m.createResult, m.createErr
+}
+
+func (m *mockClient) LookupPosting(_ context.Context, url string) (PostingLookup, error) {
+	m.gotLookupURL = url
+	m.lookupCalls++
+	return m.lookup, m.lookupErr
 }
 
 // renderHTML loads a component in the go-app test engine, runs its full

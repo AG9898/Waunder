@@ -1561,6 +1561,22 @@ textarea::placeholder { color: var(--color-ink-faint); }
 input:disabled,
 textarea:disabled { opacity: .6; cursor: not-allowed; }
 
+/* read-the-posting control under the job URL field */
+.manual-entry-lookup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  /* pulled up under the URL field so it reads as that field's control */
+  margin: calc(var(--space-2) - var(--space-4)) 0 0;
+}
+.manual-entry-lookup-note,
+.manual-entry-lookup-warning {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+}
+.manual-entry-lookup-warning { color: var(--color-danger-ink); }
+
 .manual-entry-note,
 .contacts-note,
 .push-toggle-note,
@@ -1752,6 +1768,7 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
 /* secondary / outline */
 .push-toggle-disable,
 .contact-outreach-copy,
+.manual-entry-lookup-button,
 .push-toggle-busy {
   appearance: none;
   display: inline-flex;
@@ -1769,9 +1786,14 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
   transition: background .14s ease, border-color .14s ease;
 }
 .push-toggle-disable:hover,
-.contact-outreach-copy:hover {
+.contact-outreach-copy:hover,
+.manual-entry-lookup-button:hover {
   background: var(--color-surface-sunken);
   border-color: var(--color-ink-faint);
+}
+.manual-entry-lookup-button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
 }
 
 /* loading / disabled buttons */

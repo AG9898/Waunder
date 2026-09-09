@@ -9,9 +9,17 @@ class ManualJobPostImporter
   IMPORT_ALREADY_SUBMITTED = "already_submitted"
   MATCH_EVENT_TYPE = "manual_import_matched"
 
-  Result = Struct.new(:job_post, :status, :application, :application_url, :errors, keyword_init: true) do
+  Result = Struct.new(
+    :job_post, :status, :application, :application_url, :errors, :enrichable,
+    keyword_init: true
+  ) do
     def ok? = errors.empty?
     def new? = status == IMPORT_NEW
+
+    # True when the new post has a URL to read but no owner-supplied title or
+    # company, so the stored values are host-derived placeholders. The caller
+    # follows up with EnrichJobPostJob rather than filing it under the host name.
+    def enrichable? = new? && enrichable.present?
   end
 
   MatchConflictError = Class.new(StandardError)
@@ -46,6 +54,7 @@ class ManualJobPostImporter
       status: IMPORT_NEW,
       application: nil,
       application_url: application_url,
+      enrichable: enrichable?,
       errors: []
     )
   end
@@ -167,12 +176,23 @@ class ManualJobPostImporter
     nil
   end
 
+  # Whether the stored title/company are placeholders derived from the URL host
+  # rather than owner input or pasted text. Normalization itself never fetches;
+  # the caller decides whether to enrich in the background.
+  def enrichable?
+    return false if url.blank?
+
+    (params[:title].blank? && first_text_line.blank?) || params[:company].blank? || text.blank?
+  end
+
   def source_payload
     {
       "manual_entry" => {
         "url_provided" => url.present?,
         "text_provided" => text.present?,
-        "application_url_provided" => application_url.present?
+        "application_url_provided" => application_url.present?,
+        "title_provided" => params[:title].present?,
+        "company_provided" => params[:company].present?
       }
     }
   end

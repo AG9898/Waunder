@@ -19,6 +19,18 @@ const (
 	entryError
 )
 
+// lookupState tracks the posting-metadata lookup that prefills title, company,
+// and posting text. Like the submit, it only leaves lookupIdle on an explicit
+// user action (committing the URL field, or pressing Look up) — never on mount.
+type lookupState int
+
+const (
+	lookupIdle lookupState = iota
+	lookupRunning
+	lookupDone
+	lookupFailed
+)
+
 // ManualEntry is the manual job entry form (WEB-06). It collects a job URL
 // and/or pasted posting text (plus optional title/company hints) and posts them
 // to POST /api/job_posts. Rails owns all normalization, route resolution, and
@@ -37,6 +49,18 @@ type ManualEntry struct {
 	text           string
 	title          string
 	company        string
+
+	// Set once the owner types in a prefillable field, so a later lookup never
+	// overwrites what they wrote themselves.
+	titleTouched   bool
+	companyTouched bool
+	textTouched    bool
+
+	// lookedUpURL is the URL the last lookup ran against, so committing the
+	// field again without changing it does not refetch.
+	lookedUpURL string
+	lookupState lookupState
+	lookupNote  string
 
 	state  entryState
 	err    string
@@ -62,14 +86,108 @@ func (m *ManualEntry) onApplicationURLInput(ctx app.Context, _ app.Event) {
 
 func (m *ManualEntry) onTextInput(ctx app.Context, _ app.Event) {
 	m.text = ctx.JSSrc().Get("value").String()
+	m.textTouched = true
 }
 
 func (m *ManualEntry) onTitleInput(ctx app.Context, _ app.Event) {
 	m.title = ctx.JSSrc().Get("value").String()
+	m.titleTouched = true
 }
 
 func (m *ManualEntry) onCompanyInput(ctx app.Context, _ app.Event) {
 	m.company = ctx.JSSrc().Get("value").String()
+	m.companyTouched = true
+}
+
+// onURLChange fires when the URL field is committed (blur or Enter). Reading
+// the posting there means the common case — paste a link, move on — prefills
+// itself without an extra tap.
+func (m *ManualEntry) onURLChange(ctx app.Context, _ app.Event) {
+	m.url = ctx.JSSrc().Get("value").String()
+	m.startLookup(ctx, false)
+}
+
+// lookup is the explicit Look up button, which refetches even when the URL has
+// not changed since the last attempt.
+func (m *ManualEntry) lookup(ctx app.Context, _ app.Event) {
+	m.startLookup(ctx, true)
+}
+
+// startLookup reads the posting behind the current URL and prefills the form
+// from it. It is a no-op without a URL, and skips a repeat fetch of a URL it
+// already read unless the owner asked again.
+func (m *ManualEntry) startLookup(ctx app.Context, forced bool) {
+	url := strings.TrimSpace(m.url)
+	if url == "" || m.lookupState == lookupRunning {
+		return
+	}
+	if !forced && url == m.lookedUpURL {
+		return
+	}
+
+	m.lookupState = lookupRunning
+	m.lookupNote = ""
+	ctx.Update()
+
+	reqCtx := ctx.Context
+	ctx.Async(func() {
+		res, err := m.Client.LookupPosting(reqCtx, url)
+		ctx.Dispatch(func(ctx app.Context) {
+			m.applyLookupResult(url, res, err)
+			ctx.Update()
+		})
+	})
+}
+
+// doLookup performs the lookup and applies the result synchronously. It is the
+// body invoked inside the async handler; tests drive it directly to exercise
+// the prefill without the go-app engine.
+func (m *ManualEntry) doLookup(ctx context.Context) {
+	url := strings.TrimSpace(m.url)
+	if url == "" {
+		return
+	}
+	m.lookupState = lookupRunning
+	res, err := m.Client.LookupPosting(ctx, url)
+	m.applyLookupResult(url, res, err)
+}
+
+// applyLookupResult prefills the fields the owner has not typed in themselves.
+// A posting Rails could not read is not an error state for the form — the
+// fields simply stay empty and the owner fills them in by hand.
+func (m *ManualEntry) applyLookupResult(url string, res PostingLookup, err error) {
+	m.lookedUpURL = url
+	if err != nil {
+		m.lookupState = lookupFailed
+		m.lookupNote = lookupErrorNote(err)
+		return
+	}
+	if !res.OK() {
+		m.lookupState = lookupFailed
+		m.lookupNote = "Could not read that posting. Add the title and company yourself."
+		return
+	}
+
+	filled := make([]string, 0, 3)
+	if res.Title != "" && !m.titleTouched {
+		m.title = res.Title
+		filled = append(filled, "title")
+	}
+	if res.Company != "" && !m.companyTouched {
+		m.company = res.Company
+		filled = append(filled, "company")
+	}
+	if res.Description != "" && !m.textTouched && strings.TrimSpace(m.text) == "" {
+		m.text = res.Description
+		filled = append(filled, "posting text")
+	}
+
+	m.lookupState = lookupDone
+	if len(filled) == 0 {
+		m.lookupNote = "Read the posting; your entries were kept."
+		return
+	}
+	m.lookupNote = "Filled in " + joinFields(filled) + " from the posting."
 }
 
 // submit is wired to the form's OnSubmit. It validates a minimal client hint
@@ -150,7 +268,7 @@ func (m *ManualEntry) Render() app.UI {
 		app.A().Class("manual-entry-back").Href("/jobs").Text("← Jobs"),
 		app.H1().Text("Import a job"),
 		app.P().Class("manual-entry-note").
-			Text("Paste a listing link and/or the posting text. Add an external application link when you have one."),
+			Text("Paste a listing link and the title, company, and description are read from the posting. Add an external application link when you have one."),
 		app.Form().Class("manual-entry-form").OnSubmit(m.submit).Body(
 			app.Label().Class("manual-entry-label").Body(
 				app.Span().Text("Job URL"),
@@ -159,8 +277,10 @@ func (m *ManualEntry) Render() app.UI {
 					Type("url").
 					Placeholder("https://…").
 					Value(m.url).
-					OnInput(m.onURLInput),
+					OnInput(m.onURLInput).
+					OnChange(m.onURLChange),
 			),
+			m.renderLookup(),
 			app.Label().Class("manual-entry-label").Body(
 				app.Span().Text("External application URL (optional)"),
 				app.Input().
@@ -179,7 +299,7 @@ func (m *ManualEntry) Render() app.UI {
 					OnInput(m.onTextInput),
 			),
 			app.Label().Class("manual-entry-label").Body(
-				app.Span().Text("Title (optional)"),
+				app.Span().Text("Title"),
 				app.Input().
 					Class("manual-entry-title").
 					Type("text").
@@ -187,7 +307,7 @@ func (m *ManualEntry) Render() app.UI {
 					OnInput(m.onTitleInput),
 			),
 			app.Label().Class("manual-entry-label").Body(
-				app.Span().Text("Company (optional)"),
+				app.Span().Text("Company"),
 				app.Input().
 					Class("manual-entry-company").
 					Type("text").
@@ -209,6 +329,23 @@ func (m *ManualEntry) Render() app.UI {
 	)
 }
 
+// renderLookup is the read-the-posting control that sits under the URL field:
+// an explicit retry button plus the outcome of the last lookup. Prefilling is
+// advisory — the fields stay editable and the form submits fine without it.
+func (m *ManualEntry) renderLookup() app.UI {
+	return app.Div().Class("manual-entry-lookup").Body(
+		app.Button().
+			Class("manual-entry-lookup-button").
+			Type("button").
+			Disabled(m.lookupState == lookupRunning || strings.TrimSpace(m.url) == "").
+			OnClick(m.lookup).
+			Text(lookupButtonLabel(m.lookupState)),
+		app.If(m.lookupNote != "", func() app.UI {
+			return app.P().Class(lookupNoteClass(m.lookupState)).Text(m.lookupNote)
+		}),
+	)
+}
+
 // renderResult confirms the created job and links to its detail, so the user
 // can follow the new post into the feed once Rails finishes scoring it.
 func (m *ManualEntry) renderResult() app.UI {
@@ -223,6 +360,43 @@ func (m *ManualEntry) renderResult() app.UI {
 }
 
 // --- helpers ---
+
+func lookupButtonLabel(s lookupState) string {
+	if s == lookupRunning {
+		return "Reading posting…"
+	}
+	return "Look up details"
+}
+
+func lookupNoteClass(s lookupState) string {
+	if s == lookupFailed {
+		return "manual-entry-lookup-warning"
+	}
+	return "manual-entry-lookup-note"
+}
+
+// lookupErrorNote keeps a failed lookup non-blocking: the only actionable case
+// is an expired session, and everything else falls back to typing the fields.
+func lookupErrorNote(err error) string {
+	if IsUnauthorized(err) {
+		return "Your session expired. Please sign in again."
+	}
+	return "Could not read that posting. Add the title and company yourself."
+}
+
+// joinFields renders a short list as prose ("title and company").
+func joinFields(fields []string) string {
+	switch len(fields) {
+	case 0:
+		return ""
+	case 1:
+		return fields[0]
+	case 2:
+		return fields[0] + " and " + fields[1]
+	default:
+		return strings.Join(fields[:len(fields)-1], ", ") + ", and " + fields[len(fields)-1]
+	}
+}
 
 func entryButtonLabel(s entryState) string {
 	if s == entrySubmitting {

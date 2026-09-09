@@ -20,6 +20,7 @@ Rails.application.routes.draw do
     get "digest", to: "digest#show"
     get "ingestion_batches", to: "ingestion_batches#index"
     resources :job_posts, only: %i[index show create] do
+      post :lookup, on: :collection
       post :score, on: :member
       patch :application_status, on: :member
       patch :lifecycle, on: :member
