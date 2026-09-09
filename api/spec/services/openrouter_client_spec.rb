@@ -52,7 +52,7 @@ RSpec.describe OpenrouterClient do
       allow(ENV).to receive(:[]).with("OPENROUTER_MODEL").and_return(nil)
 
       client = described_class.new(api_key: "sk-test")
-      expect(client.model).to eq("openai/gpt-oss-120b:free")
+      expect(client.model).to eq("google/gemma-4-31b-it:free")
     end
 
     it "uses OPENROUTER_MODEL from env when set" do

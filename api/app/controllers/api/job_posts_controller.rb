@@ -74,7 +74,7 @@ module Api
     # Full scored detail for one job plus its resolved application route.
     # Read-only; never triggers scoring or the LLM.
     def show
-      job_post = JobPost.includes(:company, :application_route).find(params[:id])
+      job_post = JobPost.includes(:company, :application_route, :cover_letter_draft).find(params[:id])
 
       render json: { job_post: serialize_detail(job_post) }
     end
@@ -432,6 +432,7 @@ module Api
         red_flags: job_post.red_flags,
         resume_alignment_notes: job_post.resume_alignment_notes,
         application_strategy: job_post.application_strategy,
+        cover_letter_draft: serialize_cover_letter_draft(job_post.cover_letter_draft),
         application: serialize_application(job_post.applications.order(created_at: :desc).first),
         route: {
           route_type: route&.route_type,
@@ -500,6 +501,17 @@ module Api
         next_follow_up_on: application.next_follow_up_on,
         submitted_at: application.submitted_at,
         failure_reason: application.failure_reason
+      }
+    end
+
+    def serialize_cover_letter_draft(draft)
+      return nil if draft.nil?
+
+      {
+        id: draft.id,
+        job_post_id: draft.job_post_id,
+        body: draft.body,
+        generated_at: draft.generated_at
       }
     end
 

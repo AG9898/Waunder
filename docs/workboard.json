@@ -1,7 +1,7 @@
 {
   "$schema": "./workboard.schema.json",
   "schema_version": "1.0.0",
-  "last_updated": "2026-09-08",
+  "last_updated": "2026-09-09",
   "tasks": [
     {
       "id": "INFRA-01",
@@ -1808,6 +1808,56 @@
         "api/config/routes.rb",
         "web/components/manual_entry.go",
         "web/components/client.go",
+        "web/web/app.css"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop",
+        "cd web && go test ./...",
+        "cd web && go vet ./..."
+      ]
+    },
+    {
+      "id": "LLM-04",
+      "title": "Generate focused cover letters from job details",
+      "description": "Add a Rails-owned, encrypted CoverLetterDraft associated directly with a JobPost (never an Application). An authenticated owner explicitly generates or regenerates one current letter from the posting, company, singleton Profile, and primary portfolio-synced ResumeDocument through OpenrouterClient. Configure the single shared OpenRouter model as google/gemma-4-31b-it:free, preserve graceful missing-key/upstream-error behavior, and never log prompt, response, or PII. Expose authenticated read/generate endpoints and a job-detail PWA card that displays, copies, and regenerates the saved letter without generating on mount, creating an application, or submitting anything.",
+      "status": "done",
+      "priority": "high",
+      "group_id": "LLM",
+      "depends_on": [
+        "LLM-01",
+        "PROFILE-01",
+        "WEB-02"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "The configured OpenRouter default and documented default use google/gemma-4-31b-it:free; the client continues requesting JSON with its parse fallback and does not make live calls in tests",
+        "An authenticated explicit generation request creates or replaces exactly one encrypted current cover letter for its JobPost, grounded only in persisted job, company, profile, and primary resume data, with no application or worker-submit side effect",
+        "Missing provider configuration returns a recoverable unavailable response and upstream/model failures return a recoverable generation error without exposing prompt, completion, or PII",
+        "The job-detail PWA renders saved/empty/loading/error states plus Copy and Regenerate actions; neither request fires during mount or render",
+        "Rails request/service/model tests and Go client/component tests cover the explicit flow, no side effects on render, and error paths; API RSpec/RuboCop and web go test/go vet pass"
+      ],
+      "docs": [
+        "docs/PRD.md",
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md",
+        "docs/DECISIONS.md",
+        "docs/ENV_VARS.md",
+        "docs/STYLE_GUIDE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "api/app/controllers/api",
+        "api/app/models",
+        "api/app/services",
+        "api/config/routes.rb",
+        "api/db/migrate",
+        "api/spec/models",
+        "api/spec/requests",
+        "api/spec/services",
+        "web/components/client.go",
+        "web/components/jobs.go",
+        "web/components/*_test.go",
         "web/web/app.css"
       ],
       "commands": [

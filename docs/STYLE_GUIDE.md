@@ -167,6 +167,10 @@ figures where possible.
   does not reach `<textarea>` elements, so the pasted-posting and outreach-draft fields
   (`.manual-entry-text`, `.contact-outreach-template`, `.contact-outreach-message`) set
   `overflow-wrap: break-word` directly to stay usable at mobile widths.
+- The job-detail `.job-cover-letter` card follows the assessment-section hairline rhythm. Its
+  empty state explains that generation uses the synced resume and never submits; the generated
+  body preserves paragraph breaks, with Copy and explicit Generate/Regenerate controls plus a
+  compact recoverable error state.
 - The profile screen's resume parse status (`.profile-resume-status`) and the push toggle's
   subscribed indicator (`.push-toggle-status-on`) reuse the same quiet pill idiom as the
   match-score pill, but tinted success-soft/sunken rather than sage, so "resume parsed" and

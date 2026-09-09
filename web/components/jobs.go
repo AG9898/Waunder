@@ -1001,6 +1001,9 @@ type JobDetailView struct {
 	applyState applyStatus
 	applyErr   string
 
+	coverLetterState coverLetterStatus
+	coverLetterErr   string
+
 	statusSaving bool
 	statusErr    string
 
@@ -1017,6 +1020,17 @@ const (
 	applyIdle applyStatus = iota
 	applyCreating
 	applyError
+)
+
+// coverLetterStatus tracks the separate, explicit cover-letter action. It is
+// never driven by the job-detail fetch, so opening a posting cannot spend LLM
+// quota or create a draft.
+type coverLetterStatus int
+
+const (
+	coverLetterIdle coverLetterStatus = iota
+	coverLetterGenerating
+	coverLetterError
 )
 
 func (d *JobDetailView) OnMount(ctx app.Context)     { d.start(ctx) }
@@ -1197,9 +1211,89 @@ func (d *JobDetailView) Render() app.UI {
 						app.If(job.ApplicationStrategy != "", func() app.UI {
 							return app.Div().Class("job-strategy").Body(app.H2().Text("Application approach"), app.P().Text(job.ApplicationStrategy))
 						}),
+						d.renderCoverLetter(),
 					),
 				),
 			)
+		}),
+	)
+}
+
+// generateCoverLetter is an explicit click-only action. It is intentionally
+// separate from apply: generating copy never starts an Application or reaches
+// the trusted-submit worker.
+func (d *JobDetailView) generateCoverLetter(ctx app.Context, _ app.Event) {
+	if d.coverLetterState == coverLetterGenerating {
+		return
+	}
+	d.coverLetterState = coverLetterGenerating
+	d.coverLetterErr = ""
+	ctx.Update()
+	reqCtx := ctx.Context
+	id := d.JobID
+	ctx.Async(func() {
+		draft, err := d.Client.GenerateCoverLetter(reqCtx, id)
+		ctx.Dispatch(func(ctx app.Context) {
+			d.applyCoverLetterResult(draft, err)
+			ctx.Update()
+		})
+	})
+}
+
+// doGenerateCoverLetter is the engine-free action body used by tests.
+func (d *JobDetailView) doGenerateCoverLetter(ctx context.Context) {
+	d.coverLetterState = coverLetterGenerating
+	draft, err := d.Client.GenerateCoverLetter(ctx, d.JobID)
+	d.applyCoverLetterResult(draft, err)
+}
+
+// applyCoverLetterResult owns the visible state transition after the explicit
+// request. It contains no go-app plumbing so error paths are unit-testable.
+func (d *JobDetailView) applyCoverLetterResult(draft CoverLetterDraft, err error) {
+	if err != nil {
+		d.coverLetterState = coverLetterError
+		switch {
+		case IsUnauthorized(err):
+			d.coverLetterErr = sessionExpiredMessage
+		case isServiceUnavailable(err):
+			d.coverLetterErr = "Cover-letter generation is unavailable. Please try again later."
+		default:
+			d.coverLetterErr = "Could not generate the cover letter. Please try again."
+		}
+		return
+	}
+	d.job.CoverLetterDraft = &draft
+	d.coverLetterState = coverLetterIdle
+	d.coverLetterErr = ""
+}
+
+func (d *JobDetailView) renderCoverLetter() app.UI {
+	draft := d.job.CoverLetterDraft
+	label := "Generate cover letter"
+	if draft != nil {
+		label = "Regenerate cover letter"
+	}
+	if d.coverLetterState == coverLetterGenerating {
+		label = "Generating…"
+	}
+
+	return app.Section().Class("job-cover-letter").Body(
+		app.H2().Text("Cover letter"),
+		app.If(draft == nil, func() app.UI {
+			return app.P().Class("job-cover-letter-empty").Text("Generate a tailored letter from this posting and your synced resume. It will never submit an application.")
+		}).Else(func() app.UI {
+			return app.Div().Class("job-cover-letter-draft").Body(
+				app.P().Class("job-cover-letter-body").Text(draft.Body),
+				&CopyButton{Text: draft.Body, Label: "Copy cover letter"},
+			)
+		}),
+		app.Button().
+			Class("job-cover-letter-generate").
+			Disabled(d.coverLetterState == coverLetterGenerating).
+			OnClick(d.generateCoverLetter).
+			Text(label),
+		app.If(d.coverLetterState == coverLetterError, func() app.UI {
+			return app.P().Class("job-cover-letter-error").Attr("role", "alert").Text(d.coverLetterErr)
 		}),
 	)
 }

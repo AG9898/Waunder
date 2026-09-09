@@ -741,7 +741,8 @@ button { font-family: inherit; }
 .job-red-flags li::before { background: var(--color-danger); }
 
 .job-alignment,
-.job-strategy {
+.job-strategy,
+.job-cover-letter {
   margin: 0;
   padding: var(--space-5) 0;
   border-top: 1px solid var(--color-border);
@@ -1726,6 +1727,7 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
 .draft-submit-button,
 .draft-preview-save,
 .job-apply-button,
+.job-cover-letter-generate,
 .profile-save,
 .contact-outreach-generate,
 .intake-toggle,
@@ -1750,6 +1752,7 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
 .draft-submit-button:hover,
 .draft-preview-save:hover,
 .job-apply-button:hover,
+.job-cover-letter-generate:hover,
 .profile-save:hover,
 .contact-outreach-generate:hover,
 .intake-toggle:hover,
@@ -1760,6 +1763,7 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
 .draft-submit-button:active,
 .draft-preview-save:active,
 .job-apply-button:active,
+.job-cover-letter-generate:active,
 .profile-save:active,
 .contact-outreach-generate:active,
 .intake-toggle:active,
@@ -1802,6 +1806,7 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
 .draft-submit-button:disabled,
 .draft-preview-save:disabled,
 .job-apply-button:disabled,
+.job-cover-letter-generate:disabled,
 .profile-save:disabled,
 .contact-outreach-generate:disabled,
 .intake-toggle:disabled,
@@ -1850,6 +1855,7 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
 .draft-submit-error,
 .draft-preview-error,
 .job-apply-error,
+.job-cover-letter-error,
 .application-status-error,
 .job-pipeline-error,
 .job-lifecycle-error,
@@ -2174,8 +2180,12 @@ html { scroll-padding-bottom: var(--screen-bottom); }
 .job-optional-actions .job-apply { margin: 0; padding: 12px 0; border: 0; }
 .job-optional-actions .job-contacts-link { margin-top: 0; padding: 10px 0; font-size: var(--text-sm); }
 .job-assessment { padding-top: 20px; }
-.job-alignment p, .job-strategy p { margin: 0; }
-.draft-cover-letter p, .draft-answer-value { white-space: pre-wrap; }
+.job-alignment p, .job-strategy p, .job-cover-letter p { margin: 0; }
+.draft-cover-letter p, .job-cover-letter-body, .draft-answer-value { white-space: pre-wrap; }
+.job-cover-letter { display: flex; flex-direction: column; gap: 12px; }
+.job-cover-letter-empty { color: var(--color-ink-soft); }
+.job-cover-letter-draft { color: var(--color-ink-soft); }
+.job-cover-letter-error { margin: 0; color: var(--color-danger); font-size: var(--text-sm); }
 .copy-control { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
 .copy-status { font-size: var(--text-sm); color: var(--color-ink-soft); }
 .draft-materials > * { min-width: 0; }

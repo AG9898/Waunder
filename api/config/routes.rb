@@ -25,6 +25,7 @@ Rails.application.routes.draw do
       patch :application_status, on: :member
       patch :lifecycle, on: :member
       patch :lifecycle, on: :collection, action: :bulk_lifecycle
+      resource :cover_letter_draft, only: %i[show create]
       resources :contact_candidates, only: %i[index create]
     end
     resources :contact_candidates, only: [] do

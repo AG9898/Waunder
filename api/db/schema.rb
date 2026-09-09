@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_08_150000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_09_160000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "pg_catalog.plpgsql"
@@ -134,6 +134,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_08_150000) do
     t.datetime "updated_at", null: false
     t.index ["job_post_id"], name: "index_contact_candidates_on_job_post_id"
     t.index ["linkedin_url"], name: "index_contact_candidates_on_linkedin_url"
+  end
+
+  create_table "cover_letter_drafts", force: :cascade do |t|
+    t.text "body", null: false
+    t.datetime "created_at", null: false
+    t.datetime "generated_at", null: false
+    t.bigint "job_post_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["job_post_id"], name: "index_cover_letter_drafts_on_job_post_id", unique: true
   end
 
   create_table "inbound_emails", force: :cascade do |t|
@@ -293,6 +302,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_08_150000) do
   add_foreign_key "applications", "job_posts"
   add_foreign_key "audit_events", "applications"
   add_foreign_key "contact_candidates", "job_posts"
+  add_foreign_key "cover_letter_drafts", "job_posts"
   add_foreign_key "job_post_audit_events", "job_posts"
   add_foreign_key "job_post_url_identities", "job_posts"
   add_foreign_key "job_posts", "companies"

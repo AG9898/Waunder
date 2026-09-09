@@ -7,6 +7,7 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -257,6 +258,38 @@ func TestClientCreateJobPostSendsExternalApplicationURLAndDecodesImport(t *testi
 	}
 	if result.ID != 42 || result.Import.Status != manualImportAlreadyTracked || result.Import.ApplicationStatus != "approved" {
 		t.Errorf("unexpected import result: %+v", result)
+	}
+}
+
+func TestClientGenerateAndFetchCoverLetter(t *testing.T) {
+	var calls []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls = append(calls, r.Method+" "+r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		switch r.Method {
+		case http.MethodGet:
+			_, _ = w.Write([]byte(`{"cover_letter_draft":{"id":3,"job_post_id":42,"body":"Dear Acme team","generated_at":"2026-09-09T12:00:00Z"}}`))
+		case http.MethodPost:
+			_, _ = w.Write([]byte(`{"cover_letter_draft":{"id":3,"job_post_id":42,"body":"Dear Acme team","generated_at":"2026-09-09T12:00:00Z"}}`))
+		}
+	}))
+	defer srv.Close()
+
+	c := &httpRailsClient{http: srv.Client(), base: srv.URL}
+	draft, err := c.GenerateCoverLetter(context.Background(), 42)
+	if err != nil {
+		t.Fatalf("GenerateCoverLetter: %v", err)
+	}
+	fetched, err := c.CoverLetter(context.Background(), 42)
+	if err != nil {
+		t.Fatalf("CoverLetter: %v", err)
+	}
+	if draft.Body != "Dear Acme team" || fetched == nil || fetched.JobPostID != 42 {
+		t.Fatalf("unexpected cover letter responses: generated=%+v fetched=%+v", draft, fetched)
+	}
+	want := []string{"POST /api/job_posts/42/cover_letter_draft", "GET /api/job_posts/42/cover_letter_draft"}
+	if !reflect.DeepEqual(calls, want) {
+		t.Errorf("calls = %#v, want %#v", calls, want)
 	}
 }
 

@@ -55,6 +55,15 @@ type RailsClient interface {
 	// route (GET /api/job_posts/:id).
 	Job(ctx context.Context, id int) (JobDetail, error)
 
+	// CoverLetter fetches the current manually usable cover letter for a job.
+	// It is read-only and never starts an application or submits anything.
+	CoverLetter(ctx context.Context, jobID int) (*CoverLetterDraft, error)
+
+	// GenerateCoverLetter explicitly creates or replaces the current cover
+	// letter (POST /api/job_posts/:id/cover_letter_draft). It never creates an
+	// Application, changes tracker state, or submits anything.
+	GenerateCoverLetter(ctx context.Context, jobID int) (CoverLetterDraft, error)
+
 	// Digest fetches the daily digest landing payload (GET /api/digest).
 	Digest(ctx context.Context) (Digest, error)
 
@@ -413,8 +422,18 @@ type JobDetail struct {
 	RedFlags             []string            `json:"red_flags"`
 	ResumeAlignment      string              `json:"resume_alignment_notes"`
 	ApplicationStrategy  string              `json:"application_strategy"`
+	CoverLetterDraft     *CoverLetterDraft   `json:"cover_letter_draft"`
 	Route                JobRoute            `json:"route"`
 	Application          *ApplicationTracker `json:"application"`
+}
+
+// CoverLetterDraft is the saved, owner-requested cover letter for a job. It
+// is independently generated and manually copied; it is not a worker payload.
+type CoverLetterDraft struct {
+	ID          int    `json:"id"`
+	JobPostID   int    `json:"job_post_id"`
+	Body        string `json:"body"`
+	GeneratedAt string `json:"generated_at"`
 }
 
 // JobRoute is the resolved application route for a job: how the application
@@ -779,6 +798,27 @@ func (c *httpRailsClient) Job(ctx context.Context, id int) (JobDetail, error) {
 		return JobDetail{}, err
 	}
 	return out.JobPost, nil
+}
+
+func (c *httpRailsClient) CoverLetter(ctx context.Context, jobID int) (*CoverLetterDraft, error) {
+	var out struct {
+		CoverLetterDraft *CoverLetterDraft `json:"cover_letter_draft"`
+	}
+	if err := c.get(ctx, fmt.Sprintf("/api/job_posts/%d/cover_letter_draft", jobID), &out); err != nil {
+		return nil, err
+	}
+	return out.CoverLetterDraft, nil
+}
+
+func (c *httpRailsClient) GenerateCoverLetter(ctx context.Context, jobID int) (CoverLetterDraft, error) {
+	var out struct {
+		CoverLetterDraft CoverLetterDraft `json:"cover_letter_draft"`
+	}
+	path := fmt.Sprintf("/api/job_posts/%d/cover_letter_draft", jobID)
+	if err := c.sendJSON(ctx, http.MethodPost, path, map[string]any{}, &out); err != nil {
+		return CoverLetterDraft{}, err
+	}
+	return out.CoverLetterDraft, nil
 }
 
 func (c *httpRailsClient) Digest(ctx context.Context) (Digest, error) {

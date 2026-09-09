@@ -258,6 +258,15 @@ dispatch.
   configured it skips gracefully (no draft created, no raise); on an `OpenrouterClient::Error` it
   returns a `failed` result without creating a draft. It never logs prompt/completion contents or
   Profile/ResumeDocument PII.
+- Focused cover-letter generation is isolated in `CoverLetterGenerator`
+  (`app/services/cover_letter_generator.rb`) and exposed only through the authenticated
+  nested `CoverLetterDraftsController` (`GET`/`POST
+  /api/job_posts/:job_post_id/cover_letter_draft`). `CoverLetterDraft` belongs directly to a
+  `JobPost`, encrypts its `body`, and is replaced in place on explicit regeneration. The generator
+  grounds its one JSON `cover_letter` field in persisted job/company/profile/primary-resume data,
+  never logs that content, and maps missing-key/upstream states to `503 llm_unavailable` / `502
+  generation_failed`. It never creates an `Application`, changes tracking state, or dispatches a
+  worker task; the PWA must never call it on mount or render.
 - The draft-review API exposes the worker payload as a review/edit surface, not as hidden state.
   `GET /api/applications/:id` returns `draft_ready`, `autofill_warnings`, `failure_reason`, and
   latest worker report context alongside the `autofill_payload`; `PATCH

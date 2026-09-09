@@ -98,7 +98,8 @@ The full topology and the rationale for the `/api` proxy routing decision live i
    Rails' typed new/tracked/submitted result with a `/jobs/:id` link to the returned record), a single
   job's scored detail (`/jobs/:id`, `components.JobDetailView` — summary, match score,
   relevant/missing requirements, red flags, alignment/strategy notes, the resolved
-  application route, and an intake block exposing Backlog/Remove (or Restore) via
+  application route, an owner-controlled Cover letter card (generate/copy/regenerate one
+  manual-use letter, never an Application or submit task), and an intake block exposing Backlog/Remove (or Restore) via
   `SetJobLifecycle`; INTAKE-08), the applications tracker (`/applications`,
   `components.ApplicationsView` — tracked applications with status/stage controls, plus an
   "All jobs" table view (lazily fetched on first open) that lists every JobPost via the paginated

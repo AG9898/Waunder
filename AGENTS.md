@@ -1085,3 +1085,9 @@ supplied but title (and pasted text), company, or body were not. When it fires t
 enqueues `EnrichJobPostJob` INSTEAD of `ScoreJobPostJob`, and the enrich job enqueues scoring
 itself — otherwise the scorer races ahead and scores the placeholder. Guard the fetch against
 private/loopback addresses: it is the one place the API requests a user-supplied host.
+
+### 2026-09-09 — Resume sync reads its credentials from the invoking environment
+`My_Portfolio/scripts/sync-resume.js` reads `WAUNDER_BASE_URL` and `WAUNDER_APP_SECRET` directly
+from its process environment; it does not load `.env.local`. When running it from the portfolio
+checkout, source Waunder's ignored `api/.env` using an absolute path and never print the secret.
+A successful sync reports only the parse status and whether the PDF was attached.

@@ -11,6 +11,7 @@ class JobPost < ApplicationRecord
   has_one :application_route, dependent: :destroy
   has_many :applications, dependent: :restrict_with_error
   has_many :contact_candidates, dependent: :destroy
+  has_one :cover_letter_draft, dependent: :destroy
   has_many :audit_events, class_name: "JobPostAuditEvent", dependent: :destroy
   has_many :url_identities, class_name: "JobPostUrlIdentity", dependent: :destroy
 

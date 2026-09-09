@@ -51,6 +51,13 @@ type mockClient struct {
 	jobErr error
 	gotID  int
 
+	coverLetter        *CoverLetterDraft
+	coverLetterErr     error
+	generatedLetter    CoverLetterDraft
+	generatedLetterErr error
+	gotCoverLetterID   int
+	coverLetterCalls   int
+
 	digest    Digest
 	digestErr error
 
@@ -181,6 +188,17 @@ func (m *mockClient) SetJobLifecycle(_ context.Context, ids []int, state string)
 func (m *mockClient) Job(_ context.Context, id int) (JobDetail, error) {
 	m.gotID = id
 	return m.job, m.jobErr
+}
+
+func (m *mockClient) CoverLetter(_ context.Context, jobID int) (*CoverLetterDraft, error) {
+	m.gotCoverLetterID = jobID
+	return m.coverLetter, m.coverLetterErr
+}
+
+func (m *mockClient) GenerateCoverLetter(_ context.Context, jobID int) (CoverLetterDraft, error) {
+	m.gotCoverLetterID = jobID
+	m.coverLetterCalls++
+	return m.generatedLetter, m.generatedLetterErr
 }
 
 func (m *mockClient) Digest(context.Context) (Digest, error) {
@@ -1060,6 +1078,54 @@ func TestJobDetailRendersApplyButton(t *testing.T) {
 		if !strings.Contains(html, want) {
 			t.Errorf("job detail HTML missing apply control %q\n%s", want, html)
 		}
+	}
+}
+
+func TestJobDetailRendersCoverLetterControlWithoutGenerating(t *testing.T) {
+	m := &mockClient{job: JobDetail{ID: 7, Title: "Platform Engineer", Company: "Acme"}}
+	html := renderHTML(t, &JobDetailView{JobID: 7, Client: m})
+	for _, want := range []string{"job-cover-letter", "Generate cover letter", "never submit an application"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("job detail HTML missing cover-letter control %q\n%s", want, html)
+		}
+	}
+	if m.coverLetterCalls != 0 || m.createAppCalls != 0 || m.submitCalls != 0 {
+		t.Fatalf("render generated or submitted: cover letters=%d applications=%d submits=%d", m.coverLetterCalls, m.createAppCalls, m.submitCalls)
+	}
+}
+
+func TestJobDetailDoGenerateCoverLetter(t *testing.T) {
+	m := &mockClient{generatedLetter: CoverLetterDraft{
+		ID:        3,
+		JobPostID: 7,
+		Body:      "Dear Acme team,\n\nI would be excited to contribute.",
+	}}
+	c := &JobDetailView{JobID: 7, Client: m}
+
+	c.doGenerateCoverLetter(context.Background())
+
+	if m.coverLetterCalls != 1 || m.gotCoverLetterID != 7 {
+		t.Fatalf("GenerateCoverLetter calls=%d jobID=%d, want (1, 7)", m.coverLetterCalls, m.gotCoverLetterID)
+	}
+	if m.createAppCalls != 0 || m.submitCalls != 0 {
+		t.Fatalf("cover-letter action touched application flow: creates=%d submits=%d", m.createAppCalls, m.submitCalls)
+	}
+	if c.coverLetterState != coverLetterIdle || c.coverLetterErr != "" || c.job.CoverLetterDraft == nil {
+		t.Fatalf("unexpected cover-letter state: state=%d err=%q draft=%+v", c.coverLetterState, c.coverLetterErr, c.job.CoverLetterDraft)
+	}
+	if c.job.CoverLetterDraft.Body != m.generatedLetter.Body {
+		t.Errorf("saved body = %q, want %q", c.job.CoverLetterDraft.Body, m.generatedLetter.Body)
+	}
+}
+
+func TestJobDetailCoverLetterUnavailableError(t *testing.T) {
+	m := &mockClient{generatedLetterErr: &APIError{Status: http.StatusServiceUnavailable}}
+	c := &JobDetailView{JobID: 7, Client: m}
+
+	c.doGenerateCoverLetter(context.Background())
+
+	if c.coverLetterState != coverLetterError || !strings.Contains(c.coverLetterErr, "unavailable") {
+		t.Fatalf("unexpected cover-letter error state: state=%d err=%q", c.coverLetterState, c.coverLetterErr)
 	}
 }
 
