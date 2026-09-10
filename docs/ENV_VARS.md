@@ -24,6 +24,9 @@ If any other doc mentions a variable, it should link here rather than restate it
 > reads `API_INTERNAL_URL` (default `http://localhost:3000`) for its `/api` and Resend-webhook
 > proxy, Node-side only, so it is never inlined into the browser bundle.
 > See [`GO_MIGRATION.md`](GO_MIGRATION.md).
+> `FE-27`'s shadow Caddy container consumes the same two runtime variables: `PORT` for its
+> HTTP-only listener and `API_INTERNAL_URL` for both preserved proxy paths. No new variable is
+> introduced, and this does not reconfigure the live Go service before cutover.
 
 | Variable | Required | Default | Description | Where set |
 |---|---|---|---|---|

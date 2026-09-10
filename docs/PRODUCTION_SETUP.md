@@ -45,6 +45,10 @@ each app service points `RAILWAY_DOCKERFILE_PATH` at a root-context Dockerfile:
 | `web` | `deploy/railway-web.Dockerfile` |
 | `worker` | `deploy/railway-worker.Dockerfile` |
 
+`deploy/railway-web.Dockerfile` now contains the locally verified Node-build-to-Caddy shadow
+configuration (`FE-27`). No Railway service configuration or deployment is changed until frontend
+cutover; the current production web container remains the Go/go-app server.
+
 Required production env is documented in [`ENV_VARS.md`](ENV_VARS.md). Key placement:
 
 | Variable | Railway service |

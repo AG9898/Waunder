@@ -2765,7 +2765,7 @@
       "id": "FE-27",
       "title": "Add the Caddyfile, the Railway Dockerfile, and a container smoke test",
       "description": "Replace the Go app-shell/proxy server with Caddy. The Caddyfile serves the built static assets with an SPA fallback and reverse-proxies /api/* and /webhooks/resend/inbound to API_INTERNAL_URL. Railway terminates TLS, so bind :{$PORT} with auto_https off or Caddy will try to provision certificates and fail to bind. Add encode zstd gzip, which the Go http.FileServer never had. Note that Caddy's reverse_proxy preserves the original Host header whereas Go's NewSingleHostReverseProxy rewrites it to the target, so verify the behaviour in front of Rails rather than assuming it. The Dockerfile uses a Node build stage into a Caddy runtime with the repo root as build context, matching the deploy/ convention. This task does not switch the Railway service over.",
-      "status": "todo",
+      "status": "done",
       "priority": "critical",
       "group_id": "FE",
       "depends_on": [

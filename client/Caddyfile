@@ -1,0 +1,23 @@
+{
+	auto_https off
+}
+
+:{$PORT} {
+	encode zstd gzip
+
+	@api path /api/*
+	handle @api {
+		reverse_proxy {$API_INTERNAL_URL}
+	}
+
+	@resend path /webhooks/resend/inbound
+	handle @resend {
+		reverse_proxy {$API_INTERNAL_URL}
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

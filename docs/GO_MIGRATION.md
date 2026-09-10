@@ -497,6 +497,17 @@ Caddy appears only in `FE-27`. Local development uses Vite's own `server.proxy` 
 so if Caddy proves wrong it is one task to swap for a small static server without touching any
 screen work.
 
+**`FE-27` implementation and verification.** `client/Caddyfile` disables automatic HTTPS, binds
+`:{$PORT}`, enables `zstd` and `gzip`, serves `/srv` with an SPA fallback, and sends only
+`/api/*` plus `/webhooks/resend/inbound` to `API_INTERNAL_URL`. The root-context
+`deploy/railway-web.Dockerfile` builds `client/` with Node and runs the result in Caddy; it is a
+shadow deployment definition only until `FE-30`, not a Railway service reconfiguration.
+`bash client/scripts/container-smoke.sh` builds that image and verifies the two proxy paths,
+request methods/bodies/content type/custom headers, the SPA fallback, the legacy worker, and both
+compression encodings. Its stub backend receives each caller-supplied `Host` unchanged, confirming
+that Caddy preserves the browser's original host in front of Rails rather than applying Go's
+upstream-host rewrite.
+
 ### Cutover: shadow directory, atomic final commit
 
 Work happens directly on `main` and Railway auto-deploys on push to `main`. An in-place
