@@ -4,6 +4,10 @@ Operational reference for the live Railway/Resend setup. Keep this file limited 
 non-secret values and setup facts that agents need to orient quickly; secrets stay in
 Railway variables and local ignored `.env` files.
 
+The `web` service's frontend is being migrated from Go/go-app to Vite + React + TypeScript.
+The service, domain, proxy paths, and Resend webhook URL are all unchanged by that work; see
+[`GO_MIGRATION.md`](GO_MIGRATION.md).
+
 ---
 
 ## Live URLs

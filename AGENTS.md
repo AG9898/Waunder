@@ -119,6 +119,12 @@ Docs navigation: [`docs/INDEX.md`](docs/INDEX.md)
 
 Full topology, component responsibilities, data flow, and deployment targets: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 
+**Frontend migration in flight (RESOLVED-24):** `web/` is being replaced by a Vite + React +
+TypeScript PWA behind Caddy, with Go removed entirely. Until the cutover task, `web/` is
+production and must not be edited or deleted — all new frontend work happens in `client/`.
+`api/` and `workers/` do not change. Plan of record, port map, preserved contracts, and
+verification gates: [`docs/GO_MIGRATION.md`](docs/GO_MIGRATION.md).
+
 ---
 
 ## Code Style & Constraints
@@ -169,6 +175,7 @@ the code change — never defer a doc update to a follow-up task.
 | Product scope, users, or success criteria changed | [`docs/PRD.md`](docs/PRD.md) |
 | Any doc added, removed, renamed, or moved | [`docs/INDEX.md`](docs/INDEX.md) — always |
 | Constraint or gotcha discovered during a task | This file (`AGENTS.md`) — append to Discoveries |
+| Frontend migration status, scope, or decision | [`docs/GO_MIGRATION.md`](docs/GO_MIGRATION.md) |
 
 **Rule:** If a section in `AGENTS.md` summarizes something, and the full doc changes, update
 both the summary here and the full doc in the same commit.
@@ -1098,3 +1105,18 @@ metadata defaults to `high` reasoning. A real resume-plus-live-job cover-letter 
 with that default and returned valid JSON in 13.8 seconds with `reasoning.effort: "none"`; keep
 that default in `OpenrouterClient` and use `OPENROUTER_REASONING_EFFORT` only for a deliberate
 override.
+
+### 2026-09-10 — Frontend migrating off Go/go-app; work in `client/`, never edit `web/`
+RESOLVED-24 replaces the `web/` Go + go-app WASM frontend with Vite + React + TypeScript served by
+Caddy, removing Go from the repo. The chain (FE-01…FE-30) builds in a shadow `client/` directory
+because Railway auto-deploys every push to `main` — `web/` keeps serving production until the single
+atomic cutover task, so do not edit or delete `web/` before then. `app.css` and every class name are
+carried over verbatim so the port is screenshot-verifiable; Tailwind/component-library work is the
+separate UI-01…UI-05 chain. Three non-obvious facts found while scoping, all detailed in
+[`docs/GO_MIGRATION.md`](docs/GO_MIGRATION.md): go-app serves `app.wasm` through plain
+`http.FileServer` with **no compression** (16 MB uncompressed per cold cache); go-app's cache-first
+service worker at `/app-worker.js` can pin an installed PWA to the old build **forever** after
+cutover unless the new deployment serves a kill switch at that exact path; and Rails' push payload
+(`{title, body, data:{url}}`) never matched what go-app's worker reads (`notification.path`, and it
+overwrites `data`), so the digest notification's click target has been dead — the new service worker
+reads `data.url` and Rails still does not change.

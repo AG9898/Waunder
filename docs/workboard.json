@@ -1,7 +1,7 @@
 {
   "$schema": "./workboard.schema.json",
   "schema_version": "1.0.0",
-  "last_updated": "2026-09-09",
+  "last_updated": "2026-09-10",
   "tasks": [
     {
       "id": "INFRA-01",
@@ -1898,6 +1898,1179 @@
       "commands": [
         "cd api && bundle exec rspec",
         "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "FE-01",
+      "title": "Scaffold client/ with Vite + React + TypeScript toolchain",
+      "description": "Create the shadow client/ project: Vite + React + strict TypeScript, Vitest + Testing Library (jsdom), ESLint + Prettier, and npm scripts for dev/build/typecheck/test/lint. Configure the Vite dev server to proxy /api/* and /webhooks/resend/inbound to a local Rails so the app is developed same-origin exactly as production. No application code and no assets in this task. web/ is production and must not be touched.",
+      "status": "todo",
+      "priority": "critical",
+      "group_id": "FE",
+      "depends_on": [],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "client/ builds, typechecks, lints, and runs one smoke test with all four npm scripts present",
+        "TypeScript is strict; no implicit any and no unchecked index access",
+        "Vite dev server proxies /api/* and /webhooks/resend/inbound to the Rails base URL from an env var, defaulting to localhost:3000",
+        "Nothing under web/, api/, or workers/ is modified, and Railway is not reconfigured"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/CONVENTIONS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "client/package.json",
+        "client/tsconfig.json",
+        "client/vite.config.ts",
+        "client/index.html",
+        "client/src/main.tsx",
+        "client/vitest.setup.ts",
+        "client/eslint.config.js",
+        "client/.gitignore"
+      ],
+      "commands": [
+        "cd client && npm install",
+        "cd client && npm run typecheck",
+        "cd client && npm test",
+        "cd client && npm run build",
+        "cd client && npm run lint"
+      ]
+    },
+    {
+      "id": "FE-02",
+      "title": "Copy app.css, fonts, and brand icons into client/public verbatim",
+      "description": "Move the visual system across unchanged. Copy web/web/app.css, web/web/fonts/hanken-grotesk.woff2, web/web/icons/*.svg, and web/web/icon.svg into client/public/. The only permitted edits to app.css are the asset path prefix (/web/... becomes /...) in the @font-face src and the header comments that describe go-app wiring. Do not restyle, reorder, reformat, or rename anything: the parity gate depends on this stylesheet and its class names being unchanged.",
+      "status": "todo",
+      "priority": "critical",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "app.css differs from web/web/app.css only in the @font-face src path and go-app wiring comments, verified with a diff recorded in the task",
+        "The WOFF2 font and all four SVG assets are byte-identical copies",
+        "index.html links /app.css and the font and icon URLs resolve in both dev and a production build",
+        "The /web/<path> to /<path> mapping is documented in docs/GO_MIGRATION.md for the components that reference icon paths"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/STYLE_GUIDE.md"
+      ],
+      "files": [
+        "client/public/app.css",
+        "client/public/fonts/hanken-grotesk.woff2",
+        "client/public/icons/linkedin.svg",
+        "client/public/icons/glassdoor.svg",
+        "client/public/icons/indeed.svg",
+        "client/public/icon.svg",
+        "client/index.html"
+      ],
+      "commands": [
+        "cd client && npm run build",
+        "cd client && npm run typecheck"
+      ]
+    },
+    {
+      "id": "FE-03",
+      "title": "Port API payload types as zod schemas",
+      "description": "Translate every payload type in web/components/client.go into zod schemas in client/src/api/schemas.ts with inferred TypeScript types exported. Match Go's optionality exactly: pointer and omitempty fields become optional or nullable, a null match_score stays distinguishable from zero. Schemas only, no fetch code. Runtime validation at the boundary is deliberate: Go's json.Unmarshal silently zero-values a shape mismatch, which is how the empty Applications table bug hid.",
+      "status": "todo",
+      "priority": "critical",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Every struct in client.go that crosses the API boundary has a corresponding schema and exported inferred type",
+        "Optional and nullable fields mirror the Go pointer/omitempty usage; a null match_score parses to null, not 0",
+        "Tests parse a representative fixture per schema, including a posting with no score, an application with no draft, and an unavailable lookup",
+        "A payload with an unexpected shape fails parsing rather than silently defaulting"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/ARCHITECTURE.md"
+      ],
+      "files": [
+        "client/src/api/schemas.ts",
+        "client/src/api/schemas.test.ts"
+      ],
+      "commands": [
+        "cd client && npm run typecheck",
+        "cd client && npm test"
+      ]
+    },
+    {
+      "id": "FE-04",
+      "title": "Build the API transport layer and typed errors",
+      "description": "Port the request plumbing from client.go: a same-origin fetch wrapper that sends the session cookie, JSON get and send helpers, and an APIError carrying the code and message from Rails' {error:{code,message}} envelope plus an isUnauthorized helper for 401. Add the MSW server harness the rest of the suite will use. The session cookie is httponly and must never be read from JavaScript.",
+      "status": "todo",
+      "priority": "critical",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-03"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Requests are same-origin with credentials included; no code reads document.cookie",
+        "APIError exposes the Rails error code and message; isUnauthorized detects 401 specifically",
+        "Responses are validated through the FE-03 schemas before reaching callers",
+        "Tests cover 200, a 4xx with an error envelope, 401, 500, and a malformed or non-JSON body",
+        "An MSW test harness is exported for reuse by later tasks"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "client/src/api/http.ts",
+        "client/src/api/errors.ts",
+        "client/src/api/http.test.ts",
+        "client/src/test/msw.ts"
+      ],
+      "commands": [
+        "cd client && npm run typecheck",
+        "cd client && npm test"
+      ]
+    },
+    {
+      "id": "FE-05",
+      "title": "Port all API endpoint functions and set up TanStack Query",
+      "description": "Port every method on the Go RailsClient interface into typed endpoint functions, plus a query key factory and a configured QueryClient. Reproduce the jobs feed query string exactly as JobFeedParams.query() builds it, including how an unset filter is omitted rather than sent as an empty or sentinel value. Add MSW handlers covering every endpoint so later screen tasks have a working fake backend.",
+      "status": "todo",
+      "priority": "critical",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-04"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Every RailsClient method has an endpoint function with the same HTTP method, path, and request body shape",
+        "Jobs feed params serialize identically to JobFeedParams.query(); an unset filter is omitted from the query string entirely",
+        "A query key factory covers every read endpoint so mutations can invalidate precisely",
+        "MSW handlers exist for all endpoints, and tests assert the method, path, and body of each function"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/ARCHITECTURE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "client/src/api/endpoints.ts",
+        "client/src/api/keys.ts",
+        "client/src/api/query-client.ts",
+        "client/src/api/endpoints.test.ts",
+        "client/src/test/handlers.ts"
+      ],
+      "commands": [
+        "cd client && npm run typecheck",
+        "cd client && npm test"
+      ]
+    },
+    {
+      "id": "FE-06",
+      "title": "Port label, score band, and source helpers",
+      "description": "Port the pure display helpers from client.go: MatchScoreLabel, MatchScoreBand, SourceLabel, SourceIconPath, SourceEmoji, LifecycleLabel, and TrackerGroup. These are pure functions with no dependencies and they unblock every screen task, so they land early. Keep the exact thresholds and the exact returned class and path strings, because app.css and the parity gate depend on them.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-03"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Score bands match the existing thresholds: high at 75 and above, mid 50 to 74, low below 50, and pending when unscored",
+        "Source icon paths point at the copied /icons assets and return empty for non-branded sources, which use the emoji marker instead",
+        "TrackerGroup membership mirrors Rails' APPLICATION_GROUPS and is used for row tinting only",
+        "Tests mirror the case tables from the corresponding Go tests"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/STYLE_GUIDE.md"
+      ],
+      "files": [
+        "client/src/lib/labels.ts",
+        "client/src/lib/labels.test.ts"
+      ],
+      "commands": [
+        "cd client && npm run typecheck",
+        "cd client && npm test"
+      ]
+    },
+    {
+      "id": "FE-07",
+      "title": "Set up the router and all nine route paths",
+      "description": "Add React Router with the nine routes the Go app serves, rendering placeholder screens for now. The two go-app RouteWithRegexp patterns become ordinary params: /jobs/:id and /jobs/:id/contacts. Route order matters, since /jobs/new must resolve before /jobs/:id.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "All nine paths route: /, /login, /jobs, /jobs/new, /jobs/:id, /jobs/:id/contacts, /applications, /applications/:id, /profile",
+        "/jobs/new resolves to manual entry, not to the job detail param route",
+        "An unknown path renders a not-found screen rather than a blank page",
+        "A test asserts each path renders its intended screen"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/ARCHITECTURE.md"
+      ],
+      "files": [
+        "client/src/main.tsx",
+        "client/src/routes.tsx",
+        "client/src/routes.test.tsx"
+      ],
+      "commands": [
+        "cd client && npm run typecheck",
+        "cd client && npm test"
+      ]
+    },
+    {
+      "id": "FE-08",
+      "title": "Port AppChrome: bottom navigation and layout preference",
+      "description": "Port web/components/chrome.go: the bottom navigation with active state, and the Auto/Desktop/Mobile layout selector. The preference persists to localStorage under the key waunder.layout with the same stored values as today, and is applied as data-layout on the document root so CSS resolves Auto at 960px with no JS listener. Reserve bottom-navigation and safe-area space in mobile layouts.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-07",
+        "FE-06"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "The layout preference reads and writes localStorage key waunder.layout using the same stored values as chrome.go, so an existing saved preference still loads",
+        "data-layout is set on the document root and desktop variable overrides are identical for explicit Desktop and Auto's wide-screen media query",
+        "Bottom navigation renders the correct active state per route and reserves safe-area space",
+        "Reads and writes tolerate storage being unavailable or throwing, and the chrome still renders correctly with no stored value"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/STYLE_GUIDE.md"
+      ],
+      "files": [
+        "client/src/components/app-chrome.tsx",
+        "client/src/components/app-chrome.test.tsx",
+        "client/src/lib/layout.ts"
+      ],
+      "commands": [
+        "cd client && npm run typecheck",
+        "cd client && npm test"
+      ]
+    },
+    {
+      "id": "FE-09",
+      "title": "Port the login screen and the 401 auth boundary",
+      "description": "Port web/components/login.go and the auth handling from client.go. The passphrase posts to /api/session; Rails sets the httponly signed cookie. Because the cookie cannot be read from JavaScript, signed-in state derives from responses: any 401 from any query or mutation redirects to /login, exactly as IsUnauthorized drives it today. Never log or echo the passphrase.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-05",
+        "FE-07"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Login posts the passphrase to /api/session and navigates to / on success",
+        "A failed login renders the auth error state and never renders, logs, or stores the passphrase",
+        "A 401 from any query or mutation redirects to /login",
+        "Sign-out issues DELETE /api/session and returns to the login screen",
+        "Tests cover success, failure, and the 401 redirect"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/ARCHITECTURE.md"
+      ],
+      "files": [
+        "client/src/components/login.tsx",
+        "client/src/components/login.test.tsx",
+        "client/src/lib/auth.tsx"
+      ],
+      "commands": [
+        "cd client && npm run typecheck",
+        "cd client && npm test"
+      ]
+    },
+    {
+      "id": "FE-10",
+      "title": "Configure the PWA manifest, precaching, and the update banner",
+      "description": "Add vite-plugin-pwa with content-hashed precaching, and port the update-available banner. The manifest identity fields must match the current go-app-generated manifest exactly, because a changed name or start_url makes some platforms treat this as a different installed app. The banner replaces the hand-rolled OnAppUpdate workaround: Workbox's needRefresh signal is the framework-supported version of the same thing.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-02",
+        "FE-08"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Manifest identity matches today exactly: name and short_name Waunder, start_url /, theme_color and background_color #2d2c2c, and the same icon used for default, large, SVG, and maskable",
+        "Built assets are content-hashed and precached, so a redeploy is picked up without a constant-URL cache trap",
+        "An update-available signal renders a reload banner in the app chrome, and acting on it loads the new build",
+        "Tests assert the manifest identity fields and that the banner renders on the update signal"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/ARCHITECTURE.md"
+      ],
+      "files": [
+        "client/vite.config.ts",
+        "client/src/components/update-banner.tsx",
+        "client/src/components/update-banner.test.tsx"
+      ],
+      "commands": [
+        "cd client && npm run typecheck",
+        "cd client && npm test",
+        "cd client && npm run build"
+      ]
+    },
+    {
+      "id": "FE-11",
+      "title": "Write the service worker push and notification-click handlers",
+      "description": "Implement the custom service worker's push handling against Rails' actual payload. Rails sends {title, body, data:{url, count}}; go-app's generated worker read notification.path and overwrote data, so data.url was discarded and the click target has been dead. Read data.url, set the app icon and badge, and navigate on click. Rails must not be modified to accommodate the client.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-10"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "The push handler reads {title, body, data:{url, count}} as Rails sends it, and sets the app icon and badge on the shown notification",
+        "notificationclick focuses an existing window client and navigates it to data.url, and otherwise opens a new window at data.url",
+        "In-app navigation from a focused client routes without a full reload",
+        "Tests drive the handlers with fake push and notificationclick events and assert the resolved URL",
+        "No file under api/ is changed"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/ARCHITECTURE.md"
+      ],
+      "files": [
+        "client/src/sw.ts",
+        "client/src/sw.test.ts",
+        "client/src/lib/sw-nav.ts"
+      ],
+      "commands": [
+        "cd client && npm run typecheck",
+        "cd client && npm test",
+        "cd client && npm run build"
+      ]
+    },
+    {
+      "id": "FE-12",
+      "title": "Ship the go-app service worker kill switch at /app-worker.js",
+      "description": "Serve a deliberate retirement worker at the exact path go-app used, /app-worker.js. Without it an installed PWA can be pinned to the old build permanently: go-app's worker is cache-first with no revalidation and has / in its precache set, so it keeps serving cached old HTML, which loads the old bootstrap, which registers /app-worker.js; if that path 404s, the update fails and the old worker survives forever. Service worker script fetches bypass the worker's own fetch handler, so a real file at that path does get retrieved from the network. Keep it deployed permanently.",
+      "status": "todo",
+      "priority": "critical",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-10"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "A worker is served at exactly /app-worker.js in both dev and the production build",
+        "On install it calls skipWaiting; on activate it deletes every cache key, unregisters itself, claims clients, and reloads them",
+        "It registers no fetch handler, so it can never serve stale content itself",
+        "Its logic is unit-tested against fake caches, registration, and clients objects",
+        "docs/GO_MIGRATION.md records that this file is permanent and why removing it re-arms the trap"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/PRODUCTION_SETUP.md"
+      ],
+      "files": [
+        "client/public/app-worker.js",
+        "client/src/test/app-worker.test.ts",
+        "docs/GO_MIGRATION.md"
+      ],
+      "commands": [
+        "cd client && npm test",
+        "cd client && npm run build"
+      ]
+    },
+    {
+      "id": "FE-13",
+      "title": "Port push subscribe/unsubscribe and the PushToggle control",
+      "description": "Port web/components/push.go and push_browser.go. The 157-line go-app JS bridge, with its FuncOf/Release and promise-to-channel await adapter, becomes a small plain-TypeScript module over the PushManager. Fetch the VAPID public key from GET /api/push/vapid_public_key rather than a build-time env var, which lets the web service drop VAPID_PUBLIC_KEY entirely. Never subscribe without an explicit user action.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-11",
+        "FE-05"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "The VAPID public key comes from GET /api/push/vapid_public_key; no build-time or injected env var carries it",
+        "Subscribe, read-current, and unsubscribe work through the PushManager, and unsupported, denied, on, and off states are distinct in the UI",
+        "Subscribing posts to /api/push_subscription and unsubscribing deletes it",
+        "A test asserts zero subscribe and zero persist calls after a plain render, proving the control never auto-subscribes",
+        "Tests use a mocked PushManager only; no real push is ever sent"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/ENV_VARS.md"
+      ],
+      "files": [
+        "client/src/lib/push.ts",
+        "client/src/lib/push.test.ts",
+        "client/src/components/push-toggle.tsx",
+        "client/src/components/push-toggle.test.tsx"
+      ],
+      "commands": [
+        "cd client && npm run typecheck",
+        "cd client && npm test"
+      ]
+    },
+    {
+      "id": "FE-14",
+      "title": "Port platform detection and the install guide",
+      "description": "Port web/components/pwa.go and install_guide.go. The detection logic is pure and its existing test cases are valuable, so bring the case table across: iOS and iPadOS user agents including a Macintosh UA reporting more than one touch point, the major/minor version parse, standalone detection via navigator.standalone or display-mode, and Push API availability.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-08"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Every user-agent case asserted in web/components/pwa_test.go passes against the ported detection, including iPadOS masquerading as desktop Safari",
+        "Standalone detection covers navigator.standalone and the display-mode media query",
+        "The install guide renders the correct iOS, installed, and notification-readiness states from that detection",
+        "Detection is a pure module tested without a browser"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/PRODUCTION_SETUP.md"
+      ],
+      "files": [
+        "client/src/lib/platform.ts",
+        "client/src/lib/platform.test.ts",
+        "client/src/components/install-guide.tsx",
+        "client/src/components/install-guide.test.tsx"
+      ],
+      "commands": [
+        "cd client && npm run typecheck",
+        "cd client && npm test"
+      ]
+    },
+    {
+      "id": "FE-15",
+      "title": "Port the jobs feed list rows and pagination",
+      "description": "Port the list half of JobList from web/components/jobs.go: fetch GET /api/job_posts through TanStack Query and render rows with the title, company, location, colour-banded score pill, source pill with its brand logo or emoji marker, and lifecycle status pill. Server-side pagination honours the page envelope. Filters, bins, and bulk actions are separate tasks. Keep every existing class name so the parity gate holds.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-05",
+        "FE-06",
+        "FE-08"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Rows render title, company, location, score pill with its band class, source pill with logo or emoji, and lifecycle pill, using the existing class names unchanged",
+        "Pagination uses the response page envelope and disables next when has_next is false",
+        "Loading, error, and empty-feed states all render",
+        "No client-side filtering or sorting is performed; the server owns it"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/ARCHITECTURE.md",
+        "docs/STYLE_GUIDE.md"
+      ],
+      "files": [
+        "client/src/components/jobs/job-list.tsx",
+        "client/src/components/jobs/job-row.tsx",
+        "client/src/components/jobs/job-list.test.tsx"
+      ],
+      "commands": [
+        "cd client && npm run typecheck",
+        "cd client && npm test"
+      ]
+    },
+    {
+      "id": "FE-16",
+      "title": "Port the jobs feed filters, sort, and filter persistence",
+      "description": "Port the filter panel: score band, source, location, date range, sort, and the scored/unscored view. The panel stays collapsed by default with an active-filter count badge. Persist the selection to localStorage under waunder.jobFilters using the same JSON shape jobs.go writes today, so a saved selection from the Go app still loads, and restore it before the first fetch. Reset clears only the filter controls, deliberately leaving the scored/unscored view and the lifecycle bin tabs alone.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-15"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Filters persist to and restore from localStorage key waunder.jobFilters in the same JSON shape jobs.go writes, so existing saved state still loads",
+        "Restore happens before the first fetch, so a navigation back to /jobs does not lose the selection",
+        "The panel is collapsed by default and shows an active-filter count",
+        "Reset clears the filter controls only, not the scored/unscored view or the lifecycle bin tabs",
+        "A no-filter choice sends no query parameter at all, so it cannot be mistaken for a literal filter value",
+        "Tests cover the persist and restore round-trip, reset scope, and storage being unavailable"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/ARCHITECTURE.md"
+      ],
+      "files": [
+        "client/src/components/jobs/job-filters.tsx",
+        "client/src/lib/job-filters.ts",
+        "client/src/lib/job-filters.test.ts",
+        "client/src/components/jobs/job-filters.test.tsx"
+      ],
+      "commands": [
+        "cd client && npm run typecheck",
+        "cd client && npm test"
+      ]
+    },
+    {
+      "id": "FE-17",
+      "title": "Port jobs feed lifecycle bins, selection, bulk actions, and score-on-demand",
+      "description": "Port the remaining JobList behaviour: the active/backlog/removed bin tabs, the per-row selection checkbox inside the manage bar grouped with the lifecycle buttons, bulk and single lifecycle writes, and on-demand scoring. Mutations invalidate the feed query rather than patching rows locally, because a lifecycle change can move a row out of the current bin.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-16"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Bin tabs switch between active, backlog, and removed via the state parameter",
+        "Selection lives in the manage bar with the lifecycle buttons, not as a bare floating row child",
+        "Bulk lifecycle uses the collection PATCH and single-row lifecycle uses the member PATCH",
+        "POST /api/job_posts/:id/score renders pending and failed states per row",
+        "Every mutation invalidates the feed query instead of patching local state"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/ARCHITECTURE.md"
+      ],
+      "files": [
+        "client/src/components/jobs/job-actions.tsx",
+        "client/src/components/jobs/job-bins.tsx",
+        "client/src/components/jobs/job-actions.test.tsx"
+      ],
+      "commands": [
+        "cd client && npm run typecheck",
+        "cd client && npm test"
+      ]
+    },
+    {
+      "id": "FE-18",
+      "title": "Port the landing screen: ingestion batches",
+      "description": "Port DigestView from web/components/jobs.go: GET /api/ingestion_batches rendered as collapsible batches newest-first, each holding its postings. Use a native details/summary so the postings are always present in the DOM and need no click handler to test. Keep the existing .digest* class names.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-15"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Batches render newest-first, each collapsible, with its postings nested and always present in the rendered output",
+        "Each posting shows its score, source, and lifecycle pills using the shared helpers",
+        "Empty state and pagination both render",
+        "The existing .digest* class names are unchanged"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/ARCHITECTURE.md",
+        "docs/STYLE_GUIDE.md"
+      ],
+      "files": [
+        "client/src/components/ingestion-batches/ingestion-batches.tsx",
+        "client/src/components/ingestion-batches/batch.tsx",
+        "client/src/components/ingestion-batches/ingestion-batches.test.tsx"
+      ],
+      "commands": [
+        "cd client && npm run typecheck",
+        "cd client && npm test"
+      ]
+    },
+    {
+      "id": "FE-19",
+      "title": "Port the job detail screen",
+      "description": "Port JobDetailView from web/components/jobs.go: GET /api/job_posts/:id rendering the summary, relevant and missing requirements, red flags, resume alignment notes, application strategy, compensation, source tag, and score pill, plus the route link and contacts link. The Apply button posts /api/applications and navigates to the draft review screen; it must never fire on mount.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-15"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "All scored fields render, including empty and missing cases for each optional block",
+        "The route link opens the resolved application URL and the contacts link navigates to /jobs/:id/contacts",
+        "Apply posts /api/applications and navigates to /applications/:id on success",
+        "A test asserts zero create-application calls after a full render, proving Apply never fires on mount",
+        "Long unbroken tokens in LLM-generated text do not overflow the card at mobile width"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/ARCHITECTURE.md",
+        "docs/STYLE_GUIDE.md"
+      ],
+      "files": [
+        "client/src/components/job-detail/job-detail.tsx",
+        "client/src/components/job-detail/requirements.tsx",
+        "client/src/components/job-detail/job-detail.test.tsx"
+      ],
+      "commands": [
+        "cd client && npm run typecheck",
+        "cd client && npm test"
+      ]
+    },
+    {
+      "id": "FE-20",
+      "title": "Port the cover letter draft and the manual tracker quick action",
+      "description": "Port the two job-detail side panels. The cover letter reads and generates via /api/job_posts/:id/cover_letter_draft with a copy-to-clipboard control. The tracker quick action writes applied and waiting through PATCH /api/job_posts/:id/application_status only; it must never call draft creation or submit. Omit untouched notes and follow-up dates from the request so they are preserved, use the none sentinel for an empty stage, and read the current tracker state at click time rather than from a value captured in an earlier render.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-19"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Cover letter GET and POST work with distinct generating, unavailable, and failed states",
+        "Copy to clipboard is guarded on the clipboard API being present and is inert when it is not",
+        "The tracker action writes only through PATCH /api/job_posts/:id/application_status and never calls application creation or submit",
+        "Untouched notes and follow-up dates are omitted from the request payload so existing values survive",
+        "An empty stage sends the none sentinel rather than an empty string",
+        "The stage change handler reads current tracker state at click time, not a stale captured value"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/ARCHITECTURE.md"
+      ],
+      "files": [
+        "client/src/components/job-detail/cover-letter.tsx",
+        "client/src/components/job-detail/tracker-action.tsx",
+        "client/src/components/copy-button.tsx",
+        "client/src/components/job-detail/tracker-action.test.tsx",
+        "client/src/components/job-detail/cover-letter.test.tsx"
+      ],
+      "commands": [
+        "cd client && npm run typecheck",
+        "cd client && npm test"
+      ]
+    },
+    {
+      "id": "FE-21",
+      "title": "Port the contacts and outreach draft screen",
+      "description": "Port web/components/contacts.go: list and create contact candidates for a job post, and generate an outreach draft per candidate with state keyed by candidate id. Outreach is prefill-for-manual-sending only. There must be no send affordance of any kind, and the screen must never message anyone. Surface the two distinct Rails failures separately so the owner learns whether the LLM was unavailable or the generation failed.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-19"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Candidates list and create through the nested contact_candidates endpoints",
+        "Outreach generation posts to /api/contact_candidates/:id/outreach_drafts with per-candidate state keyed by candidate id",
+        "A 503 llm_unavailable and a 502 generation_failed render as distinct messages",
+        "The generated draft is copyable and its textarea wraps long unbroken tokens safely",
+        "A test asserts zero generate calls after a plain render, and a second test asserts no send or submit affordance appears anywhere in the rendered output"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/ARCHITECTURE.md"
+      ],
+      "files": [
+        "client/src/components/contacts/contacts.tsx",
+        "client/src/components/contacts/outreach-draft.tsx",
+        "client/src/components/contacts/contacts.test.tsx"
+      ],
+      "commands": [
+        "cd client && npm run typecheck",
+        "cd client && npm test"
+      ]
+    },
+    {
+      "id": "FE-22",
+      "title": "Port the application tracker table",
+      "description": "Port web/components/applications.go: one table over GET /api/job_posts with status=all and state=open, with each job's latest application attached by Rails. Group tabs come from application_counts. One markup renders as self-labelling cards on mobile and a real table inside the existing container query, so it follows the selected layout rather than the viewport. Note that status must be sent explicitly as all: leaving it unset gets the scored-only default, which is what made this table render empty before.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-15",
+        "FE-06"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "The feed request sends status=all and state=open explicitly, and a test asserts the status parameter is present rather than relying on a server default",
+        "Group tabs and their totals come from application_counts",
+        "One table markup renders as self-labelling cards on mobile with each cell painted from its data-label, and as a real table inside the existing 800px container query",
+        "Desktop display values are set explicitly rather than with revert",
+        "The group tint is an inset box-shadow on the leading cell, not a border-left on the row",
+        "Row status writes go through PATCH /api/job_posts/:id/application_status and then invalidate and refetch, because a change can move a row out of the active tab"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/ARCHITECTURE.md",
+        "docs/STYLE_GUIDE.md"
+      ],
+      "files": [
+        "client/src/components/tracker/tracker.tsx",
+        "client/src/components/tracker/tracker-row.tsx",
+        "client/src/components/tracker/tracker.test.tsx"
+      ],
+      "commands": [
+        "cd client && npm run typecheck",
+        "cd client && npm test"
+      ]
+    },
+    {
+      "id": "FE-23",
+      "title": "Port the manual entry form",
+      "description": "Port web/components/manual_entry.go: post to /api/job_posts wrapped as {job_post:{...}} and decode the top-level {job_post, import} envelope, rendering the new, tracked, and submitted import outcomes distinctly. The client does only a URL-or-text-present hint and trims fields. All real validation, HTTPS-URL checking, normalization, identity matching, route resolution, and scoring stay in Rails.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-05"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "The request wraps fields as {job_post:{...}} and the response is read from the top-level job_post and import keys",
+        "New, already-tracked, and already-submitted import outcomes each render distinctly",
+        "The client performs only a URL-or-text-present hint and field trimming; it does no URL validation or normalization",
+        "Rails validation errors are surfaced to the owner rather than swallowed",
+        "Tests cover each import outcome and the client-side hint"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/ARCHITECTURE.md"
+      ],
+      "files": [
+        "client/src/components/manual-entry/manual-entry.tsx",
+        "client/src/components/manual-entry/import-result.tsx",
+        "client/src/components/manual-entry/manual-entry.test.tsx"
+      ],
+      "commands": [
+        "cd client && npm run typecheck",
+        "cd client && npm test"
+      ]
+    },
+    {
+      "id": "FE-24",
+      "title": "Port manual entry posting lookup and prefill",
+      "description": "Port the lookup prefill: POST /api/job_posts/lookup when the URL field is committed, filling only fields the owner has not typed into, with the prefilled title and company rendered under the lookup control. A lookup that answers unavailable is never an error and must never block submission, since Rails enriches in the background after import anyway.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-23"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Lookup fires when the URL field is committed, not on every keystroke",
+        "Both the ok and unavailable statuses are handled, and unavailable never blocks or fails submission",
+        "Only fields the owner has not typed into are filled, and the prefilled title and company render under the lookup control",
+        "Tests cover ok, unavailable, and a lookup error, each leaving the form submittable"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/ARCHITECTURE.md"
+      ],
+      "files": [
+        "client/src/components/manual-entry/lookup.tsx",
+        "client/src/components/manual-entry/lookup.test.tsx"
+      ],
+      "commands": [
+        "cd client && npm run typecheck",
+        "cd client && npm test"
+      ]
+    },
+    {
+      "id": "FE-25",
+      "title": "Port the profile screen",
+      "description": "Port web/components/profile.go: read and update /api/profile, and render the resume document metadata. Encrypted resume and profile PII is exposed by Rails as presence flags only and must be rendered that way; never render or request a raw encrypted value. The PushToggle from FE-13 embeds here.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-05",
+        "FE-13"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Profile reads and updates through GET and PATCH /api/profile with save success and error states",
+        "Sensitive fields render as presence indicators only; no raw encrypted value is rendered or requested",
+        "Resume metadata renders title, parse status, and file presence using the existing inherited list structure",
+        "The PushToggle is embedded and functional on this screen",
+        "Tests cover a profile with and without a resume, and a failed save"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/ARCHITECTURE.md"
+      ],
+      "files": [
+        "client/src/components/profile/profile.tsx",
+        "client/src/components/profile/resume-meta.tsx",
+        "client/src/components/profile/profile.test.tsx"
+      ],
+      "commands": [
+        "cd client && npm run typecheck",
+        "cd client && npm test"
+      ]
+    },
+    {
+      "id": "FE-26",
+      "title": "Port the draft review and submit screen",
+      "description": "Port web/components/draft.go: GET /api/applications/:id renders draft_ready, autofill_warnings, failure_reason, the latest worker report context, and the worker-shaped autofill payload. Reviewed answers are editable and saved through PATCH /api/applications/:id/draft, while Rails-owned ATS, apply URL, and resume metadata stay read-only. Submit stays disabled until the draft is ready and warnings are clear; Rails' dispatcher remains the final safety gate and the client must never bypass it.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-05",
+        "FE-08"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "draft_ready, autofill_warnings, failure_reason, and worker report context all render, including the not-ready and warning cases",
+        "Answers are editable and saved via PATCH /api/applications/:id/draft; ATS, apply URL, and resume metadata are read-only",
+        "The submit control is disabled until draft_ready is true and warnings are empty",
+        "Submit posts /api/applications/:id/submit and renders the returned status",
+        "A test asserts zero submit calls after a full render lifecycle, proving submit never fires on mount",
+        "The long apply URL rendered as link text wraps and does not overflow at mobile width"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/ARCHITECTURE.md",
+        "docs/STYLE_GUIDE.md"
+      ],
+      "files": [
+        "client/src/components/draft-review/draft-review.tsx",
+        "client/src/components/draft-review/autofill-answers.tsx",
+        "client/src/components/draft-review/draft-review.test.tsx"
+      ],
+      "commands": [
+        "cd client && npm run typecheck",
+        "cd client && npm test"
+      ]
+    },
+    {
+      "id": "FE-27",
+      "title": "Add the Caddyfile, the Railway Dockerfile, and a container smoke test",
+      "description": "Replace the Go app-shell/proxy server with Caddy. The Caddyfile serves the built static assets with an SPA fallback and reverse-proxies /api/* and /webhooks/resend/inbound to API_INTERNAL_URL. Railway terminates TLS, so bind :{$PORT} with auto_https off or Caddy will try to provision certificates and fail to bind. Add encode zstd gzip, which the Go http.FileServer never had. Note that Caddy's reverse_proxy preserves the original Host header whereas Go's NewSingleHostReverseProxy rewrites it to the target, so verify the behaviour in front of Rails rather than assuming it. The Dockerfile uses a Node build stage into a Caddy runtime with the repo root as build context, matching the deploy/ convention. This task does not switch the Railway service over.",
+      "status": "todo",
+      "priority": "critical",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-02",
+        "FE-10",
+        "FE-12"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "The Caddyfile binds :{$PORT} with auto_https off, serves static files with an SPA fallback, enables encode zstd gzip, and reverse-proxies /api/* and /webhooks/resend/inbound to API_INTERNAL_URL",
+        "deploy/railway-web.Dockerfile is a Node build stage into a Caddy runtime and assumes the repo root as build context",
+        "A smoke test builds and runs the image and asserts both proxy paths reach a stub backend with method, body, and headers intact",
+        "The smoke test asserts an SPA deep link such as /jobs/123 returns the app shell, /app-worker.js is served, and static assets return compressed",
+        "The Host header behaviour in front of Rails is verified and the result recorded in docs/GO_MIGRATION.md",
+        "Nothing under web/ is changed and the Railway service is not reconfigured"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/ARCHITECTURE.md",
+        "docs/ENV_VARS.md",
+        "docs/PRODUCTION_SETUP.md"
+      ],
+      "files": [
+        "client/Caddyfile",
+        "deploy/railway-web.Dockerfile",
+        "client/scripts/container-smoke.sh",
+        "docs/GO_MIGRATION.md"
+      ],
+      "commands": [
+        "cd client && npm run build",
+        "bash client/scripts/container-smoke.sh"
+      ]
+    },
+    {
+      "id": "FE-28",
+      "title": "Build and pass the visual parity gate against the Go app",
+      "description": "Prove the port is a port. Screenshot all nine routes at mobile and desktop widths against both the running Go app and the new container, backed by identical stubbed API responses, and emit a side-by-side diff report. app.css and every markup class are unchanged by design, so any visual difference is a defect until explained. Do not pass serviceWorkers:'block' to Playwright: it bypasses the caching path entirely, so a screenshot can look perfect while real returning browsers see something else. Reuse the Playwright browser already vendored under workers/node_modules.",
+      "status": "todo",
+      "priority": "critical",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-18",
+        "FE-20",
+        "FE-21",
+        "FE-22",
+        "FE-24",
+        "FE-25",
+        "FE-26",
+        "FE-27"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "All nine routes are screenshotted at mobile and desktop widths against both apps from identical stubbed API responses",
+        "A side-by-side diff report is produced and committed or written to a documented path",
+        "The script does not pass serviceWorkers:'block'",
+        "Every non-zero diff is either fixed or explained in docs/GO_MIGRATION.md with a reason it is acceptable",
+        "The focus-visible ring on the sage primary buttons is checked with a keyboard tab walk, not a same-frame screenshot after focus"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/STYLE_GUIDE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "client/scripts/parity-gate.cjs",
+        "docs/GO_MIGRATION.md"
+      ],
+      "commands": [
+        "cd client && npm run build",
+        "node client/scripts/parity-gate.cjs"
+      ]
+    },
+    {
+      "id": "FE-29",
+      "title": "Verify the Resend webhook path and the service worker handoff",
+      "description": "Exercise the two production data paths the cutover cannot be allowed to break. First, prove a real or replayed Resend email.received survives Svix signature verification through Caddy into Rails, with the raw body and svix-* headers intact, and creates an InboundEmail. Svix verifies against the raw request body, so any proxy-layer body rewriting silently breaks ingestion. Second, prove the /app-worker.js kill switch actually retires the go-app worker: load the Go app first in a launchPersistentContext browser, then point it at the new build and confirm the old worker unregisters and its caches are cleared. Record both procedures and their results. No production Railway change.",
+      "status": "todo",
+      "priority": "critical",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-27",
+        "FE-12"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "A real or replayed Resend email.received passes Svix verification through Caddy into Rails and creates an InboundEmail row",
+        "The raw request body and svix-* headers are confirmed to arrive unmodified through the proxy",
+        "A launchPersistentContext browser that first loaded the Go app is shown to unregister the go-app worker and clear its caches after visiting the new build",
+        "Both procedures and their results are recorded in docs/GO_MIGRATION.md, and the PWA-stuck manual fallback is documented in docs/PRODUCTION_SETUP.md",
+        "No Railway service or variable is changed by this task"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/PRODUCTION_SETUP.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "client/scripts/handoff-check.cjs",
+        "docs/GO_MIGRATION.md",
+        "docs/PRODUCTION_SETUP.md"
+      ],
+      "commands": [
+        "node client/scripts/handoff-check.cjs",
+        "bash client/scripts/container-smoke.sh"
+      ]
+    },
+    {
+      "id": "FE-30",
+      "title": "Cut over atomically: delete Go, promote client to web, rewrite the docs",
+      "description": "One commit that flips production. Repoint deploy/railway-web.Dockerfile, delete web/, and move client/ into web/. Then rewrite every doc that describes the Go frontend, following the cutover checklist in docs/GO_MIGRATION.md. AGENTS.md matters most because it is loaded into every agent session: its Quick Start, Build and Verification table, Repository Structure, Architecture summary, and the four obsolete go-app entries under Debugging and Gotchas are all wrong after this commit. Drop VAPID_PUBLIC_KEY from the web service in both ENV_VARS.md and the Railway dashboard. Verify the live deploy after pushing.",
+      "status": "todo",
+      "priority": "critical",
+      "group_id": "FE",
+      "depends_on": [
+        "FE-28",
+        "FE-29"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "No Go remains anywhere in the repository: no *.go, go.mod, go.sum, Makefile, or app.wasm",
+        "client/ has been moved to web/ and deploy/railway-web.Dockerfile builds it",
+        "VAPID_PUBLIC_KEY is removed from the web service in ENV_VARS.md and from the Railway web service variables",
+        "ARCHITECTURE, CONVENTIONS, TESTING, ENV_VARS, STYLE_GUIDE, PRODUCTION_SETUP, PRD, README, and AGENTS.md are rewritten per the docs/GO_MIGRATION.md cutover checklist, with every forward-pointer note replaced by the real content",
+        "AGENTS.md Quick Start, Build and Verification table, Repository Structure, Architecture summary, and the obsolete go-app gotchas are all corrected",
+        "docs/INDEX.md is consistent and docs/GO_MIGRATION.md status is flipped to done with the actual deltas recorded",
+        "The change lands as a single commit and the live deploy is verified after push"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/INDEX.md",
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md",
+        "docs/TESTING.md",
+        "docs/ENV_VARS.md",
+        "docs/STYLE_GUIDE.md",
+        "docs/PRODUCTION_SETUP.md",
+        "docs/PRD.md"
+      ],
+      "files": [
+        "web/",
+        "client/",
+        "deploy/railway-web.Dockerfile",
+        "README.md",
+        "AGENTS.md"
+      ],
+      "commands": [
+        "cd web && npm ci",
+        "cd web && npm run typecheck",
+        "cd web && npm test",
+        "cd web && npm run build",
+        "cd web && npm run lint"
+      ]
+    },
+    {
+      "id": "UI-01",
+      "title": "Add Tailwind v4 alongside app.css without Preflight",
+      "description": "Begin the styling phase. Import only tailwindcss/theme and tailwindcss/utilities, never the full tailwindcss entry, because its Preflight fights app.css's own resets and base element styles. Derive @theme from the existing :root token block: --color-bg, --radius-pill, --text-xs and the rest are already in Tailwind v4's token naming shape, so the design system transfers rather than being re-derived. app.css stays loaded and authoritative; no shipped screen changes appearance in this task.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "UI",
+      "depends_on": [
+        "FE-30"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Only tailwindcss/theme and tailwindcss/utilities are imported; Preflight is not loaded",
+        "@theme is derived from the existing :root tokens with no token value changed",
+        "app.css is still loaded and authoritative for every existing screen",
+        "A probe component demonstrates utilities applying correctly without altering any existing screen",
+        "The parity screenshots from FE-28 are unchanged"
+      ],
+      "docs": [
+        "docs/GO_MIGRATION.md",
+        "docs/STYLE_GUIDE.md",
+        "docs/CONVENTIONS.md"
+      ],
+      "files": [
+        "web/src/styles/tailwind.css",
+        "web/vite.config.ts",
+        "docs/STYLE_GUIDE.md"
+      ],
+      "commands": [
+        "cd web && npm run build",
+        "cd web && npm test"
+      ]
+    },
+    {
+      "id": "UI-02",
+      "title": "Initialise shadcn/ui and vendor the base primitives",
+      "description": "Vendor shadcn/ui components into the repository rather than adding a runtime dependency, matching the policy this project already follows for the self-hosted font and the brand logo SVGs. Theme them from the existing tokens so they inherit the warm paper and sage palette. Land button, input, select, dialog, and sheet as the primitives later tasks build on. No shipped screen changes appearance yet.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Components are vendored into the repository, not added as an npm runtime UI dependency",
+        "Primitives are themed from the existing tokens and match the palette in docs/STYLE_GUIDE.md",
+        "Button, input, select, dialog, and sheet are available and rendered in a test",
+        "No existing screen changes appearance in this task"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md",
+        "docs/CONVENTIONS.md"
+      ],
+      "files": [
+        "web/src/components/ui/",
+        "docs/STYLE_GUIDE.md",
+        "docs/CONVENTIONS.md"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm test",
+        "cd web && npm run build"
+      ]
+    },
+    {
+      "id": "UI-03",
+      "title": "Replace the jobs feed filter panel with a drawer",
+      "description": "Move the jobs feed filters out of the native details/summary panel into a proper drawer, which is the first interaction the go-app version could not do well. The persisted filter shape must not change: waunder.jobFilters keeps the same key and JSON so a saved selection still loads. Fix the focus-visible ring on the sage primary buttons properly while here, rather than the single narrow override the Go version carried.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-02"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Filters open in a drawer with the active-filter count preserved and reset still scoped to filters only",
+        "The waunder.jobFilters key and JSON shape are unchanged",
+        "Keyboard navigation, focus trapping, and escape-to-close all work",
+        "The focus-visible ring is clearly visible on sage-filled primary buttons across the app, verified with a keyboard tab walk",
+        "Mobile and desktop layouts both behave correctly under the existing container query"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md",
+        "docs/GO_MIGRATION.md"
+      ],
+      "files": [
+        "web/src/components/jobs/job-filters.tsx",
+        "web/src/components/jobs/job-filters.test.tsx",
+        "docs/STYLE_GUIDE.md"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm test"
+      ]
+    },
+    {
+      "id": "UI-04",
+      "title": "Rebuild the tracker table on TanStack Table",
+      "description": "Give the tracker the table behaviour the Go version could not: column sorting, column visibility, and virtualization for long lists. The mobile self-labelling card layout must survive, still driven by the existing container query rather than the viewport, and group tabs, counts, and row writes keep their current behaviour including invalidate-and-refetch after a status change.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-02"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Column sorting and column visibility work, and long lists are virtualized without breaking the card layout",
+        "The mobile card layout is preserved and still driven by the existing container query, not the viewport",
+        "Group tabs, counts, and row status writes behave as before, including invalidate and refetch after a change",
+        "The group tint remains an inset box-shadow on the leading cell"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md",
+        "docs/GO_MIGRATION.md"
+      ],
+      "files": [
+        "web/src/components/tracker/tracker.tsx",
+        "web/src/components/tracker/tracker-row.tsx",
+        "web/src/components/tracker/tracker.test.tsx"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm test"
+      ]
+    },
+    {
+      "id": "UI-05",
+      "title": "Add toasts for transient feedback and motion polish",
+      "description": "Replace inline error paragraphs with toasts for transient mutation feedback such as a saved status or a failed lifecycle write, while keeping permanent states inline where they belong: draft warnings, scoring failures, and validation errors stay on the screen they describe. Add restrained route and list transitions that respect prefers-reduced-motion.",
+      "status": "todo",
+      "priority": "low",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-02"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Transient mutation feedback surfaces as toasts, and permanent states such as draft warnings, scoring failures, and validation errors remain inline",
+        "Toasts are announced to assistive technology and dismissible",
+        "Route and list transitions are restrained and fully disabled under prefers-reduced-motion",
+        "No transition delays or hides a safety-relevant state such as the draft submit gating"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md"
+      ],
+      "files": [
+        "web/src/components/ui/toast.tsx",
+        "web/src/lib/toast.ts",
+        "docs/STYLE_GUIDE.md"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm test"
       ]
     }
   ]

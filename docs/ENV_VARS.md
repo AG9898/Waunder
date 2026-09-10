@@ -17,6 +17,11 @@ If any other doc mentions a variable, it should link here rather than restate it
 
 ## Variable Matrix
 
+> **Migrating:** the `web` service is moving to Vite + React + TypeScript. At cutover
+> `VAPID_PUBLIC_KEY` is dropped from `web` (the PWA fetches it from
+> `GET /api/push/vapid_public_key` instead) and the no-`VITE_*` note above is restated.
+> `API_INTERNAL_URL` and `PORT` are unchanged. See [`GO_MIGRATION.md`](GO_MIGRATION.md).
+
 | Variable | Required | Default | Description | Where set |
 |---|---|---|---|---|
 | `API_INTERNAL_URL` | Conditional (Required for prod `web`; set on `worker` only when trusted-submit automation should run) | none | Base URL of the Rails `api` service. The `web` server proxies `/api/*` and `/webhooks/resend/inbound` here, and the `worker` polls it. When unset, `web` disables the Rails proxy and serves standalone, and the worker idles/exits; production may intentionally leave it unset on `worker` to avoid idle Playwright compute. | `web` + optional `worker` runtime env (Railway private-network URL) |

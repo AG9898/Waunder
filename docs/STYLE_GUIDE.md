@@ -14,6 +14,11 @@ Its static HTML files and screenshots are reference material only. Do not copy t
 HTML into the app. The go-app components in `web/components/` remain the markup and behavior
 source of truth; the stylesheet is integrated through go-app's `app.Handler`.
 
+> **Migrating:** the frontend is moving to Vite + React + TypeScript. `app.css` and every
+> class name in it are carried over **verbatim** by the port, so this visual system survives
+> unchanged; only the component language changes. Styling upgrades (Tailwind, component
+> libraries) are a separate later phase. See [`GO_MIGRATION.md`](GO_MIGRATION.md).
+
 ---
 
 ## Visual Principles

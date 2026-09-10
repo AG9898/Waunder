@@ -45,6 +45,11 @@ These apply across every stack in this project.
 
 ## Stack — web/ (Go + go-app, Go 1.26)
 
+> **Migrating:** the `web/` frontend is being replaced with a Vite + React + TypeScript
+> PWA (Go removed entirely). This section describes the current Go/go-app implementation and
+> stays accurate until the cutover task rewrites it. Plan of record:
+> [`GO_MIGRATION.md`](GO_MIGRATION.md).
+
 The PWA frontend and its app-shell/proxy server. `main.go` is a dual-target program: the same
 package compiles both to WebAssembly for the browser and to a native server binary.
 

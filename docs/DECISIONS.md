@@ -416,3 +416,61 @@ manual — the placeholder rows it produces are unscoreable and unsearchable.
 `web/` (`components.ManualEntry` lookup prefill, `RailsClient.LookupPosting`, `app.css`),
 [`ARCHITECTURE.md`](ARCHITECTURE.md), [`CONVENTIONS.md`](CONVENTIONS.md), [`TESTING.md`](TESTING.md).
 See also MANUAL-01, MANUAL-02, RESOLVED-20.
+
+---
+
+### RESOLVED-24 — Frontend moves from Go/go-app to Vite + React + TypeScript; Go is removed
+
+**Resolved:** 2026-09-10
+
+**Decision:** Replace the `web/` frontend implementation with a Vite + React + TypeScript SPA
+(TanStack Query, React Router, `vite-plugin-pwa`, Vitest/Testing Library/MSW, zod at the API
+boundary) and remove Go from the repository entirely. The app-shell/proxy server becomes a Caddyfile
+that serves static files with an SPA fallback and reverse-proxies `/api/*` plus
+`/webhooks/resend/inbound` to `API_INTERNAL_URL`. `api/` and `workers/` do not change: the API is
+already a JSON-only contract under `/api` with an httponly signed session cookie, so a browser
+`fetch()` behaves identically to the Go client. `app.css` and every class name are carried over
+verbatim so the port is screenshot-verifiable; Tailwind and component libraries are a separate later
+phase. The migration is built in a shadow `client/` directory with `web/` serving production
+untouched, and lands in one atomic cutover commit that repoints
+`deploy/railway-web.Dockerfile`, deletes `web/`, and renames `client/` to `web/`. Full plan of
+record, port map, preserved contracts, and verification gates: [`GO_MIGRATION.md`](GO_MIGRATION.md).
+
+**Why:** Four measured reasons. (1) go-app serves static assets through plain `http.FileServer`
+with no compression, so the PWA ships a 16,047,853-byte uncompressed `app.wasm` on every cold
+cache; an equivalent React build is 150–250 KB gzipped, which matters for a mobile PWA the OS
+evicts from memory. (2) go-app's generated service worker is cache-first with no revalidation over
+a constant, non-hashed `app.wasm` URL, which already required a hand-rolled update banner as a
+workaround; Workbox gives content-hashed precaching and a real update signal as table stakes.
+(3) A large share of the frontend's structure is test-harness workaround — `OnClick` handlers
+cannot be invoked from a test, so every interactive component carries a `do*`/`apply*` split that
+exists only to be testable, and `app.Option().Value("")` reporting an option's text as its value
+already shipped a user-facing bug in the jobs-feed Source filter. (4) The screens that remain
+unsatisfying (tracker tables, filter panel, interaction feedback) want mature components, and the
+React ecosystem's copy-source-in model (shadcn/ui) matches the vendoring policy this repo already
+follows for its font and brand logos.
+
+**Tradeoff accepted:** `web/` gains a `node_modules` supply chain where it previously had almost no
+third-party runtime dependencies, and build time grows by an `npm ci` stage. Go's compile-time
+checking of the API boundary is replaced by zod validation at runtime, which is stricter than what
+exists today — Go's `json.Unmarshal` silently zero-values a shape mismatch, which is how the empty
+Applications table bug hid. The service-worker handoff is a real one-time risk: go-app's cache-first
+worker can pin an installed PWA to the old build permanently, so the new deployment must serve a
+kill switch at `/app-worker.js` indefinitely.
+
+**Alternatives rejected:** Svelte — smaller bundles and less ceremony, but the bundle constraint is
+already satisfied ~60× by leaving WASM, its Radix/shadcn/TanStack equivalents are ports that trail
+upstream, and this repo is built by agents where React/TSX is far better represented. Next.js or
+another Node server — SSR buys nothing for a single-user authenticated app with no SEO, and it
+trades a ~20 MB resident Go process for a Node runtime. Having Rails serve the built assets —
+would break the invariant that Rails has no public domain, and lose the cheap always-on shell.
+In-place replacement of `web/` — work happens on `main` with Railway auto-deploying on push, so it
+would leave production a dead PWA for the whole task chain. Migrating styling in the same pass —
+makes a visual regression indistinguishable from a deliberate design change.
+
+**Affects:** `web/` (entire service), `deploy/railway-web.Dockerfile`,
+[`GO_MIGRATION.md`](GO_MIGRATION.md), [`ARCHITECTURE.md`](ARCHITECTURE.md),
+[`CONVENTIONS.md`](CONVENTIONS.md), [`TESTING.md`](TESTING.md), [`ENV_VARS.md`](ENV_VARS.md),
+[`STYLE_GUIDE.md`](STYLE_GUIDE.md), [`PRODUCTION_SETUP.md`](PRODUCTION_SETUP.md), `README.md`,
+`CLAUDE.md`. Rails and the worker are unaffected. See also RESOLVED-04 (Web Push), RESOLVED-11
+(monorepo), RESOLVED-14 (session cookie auth), FE-01…FE-30, UI-01…UI-05.

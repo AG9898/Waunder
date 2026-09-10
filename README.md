@@ -4,6 +4,10 @@ A mobile-first, single-user personal job application assistant — installable a
 
 > **Status:** active MVP build with production wiring on Railway. See [`docs/PRD.md`](docs/PRD.md) for scope, [`docs/PRODUCTION_SETUP.md`](docs/PRODUCTION_SETUP.md) for live setup facts, and [`docs/workboard.json`](docs/workboard.json) for the task queue.
 
+> **In flight:** the `web/` frontend is migrating from Go + go-app to Vite + React +
+> TypeScript, with Go removed entirely. The Rails API and the Playwright worker are
+> unchanged. Plan of record: [`docs/GO_MIGRATION.md`](docs/GO_MIGRATION.md).
+
 ## What is Waunder?
 
 Waunder finds and scores relevant job openings from forwarded job-alert emails, notifies you with a daily push digest, drafts tailored application materials, tracks contacts, generates outreach messages, and can submit applications to supported ATS platforms — but only after you explicitly approve each one. It is a personal tool for a single owner, not a SaaS.

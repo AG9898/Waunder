@@ -7,6 +7,10 @@
 Waunder has three stacks, each with its own test runner: `api/` (Rails / RSpec),
 `web/` (Go / `go test`), and `workers/` (Node built-in test runner).
 
+> **Migrating:** `web/` is moving to Vite + React + TypeScript, so its test stack becomes
+> Vitest + Testing Library + MSW. Everything below describes the current Go/go-app suite and
+> stays accurate until the cutover task rewrites it. See [`GO_MIGRATION.md`](GO_MIGRATION.md).
+
 ---
 
 ## Quick Start

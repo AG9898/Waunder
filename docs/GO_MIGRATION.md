@@ -1,0 +1,344 @@
+# GO_MIGRATION.md — Frontend Migration from Go/go-app to TypeScript
+
+> Canonical record for the `web/` frontend migration: why it is happening, what was decided,
+> what must be preserved byte-exactly, and how it is verified.
+> Other docs link here rather than restating the migration. Architecture, conventions, testing,
+> env vars, and style rules are rewritten in their own docs at cutover (see
+> [Cutover doc checklist](#cutover-doc-checklist)).
+
+**Status:** planned — decided 2026-09-10, not yet started. Production still runs the Go/go-app
+PWA and keeps running it until the final cutover task.
+
+**Decision record:** [`DECISIONS.md`](DECISIONS.md) RESOLVED-24.
+**Task chain:** `FE-01` … `FE-30` in [`workboard.json`](workboard.json), then `UI-01` … `UI-05`.
+
+---
+
+## Scope
+
+Replace the `web/` service's frontend implementation. Nothing else changes:
+
+- **`api/` is untouched.** No routes, controllers, serializers, models, migrations, or jobs change.
+  The full API surface is already a JSON-only contract under `/api`, and auth is an httponly signed
+  cookie set by Rails. A `fetch()` from a TypeScript SPA behaves identically to the Go client.
+- **`workers/` is untouched.**
+- **The `web` Railway service is reused.** Same service, same `RAILWAY_DOCKERFILE_PATH`
+  (`deploy/railway-web.Dockerfile`), same private-network proxy to Rails, same public domain, same
+  Resend webhook URL.
+
+The one caveat to "no Rails changes": the new service worker must honor Rails' existing Web Push
+payload shape rather than the framework's. See [Web Push payload](#web-push-payload-fix-a-real-bug).
+
+---
+
+## Why
+
+Four measured reasons, not a preference.
+
+### 1. The app ships a 16 MB uncompressed WebAssembly binary
+
+`web/web/app.wasm` is 16,047,853 bytes. go-app serves static assets through plain
+`http.FileServer` (`pkg/app/resource.go:21`) with **no gzip and no brotli**, so that is the
+over-the-wire size on every cold cache. Compressed it would still be 3.9 MB. An equivalent
+Vite + React build of these nine screens lands around 150–250 KB gzipped.
+
+This is the dominant cost for a mobile-first PWA that the OS evicts from memory.
+
+### 2. The service-worker update path is a framework limitation
+
+go-app's generated `app-worker.js` is cache-first with no revalidation (`fetchWithCache` returns
+any cache hit and never refetches), and `/web/app.wasm` is a constant, non-hashed URL. Shipped
+changes stayed invisible to an already-loaded page, which required hand-rolling `OnAppUpdate`, a
+reload banner, and a `goappTryUpdate()` JS poke as a workaround. `vite-plugin-pwa` (Workbox)
+provides content-hashed precache manifests and a proper `needRefresh` signal as table stakes.
+
+### 3. A large share of the frontend's complexity is test-harness workaround
+
+Documented in `CLAUDE.md` Discoveries: `OnClick` handlers cannot be invoked from a test because
+there is no way to obtain an `app.Context`; `app.PrintHTML` spins up its own engine and re-runs
+`OnPreRender`, resetting post-action state; `OnMount` never fires under `app.NewTestEngine()`, so
+data screens must implement both `OnMount` and `OnPreRender`; rendered attribute order is
+nondeterministic because go-app builds attributes from a Go map (one assertion was ~30% flaky);
+render assertions must match HTML-escaped text; `app.HTMLTextarea` has no `.Value()`;
+`app.Option().Value("")` reports the option's **text** as its value, which shipped a real
+user-facing bug in the jobs-feed Source filter.
+
+The `do*`/`apply*` split that appears in every interactive component
+(`doSubmit`/`applySubmitResult`, `doGenerate`/`applyGenerateResult`, `doShowTable`/
+`applyJobsResult`) exists **only** because go-app click handlers are not directly testable. That
+is application architecture bent around a framework limitation.
+
+### 4. Library ecosystem — the original motivation
+
+The screens that remain unsatisfying are exactly the ones that want mature components: the tracker
+and all-jobs tables (sorting, column visibility, virtualization), the filter panel (currently a
+native `<details>`), and interaction feedback (currently inline error paragraphs).
+
+---
+
+## Decisions
+
+### Stack: Vite + React + TypeScript
+
+Chosen over Svelte for reasons specific to this repository:
+
+- **shadcn/ui is a copy-source-into-the-repo model, not an npm dependency.** That matches the
+  vendoring policy this project already follows — Hanken Grotesk is a self-hosted WOFF2 rather than
+  a Google Fonts `@import`, and the LinkedIn/Glassdoor/Indeed logos are Simple Icons SVGs baked
+  into the repo rather than a live CDN. `shadcn-svelte` is a community port that trails upstream.
+- The specific libraries these screens want are React-first: TanStack Table (tracker), `vaul`
+  (filter drawer), `cmdk` (command palette), Recharts (score distribution). Svelte gets adapters
+  or ports that lag.
+- This repository is built through agents against a workboard. React/TSX has substantially denser
+  representation than Svelte 5 runes, which are recent enough that generated Svelte frequently
+  comes out in Svelte 4 idiom.
+
+Bundle size did not decide this. Leaving WASM already satisfies that constraint roughly 60×; the
+React-vs-Svelte delta (~200 KB vs ~120 KB gzipped) is noise at that point.
+
+**Supporting libraries:** TanStack Query for server state (this app is entirely server state —
+fetch, cache, invalidate, refetch-after-mutation), React Router for routing, `vite-plugin-pwa`
+for the manifest and service worker, Vitest + Testing Library + MSW for tests, zod for
+runtime validation at the API boundary.
+
+### Server: Caddy, and Go is removed entirely
+
+The Go server does four things: serve static files, SPA fallback, proxy `/api/*` to Rails, proxy
+`/webhooks/resend/inbound` to Rails. A Caddyfile does all four in roughly fifteen lines and adds
+`encode zstd gzip`, which the Go `http.FileServer` never had.
+
+Three configuration facts that must be got right:
+
+- Railway terminates TLS. The site address must be `:{$PORT}` with `auto_https off`, or Caddy
+  attempts certificate provisioning and fails to bind.
+- Caddy's `reverse_proxy` **preserves the original `Host` header** by default, whereas Go's
+  `httputil.NewSingleHostReverseProxy` **rewrites it to the target host**. This is a real
+  behavioral difference in front of Rails and must be verified, not assumed.
+- `main_test.go`'s proxy unit test is replaced by a container smoke test (run the built image,
+  curl both proxy paths and an SPA deep link). For a reverse-proxy configuration this tests the
+  actual thing rather than testing `httputil`.
+
+Caddy appears only in `FE-27`. Local development uses Vite's own `server.proxy` to a local Rails,
+so if Caddy proves wrong it is one task to swap for a small static server without touching any
+screen work.
+
+### Cutover: shadow directory, atomic final commit
+
+Work happens directly on `main` and Railway auto-deploys on push to `main`. An in-place
+replacement of `web/` would leave production a dead PWA for the entire task chain.
+
+Instead:
+
+1. The new app is built in **`client/`**. `web/` keeps serving production, untouched, throughout.
+2. Every task from `FE-01` to `FE-29` is independently verifiable via `npm test`, `npm run build`,
+   and the Vite dev server against a local Rails. None of them change what production serves.
+3. `FE-30` is one atomic commit: repoint `deploy/railway-web.Dockerfile`, `git rm -r web/`,
+   `git mv client web`.
+
+Production is green at every commit, the chain can be abandoned at any point, and the end state is
+the current layout — `api/`, `web/`, `workers/` — with zero Go.
+
+### Tailwind and component libraries are deferred, deliberately
+
+`FE-01` … `FE-30` port to **`app.css` verbatim**, keeping the same class names. That makes the port
+provable: identical markup classes and stylesheet mean a screenshot diff is a real regression
+signal rather than a design change indistinguishable from a bug.
+
+`UI-01` … `UI-05` then do the styling upgrade. Two constraints for that phase:
+
+- Tailwind v4's default `@import "tailwindcss"` includes Preflight, which fights `app.css`'s own
+  resets and base element styles. Import **only** `theme` and `utilities` so the two coexist.
+- The existing `:root` token block (`--color-bg`, `--radius-pill`, `--text-xs`, …) is already in
+  Tailwind v4's `@theme` naming shape, so the design system transfers rather than being
+  re-derived. Convert component by component, deleting `app.css` sections as they empty.
+
+---
+
+## End state
+
+```
+api/           Rails 8.1 API — unchanged
+web/           Vite + React + TypeScript PWA (was Go + go-app)
+  index.html
+  package.json
+  vite.config.ts
+  Caddyfile         static + SPA fallback + /api and Resend webhook proxy
+  public/           app.css, fonts/, icons/, icon.svg, app-worker.js (kill switch)
+  src/
+    api/            zod schemas, transport, endpoint functions, query keys
+    components/     screens and shared UI
+    lib/            label/format helpers, platform detection
+    sw.ts           custom service worker (precache + push)
+workers/       Node + Playwright worker — unchanged
+deploy/
+  railway-web.Dockerfile   node build stage -> caddy runtime
+```
+
+No Go toolchain, no `go.mod`, no `Makefile`, no `app.wasm`.
+
+---
+
+## Port map
+
+| Go source | LOC | Becomes |
+|---|---|---|
+| `web/main.go` (routes) | 121 | `src/main.tsx` + React Router route table |
+| `web/main.go` (proxy, PWA handler) | — | `Caddyfile` + `vite-plugin-pwa` config |
+| `web/components/client.go` | 1,115 | `src/api/{schemas,client,endpoints,keys}.ts` + `src/lib/labels.ts` |
+| `web/components/jobs.go` — `JobList` | ~920 | `src/components/jobs/` (list, filters, lifecycle) |
+| `web/components/jobs.go` — `JobDetailView` | ~570 | `src/components/job-detail/` |
+| `web/components/jobs.go` — `DigestView` | ~450 | `src/components/ingestion-batches/` |
+| `web/components/applications.go` | 653 | `src/components/tracker/` |
+| `web/components/draft.go` | 576 | `src/components/draft-review/` |
+| `web/components/manual_entry.go` | 477 | `src/components/manual-entry/` |
+| `web/components/contacts.go` | 325 | `src/components/contacts/` |
+| `web/components/push.go` + `push_browser.go` | 427 | `src/components/push-toggle.tsx` + `src/lib/push.ts` (~30 lines; the `FuncOf`/`Release`/promise-to-channel `await` adapter disappears) |
+| `web/components/profile.go` | 266 | `src/components/profile/` |
+| `web/components/install_guide.go` + `pwa.go` | 281 | `src/components/install-guide.tsx` + `src/lib/platform.ts` |
+| `web/components/chrome.go` | 134 | `src/components/app-chrome.tsx` |
+| `web/components/login.go` | 113 | `src/components/login.tsx` |
+| `web/components/copy_button.go` | 50 | `src/components/copy-button.tsx` |
+| `web/web/app.css` | 64 KB | `web/public/app.css` — **copied verbatim** |
+| `web/web/fonts/`, `web/web/icons/`, `web/web/icon.svg` | — | `web/public/` — copied verbatim |
+| `web/components/*_test.go` | 3,866 | Vitest + Testing Library + MSW; expect fewer lines |
+| `web/scripts/layout-smoke.cjs` | — | extended into the parity gate (`FE-28`) |
+
+Nine routes carry over unchanged: `/`, `/login`, `/jobs`, `/jobs/new`, `/jobs/:id`,
+`/jobs/:id/contacts`, `/applications`, `/applications/:id`, `/profile`. The two go-app
+`RouteWithRegexp` patterns become ordinary React Router params.
+
+---
+
+## Preserved contracts
+
+These are cheap to preserve and fail silently if missed. Every one is an acceptance criterion on
+the task that owns it.
+
+| Contract | Exact value | Symptom if changed |
+|---|---|---|
+| Layout preference storage | key `waunder.layout`; same values (Auto/Desktop/Mobile) | Owner's layout choice silently resets |
+| Jobs feed filter storage | key `waunder.jobFilters`; same JSON shape | Owner's saved filters silently reset |
+| Session cookie | `waunder_session`, httponly ⇒ unreadable from JS. Auth state derives from a 401 on any request, exactly as `IsUnauthorized` does today | Login loop, or a UI that thinks it is signed in |
+| Manifest identity | `name`/`short_name` `Waunder`, `start_url` `/`, `theme_color` and `background_color` `#2d2c2c`, same icon | Some platforms treat it as a different installed app |
+| Web Push payload | `{title, body, data: {url, count}}` — see below | Notification click goes nowhere |
+| Asset paths | 5 references: `app.css:26` `@font-face`, `main.go:96-101` styles/icon, `client.go:635-639` source logos | Missing font, missing brand logos |
+| Proxy paths | `/api/*` and `/webhooks/resend/inbound` → `API_INTERNAL_URL` | Inbound email ingestion stops |
+
+### A free simplification
+
+`VAPID_PUBLIC_KEY` is currently injected into the WASM bundle through go-app's `Env` map
+(`main.go:104-106`) and read with `goappGetenv`. But `GET /api/push/vapid_public_key` already
+exists and `client.go:930` already calls it. Fetch it from the API and drop the environment
+variable from the `web` service entirely.
+
+---
+
+## Service worker handoff
+
+**This is the highest-risk item in the migration.** Without explicit handling, the installed PWA
+can be permanently stuck on the old build.
+
+go-app registers its worker at `/app-worker.js` with cache name `app-<version>`, and its fetch
+handler is `fetchWithCache` — pure cache-first, no revalidation — with `/` in the precache set.
+After cutover the sequence is:
+
+1. The installed PWA asks its old service worker for `/`.
+2. The old worker returns the **cached old HTML** (cache-first, never revalidates).
+3. That HTML loads the old `/app.js` bootstrap, which registers `/app-worker.js`.
+4. The new deployment no longer serves `/app-worker.js` → 404 → the update fails.
+5. The old worker survives. The new app is never reached.
+
+**Mitigation (`FE-12`):** the new deployment serves a deliberate kill switch at
+`/app-worker.js` — a small worker that on `install` calls `skipWaiting()`, and on `activate`
+deletes every cache key, calls `self.registration.unregister()`, claims clients, and reloads them.
+Service worker script fetches bypass the service worker's own fetch handler per spec, so the
+browser does retrieve the fresh file from the network; `AppChrome` additionally calls
+`goappTryUpdate()` on mount today, which forces the check.
+
+Keep `/app-worker.js` deployed indefinitely — it is a few lines, and removing it re-arms the trap
+for any device that has not opened the app since cutover.
+
+**Manual fallback**, if a device is still stuck: uninstall and reinstall the PWA from the browser.
+Documented in [`PRODUCTION_SETUP.md`](PRODUCTION_SETUP.md).
+
+**Verification trap:** Playwright's `serviceWorkers: 'block'` (used today by
+`web/scripts/layout-smoke.cjs`) bypasses this entire path, so a screenshot can look perfect while
+every real returning browser shows the old build. The handoff must be verified with
+`launchPersistentContext` and no such option.
+
+---
+
+## Web Push payload — fix a real bug
+
+Rails sends `{title, body, data: {url: "/", count: N}}` (`daily_digest_builder.rb:23-26`).
+
+go-app's generated worker reads `notification.path` for the click target and **overwrites the
+`data` key** with its own `{goapp: {path, actions}}`. Rails never sends a top-level `path`, so
+`data.goapp.path` is `undefined` and `data.url` is discarded. `icon` and `badge` are undefined
+too, so the notification renders with a browser default icon.
+
+The live symptom degrades differently depending on whether a window is already open
+(`clients.matchAll` → focus, versus `clients.openWindow(undefined)`), so this has probably looked
+like it works. The shape mismatch is a static fact on both sides.
+
+**The new service worker reads `data.url`, sets the app icon and badge, and Rails still does not
+change.** Owned by `FE-11`.
+
+---
+
+## Verification
+
+Per task: `npm run build`, `npm run typecheck`, `npm test` (Vitest), `npm run lint` in `client/`.
+Rails is untouched, so `api/` suites are unaffected — but the API must be running locally for any
+manual check, via Vite's dev proxy.
+
+Three gates before the cutover commit, each its own task:
+
+- **`FE-27` container smoke test** — build the image, run it, assert `/api/*` proxies, the Resend
+  webhook path proxies, an SPA deep link (`/jobs/123`) returns the shell, static assets are served
+  compressed, and the `Host` header behavior in front of Rails is correct.
+- **`FE-28` visual parity gate** — Playwright screenshots of all nine routes at mobile and desktop
+  widths, against the Go app and the new app side by side, with a diff report. `app.css` and the
+  markup classes are unchanged, so any visual difference is a defect.
+- **`FE-29` live integration** — a real (or replayed) Resend `email.received` survives Svix
+  signature verification through Caddy, and the `/app-worker.js` kill switch retires the go-app
+  worker in a persistent browser context.
+
+---
+
+## Cutover doc checklist
+
+The docs below are **accurate today** and describe the Go frontend correctly. They must be
+rewritten in the `FE-30` cutover commit, not before — documenting a React frontend while
+production runs Go would be false. `FE-30` owns all of it:
+
+| Doc | Change at cutover |
+|---|---|
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Rewrite `### web (Go + go-app PWA server)` and the Overview/Topology mentions |
+| [`CONVENTIONS.md`](CONVENTIONS.md) | Replace `## Stack — web/ (Go + go-app, Go 1.26)` with the TypeScript stack rules |
+| [`TESTING.md`](TESTING.md) | Replace the `web/` Go test stack, inventory, and go-app patterns with Vitest/Testing Library/MSW |
+| [`ENV_VARS.md`](ENV_VARS.md) | Remove `VAPID_PUBLIC_KEY` from the `web` service; drop the "no `VITE_*` convention" note or restate it |
+| [`STYLE_GUIDE.md`](STYLE_GUIDE.md) | Retarget "the go-app components in `web/components/`" to the React components; keep the visual system as-is |
+| [`PRODUCTION_SETUP.md`](PRODUCTION_SETUP.md) | Build/runtime facts for the `web` service; PWA-stuck manual fallback |
+| [`PRD.md`](PRD.md) | Two incidental go-app mentions |
+| [`INDEX.md`](INDEX.md) | Confirm this file's row; no other change |
+| `README.md` | Monorepo layout, tech stack, quick start, and the "Why a PWA" paragraph |
+| `CLAUDE.md` / `AGENTS.md` | Quick Start, Build & Verification table, Repository Structure, Architecture summary, and the four obsolete go-app entries under Debugging & Gotchas. This file is loaded into every agent session, so a stale version is worse than a missing one |
+| This file | Flip **Status** to done and record what actually differed |
+
+---
+
+## Notes for agents working the chain
+
+- Until `FE-30`, `web/` is production. Do not edit it, and do not delete it.
+- All new work goes in `client/`. It is not wired to Railway and cannot break production.
+- `app.css` is copied **verbatim** in `FE-02`. Do not restyle, tidy, or reformat it, and do not
+  change a class name in any component — the parity gate depends on both being unchanged. Styling
+  changes belong to `UI-01` and later.
+- Rails is the source of truth for all validation, normalization, scoring, route resolution, and
+  submit safety. The frontend does trim-only client hints, exactly as the Go client did. Porting is
+  not an occasion to move logic forward.
+- Never add an outbound send affordance to the outreach screen — outreach stays prefill-for-manual-
+  sending, and the draft-review submit button stays gated on `draft_ready` with no warnings.
+- Keep the API contract read-only in this chain. If a screen appears to need an endpoint change,
+  stop and report rather than editing `api/`.
