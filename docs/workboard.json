@@ -2200,7 +2200,7 @@
       "id": "FE-10",
       "title": "Configure the PWA manifest, precaching, and the update banner",
       "description": "Add vite-plugin-pwa with content-hashed precaching, and port the update-available banner. The manifest identity fields must match the current go-app-generated manifest exactly, because a changed name or start_url makes some platforms treat this as a different installed app. The banner replaces the hand-rolled OnAppUpdate workaround: Workbox's needRefresh signal is the framework-supported version of the same thing.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FE",
       "depends_on": [

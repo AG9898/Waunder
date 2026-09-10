@@ -39,6 +39,7 @@ import {
   writeLayout,
 } from "../lib/layout";
 import type { LayoutPreference } from "../lib/layout";
+import { UpdateBanner } from "./update-banner";
 
 /** Shown when the layout choice was applied but could not be persisted. */
 const STORAGE_ERROR = "Layout changed. This browser could not save the preference.";
@@ -128,6 +129,7 @@ export function AppChrome() {
           </Link>
         ))}
       </nav>
+      <UpdateBanner />
       {storageFailed ? (
         <p className="layout-error" role="status">
           {STORAGE_ERROR}

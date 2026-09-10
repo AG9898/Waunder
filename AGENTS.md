@@ -1276,3 +1276,9 @@ a `client.fetchQuery` that triggers the redirect in `act()` or React warns about
 state update. Also: `DELETE /api/session` was never called by any Go screen, so sign-out is new
 (`useSignOut`, rendered by FE-25) — and because `destroy` is session-guarded, a 401 from it means
 "already signed out" and must be treated as success, not as an error.
+
+### 2026-09-10 — go-app manifest parity needs four same-source icon records
+go-app emits four manifest icons from its default, large, SVG, and maskable handler fields even
+when every field points to the same SVG: maskable 512 PNG-labelled, SVG any, large 512 PNG-labelled,
+and default 192 PNG-labelled. Preserve those records plus the absent `id` in the Vite manifest;
+one modern-looking SVG icon entry changes the installed PWA's manifest contract during cutover.

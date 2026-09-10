@@ -403,6 +403,22 @@ the owner knows it will not survive a reload.
 replaces it with Workbox's `needRefresh` signal in `update-banner.tsx`. The `.app-update` CSS is
 already in place.
 
+#### PWA manifest, precache, and update prompt (`FE-10`)
+
+`vite-plugin-pwa` owns the shadow client's `/manifest.webmanifest`, generated service worker, and
+the content-hashed precache manifest. `client/vite.config.ts` pins the manifest identity to the
+current go-app output: name/short name `Waunder`, start URL and scope `/`, standalone display,
+both colors `#2d2c2c`, and the four default/large/SVG/maskable records all pointing to `/icon.svg`.
+It deliberately supplies **no `id`**, so platforms continue to derive identity from the unchanged
+start URL and preserve the owner's installed icon.
+
+The plugin uses `registerType: "prompt"`; `UpdateBanner` calls Workbox's `useRegisterSW()` and
+renders the existing `.app-update` banner only when its `needRefresh` signal says a new worker is
+waiting. Reload remains an explicit owner action, so an in-progress edit is never discarded. Vite
+hashes module assets by content; stable public URLs (`/app.css`, fonts, and SVGs) are instead
+included in Workbox's precache with revision hashes, preventing go-app's constant-URL cache trap
+without changing the public asset contract.
+
 #### Login and the 401 auth boundary (`FE-09`)
 
 `client/src/components/login.tsx` is the passphrase screen — markup, classes, copy, and all three

@@ -1,5 +1,7 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
+import { VitePWA } from "vite-plugin-pwa";
+import type { ManifestOptions } from "vite-plugin-pwa";
 
 // The PWA is always served same-origin: in production Caddy proxies /api/* and the Resend
 // inbound webhook path to Rails over Railway's private network, and in local dev this proxy
@@ -13,8 +15,37 @@ const railsBaseUrl = process.env["API_INTERNAL_URL"] ?? "http://localhost:3000";
 // default, so the dev proxy must not rewrite it either (Vite's default, set explicitly).
 const proxyToRails = { target: railsBaseUrl, changeOrigin: false } as const;
 
+// These fields preserve the installed Go PWA's identity. In particular, leave `id` absent so
+// platforms that derive identity from start_url continue to recognize the existing home-screen app.
+export const pwaManifest = {
+  name: "Waunder",
+  short_name: "Waunder",
+  description: "Personal job application assistant",
+  start_url: "/",
+  scope: "/",
+  display: "standalone",
+  background_color: "#2d2c2c",
+  theme_color: "#2d2c2c",
+  // go-app generated four icon records from these fields. Keep the same records and source icon.
+  icons: [
+    { src: "/icon.svg", type: "image/png", purpose: "maskable", sizes: "512x512" },
+    { src: "/icon.svg", type: "image/svg+xml", sizes: "any" },
+    { src: "/icon.svg", type: "image/png", sizes: "512x512" },
+    { src: "/icon.svg", type: "image/png", sizes: "192x192" },
+  ],
+} satisfies Partial<ManifestOptions>;
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: "prompt",
+      manifestFilename: "manifest.webmanifest",
+      manifest: pwaManifest,
+      // Public files retain stable URLs, so they must be revisioned in the precache manifest.
+      workbox: { globPatterns: ["**/*.{js,css,html,svg,woff2}"] },
+    }),
+  ],
   server: {
     port: 8000,
     proxy: {
