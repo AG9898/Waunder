@@ -58,6 +58,10 @@ a fast check. Skip slow checks only when the task says so.
 | `cd api && bin/rubocop` | Ruby lint (rubocop-rails-omakase) | fast |
 | `cd workers && npm test` | Worker safety / unit tests | fast |
 | `cd workers && npm run typecheck` | TypeScript types (`tsc --noEmit`) | fast |
+| `cd client && npm test` | Shadow frontend tests (Vitest + jsdom) | fast |
+| `cd client && npm run typecheck` | Shadow frontend types (`tsc --noEmit`) | fast |
+| `cd client && npm run lint` | Shadow frontend lint (`eslint .`) | fast |
+| `cd client && npm run build` | Shadow frontend production build (`vite build`) | fast |
 | `cd web && go test ./...` | Go tests | fast |
 | `cd web && go vet ./...` | Go static checks | fast |
 | `cd api && bin/ci` | Full CI incl. brakeman + bundler-audit | slow |
@@ -85,6 +89,11 @@ workers/       Node + TypeScript + Playwright automation worker
   src/types.ts    Shared task/payload types
   src/config.ts   Worker configuration
   src/ats/        Per-ATS form-fill logic
+client/        Vite + React + TypeScript PWA — shadow replacement for web/, not deployed
+               until the FE-30 cutover (see docs/GO_MIGRATION.md)
+  index.html      Vite entry
+  vite.config.ts  Dev server + /api and Resend-webhook proxy + Vitest config
+  src/            React source and colocated *.test.tsx
 docs/          Project docs and task queue
   INDEX.md        Documentation navigation map
   PRD.md          Product requirements and scope
@@ -257,7 +266,9 @@ See [`docs/ENV_VARS.md`](docs/ENV_VARS.md) for the canonical variable and secret
 
 Before marking any task done, run the fast checks for the service you changed: `cd api &&
 bundle exec rspec` and `cd api && bin/rubocop` for Rails; `cd workers && npm test` and `npm run
-typecheck` for the worker; `cd web && go test ./...` and `go vet ./...` for the web service.
+typecheck` for the worker; `cd web && go test ./...` and `go vet ./...` for the web service;
+`cd client && npm test`, `npm run typecheck`, `npm run lint`, and `npm run build` for the
+shadow frontend.
 
 Full test strategy, file inventory, and patterns for writing new tests: [`docs/TESTING.md`](docs/TESTING.md)
 
@@ -1120,3 +1131,19 @@ cutover unless the new deployment serves a kill switch at that exact path; and R
 (`{title, body, data:{url}}`) never matched what go-app's worker reads (`notification.path`, and it
 overwrites `data`), so the digest notification's click target has been dead — the new service worker
 reads `data.url` and Rails still does not change.
+
+### 2026-09-10 — client/ scaffold: pinned toolchain and the dev proxy that mirrors Caddy
+FE-01 created the shadow `client/` project (Vite 8 + React 19 + TS 5.9 + Vitest 5 + jsdom +
+Testing Library, ESLint 10 flat config + Prettier 3), standalone like `workers/` — no monorepo
+workspace. Two version traps: npm's latest `typescript` is now **7.x** (the native port) but
+`typescript-eslint` peers at `<6.1.0`, so pin TS `~5.9`; and `@eslint/js` tops out at `10.0.1`
+while `eslint` itself is at `10.10.0`, so the two are not version-locked. `vite.config.ts` reads
+`API_INTERNAL_URL` (default `http://localhost:3000`) Node-side only — never a `VITE_*` var — and
+proxies both `/api` and `/webhooks/resend/inbound` with `changeOrigin: false`, so Rails sees the
+browser's original `Host` exactly as it will behind Caddy (the Go server rewrote it). Verify the
+proxy by pointing `API_INTERNAL_URL` at a throwaway node server echoing `req.url` +
+`req.headers.host`; verify the default with no server at all via vite's `loadConfigFromFile` and
+printing `config.server.proxy`. TS is strict + `noUncheckedIndexedAccess`, so array/record
+indexing yields `T | undefined` — ported Go code cannot assume a zero value. ESLint is
+deliberately syntactic (`tseslint.configs.recommended`, not type-checked) since `npm run
+typecheck` owns type errors.

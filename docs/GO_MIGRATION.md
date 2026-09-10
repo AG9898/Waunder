@@ -6,8 +6,9 @@
 > env vars, and style rules are rewritten in their own docs at cutover (see
 > [Cutover doc checklist](#cutover-doc-checklist)).
 
-**Status:** planned — decided 2026-09-10, not yet started. Production still runs the Go/go-app
-PWA and keeps running it until the final cutover task.
+**Status:** in progress — decided 2026-09-10, chain started 2026-09-10 with `FE-01` (the
+`client/` toolchain). Production still runs the Go/go-app PWA and keeps running it until the
+final cutover task (`FE-30`).
 
 **Decision record:** [`DECISIONS.md`](DECISIONS.md) RESOLVED-24.
 **Task chain:** `FE-01` … `FE-30` in [`workboard.json`](workboard.json), then `UI-01` … `UI-05`.
@@ -100,6 +101,40 @@ React-vs-Svelte delta (~200 KB vs ~120 KB gzipped) is noise at that point.
 fetch, cache, invalidate, refetch-after-mutation), React Router for routing, `vite-plugin-pwa`
 for the manifest and service worker, Vitest + Testing Library + MSW for tests, zod for
 runtime validation at the API boundary.
+
+#### Toolchain as scaffolded (`FE-01`)
+
+`client/` is a plain npm project — no monorepo workspace, no shared root `package.json`, matching
+how `workers/` already stands alone. Node `>=22`, ESM (`"type": "module"`).
+
+| Concern | Choice |
+|---|---|
+| Build / dev server | Vite 8 + `@vitejs/plugin-react` 6 |
+| UI | React 19 |
+| Types | TypeScript 5.9, single `tsconfig.json`, `noEmit` |
+| Tests | Vitest 5 + jsdom + Testing Library + `@testing-library/jest-dom` |
+| Lint | ESLint 10 flat config + `typescript-eslint` + react-hooks / react-refresh plugins |
+| Format | Prettier 3, with `eslint-config-prettier` last so the two never disagree |
+
+Five scripts, and they are the per-task verification gate: `dev`, `build`, `typecheck`, `test`,
+`lint` (plus `preview`, `test:watch`, `format`, `format:check`).
+
+TypeScript is strict **plus** `noUncheckedIndexedAccess`, `noImplicitOverride`,
+`noImplicitReturns`, `noFallthroughCasesInSwitch`, `noUnusedLocals`, `noUnusedParameters`, and
+`verbatimModuleSyntax`. Indexing an array or record yields `T | undefined`, so ported code has to
+handle the empty case explicitly rather than inheriting the Go zero-value habit.
+
+ESLint runs **syntactically** (`tseslint.configs.recommended`, not the type-checked variant):
+`npm run typecheck` already owns type errors, so lint stays fast and needs no second tsconfig
+project for `vite.config.ts` / `eslint.config.js`.
+
+**Dev proxy.** `vite.config.ts` proxies `/api` and `/webhooks/resend/inbound` to
+`API_INTERNAL_URL`, defaulting to `http://localhost:3000` — the same variable name the deployed
+service uses, read Node-side only and never inlined into the bundle, so no `VITE_*` value is
+introduced. `changeOrigin` is explicitly `false`: Rails must receive the browser's original
+`Host` header in dev exactly as it will behind Caddy, whose `reverse_proxy` preserves `Host` by
+default (unlike the Go server's `httputil` rewrite). The dev server listens on 8000, matching the
+Go server's default.
 
 ### Server: Caddy, and Go is removed entirely
 

@@ -114,6 +114,60 @@ package compiles both to WebAssembly for the browser and to a native server bina
 
 ---
 
+## Stack — client/ (Vite + React + TypeScript, Node 22)
+
+> **Shadow project.** `client/` is the replacement frontend being built alongside the live
+> Go/go-app `web/` service. It is not deployed and is not wired to Railway until the cutover task
+> (`FE-30`) swaps the two directories. Until then, **never edit or delete `web/`**, and put all
+> new frontend work here. Plan of record: [`GO_MIGRATION.md`](GO_MIGRATION.md).
+
+A standalone npm project (no monorepo workspace), exactly like `workers/`. Node `>=22`, ESM
+(`"type": "module"`).
+
+### Language and Types
+
+- TypeScript `strict` **plus** `noUncheckedIndexedAccess`, `noImplicitOverride`,
+  `noImplicitReturns`, `noFallthroughCasesInSwitch`, `noUnusedLocals`, `noUnusedParameters`, and
+  `verbatimModuleSyntax`. No implicit `any`, and indexing an array or record yields
+  `T | undefined` — handle the empty case rather than assuming a Go-style zero value.
+- One `tsconfig.json` with `noEmit`; Vite owns the build, `tsc` only typechecks.
+- Bundler module resolution — local imports carry **no** file extension, unlike `workers/`, which
+  is NodeNext and requires explicit `.js` specifiers.
+
+### Module and File Organization
+
+- `index.html` is the Vite entry; `src/main.tsx` mounts the React root.
+- `vite.config.ts` holds the dev server, proxy, and Vitest config in one file.
+- `vitest.setup.ts` registers the jest-dom matchers.
+- Tests are colocated with their subject as `*.test.ts` / `*.test.tsx` under `src/`.
+
+### Scripts
+
+- `npm run dev` — Vite dev server on port 8000 with the Rails proxy.
+- `npm run build` — `vite build`.
+- `npm run typecheck` — `tsc --noEmit`.
+- `npm test` — `vitest run` (jsdom + Testing Library).
+- `npm run lint` — `eslint .`.
+- `npm run format` / `npm run format:check` — Prettier.
+
+### Patterns
+
+- **Same-origin only.** The dev server proxies `/api` and `/webhooks/resend/inbound` to
+  `API_INTERNAL_URL` (default `http://localhost:3000`), matching what Caddy will do in production.
+  Never call Rails cross-origin, never hardcode a backend URL, and never introduce a `VITE_*`
+  browser-exposed backend variable — `API_INTERNAL_URL` is read Node-side in `vite.config.ts` only
+  and is never inlined into the bundle.
+- `changeOrigin` stays `false` so Rails receives the browser's original `Host` header, matching
+  Caddy's `reverse_proxy` default (the Go server rewrote it; that difference is deliberate here).
+- ESLint is configured **syntactically** (`typescript-eslint`'s `recommended`, not the
+  type-checked variant) because `npm run typecheck` already owns type errors. `eslint-config-prettier`
+  is applied last so formatting is Prettier's job alone.
+- Rails stays the source of truth for validation, normalization, scoring, route resolution, and
+  submit safety. The client does trim-only hints, exactly as the Go client did — porting is not an
+  occasion to move logic forward.
+
+---
+
 ## Stack — api/ (Ruby on Rails 8.1.3, API-only, Ruby 3.2.3)
 
 The backend and single source of truth. Owns all domain data, LLM orchestration, and worker

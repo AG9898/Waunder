@@ -17,10 +17,13 @@ If any other doc mentions a variable, it should link here rather than restate it
 
 ## Variable Matrix
 
-> **Migrating:** the `web` service is moving to Vite + React + TypeScript. At cutover
-> `VAPID_PUBLIC_KEY` is dropped from `web` (the PWA fetches it from
-> `GET /api/push/vapid_public_key` instead) and the no-`VITE_*` note above is restated.
-> `API_INTERNAL_URL` and `PORT` are unchanged. See [`GO_MIGRATION.md`](GO_MIGRATION.md).
+> **Migrating:** the `web` service is moving to Vite + React + TypeScript, built in the shadow
+> `client/` directory until cutover. At cutover `VAPID_PUBLIC_KEY` is dropped from `web` (the PWA
+> fetches it from `GET /api/push/vapid_public_key` instead) and the no-`VITE_*` note above is
+> restated. `API_INTERNAL_URL` and `PORT` are unchanged — `client/`'s Vite dev server already
+> reads `API_INTERNAL_URL` (default `http://localhost:3000`) for its `/api` and Resend-webhook
+> proxy, Node-side only, so it is never inlined into the browser bundle.
+> See [`GO_MIGRATION.md`](GO_MIGRATION.md).
 
 | Variable | Required | Default | Description | Where set |
 |---|---|---|---|---|

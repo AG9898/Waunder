@@ -4,12 +4,14 @@
 > Read before adding any new test file or modifying an existing one.
 > Code conventions that affect test structure live in [`CONVENTIONS.md`](CONVENTIONS.md).
 
-Waunder has three stacks, each with its own test runner: `api/` (Rails / RSpec),
-`web/` (Go / `go test`), and `workers/` (Node built-in test runner).
+Waunder has three deployed stacks, each with its own test runner: `api/` (Rails / RSpec),
+`web/` (Go / `go test`), and `workers/` (Node built-in test runner). A fourth, `client/`, is the
+in-progress replacement frontend and runs Vitest.
 
-> **Migrating:** `web/` is moving to Vite + React + TypeScript, so its test stack becomes
-> Vitest + Testing Library + MSW. Everything below describes the current Go/go-app suite and
-> stays accurate until the cutover task rewrites it. See [`GO_MIGRATION.md`](GO_MIGRATION.md).
+> **Migrating:** `web/` is being replaced by the Vite + React + TypeScript project in `client/`,
+> whose test stack is Vitest + Testing Library + MSW. The `web/` sections below describe the
+> current Go/go-app suite and stay accurate until the cutover task removes it. See
+> [`GO_MIGRATION.md`](GO_MIGRATION.md).
 
 ---
 
@@ -28,6 +30,13 @@ cd web && go test ./...                                  # all Go tests
 cd workers && npm test                                   # all tests
 cd workers && node --import tsx --test src/safety.test.ts  # single file
 cd workers && npm run typecheck                          # tsc --noEmit
+
+# --- client/ (Vite + React + TypeScript, shadow frontend) ---
+cd client && npm test                                    # all tests (vitest run)
+cd client && npx vitest run src/toolchain.test.tsx       # single file
+cd client && npm run typecheck                           # tsc --noEmit
+cd client && npm run lint                                # eslint .
+cd client && npm run build                               # vite build
 ```
 
 ---
@@ -39,6 +48,7 @@ cd workers && npm run typecheck                          # tsc --noEmit
 | api (Rails) | RSpec (`rspec-rails ~> 8.0`) | Ruby 3.2.3 / Rails 8.1.3 | `api/spec/` | `cd api && bundle exec rspec` |
 | web (go-app) | Go testing (`go test`) | Go 1.26 | `web/**/*_test.go` | `cd web && go test ./...` |
 | workers | Node built-in test runner (`node --test`) + tsx | Node 22 / TS 5.7 | `workers/src/*.test.ts`, `workers/src/**/*.test.ts` | `cd workers && npm test` |
+| client (shadow frontend) | Vitest 5 + jsdom + Testing Library + `@testing-library/jest-dom` | Node 22 / TS 5.9 / React 19 | `client/src/**/*.{test,spec}.{ts,tsx}` | `cd client && npm test` |
 
 ---
 
@@ -243,6 +253,11 @@ Be honest about the current state — most of the suite is still to be written.
   `Jobs` returns those counts via `mockClient.jobsCounts`. The mocked `IngestionBatches`
   now returns an `IngestionBatchPage` and records the requested page (`gotBatchesPage`).
 
+- **client/** — `src/toolchain.test.tsx`: the `FE-01` scaffold smoke test. Renders a React element
+  through Testing Library into jsdom and asserts it with a jest-dom matcher, so a green run proves
+  Vite + React + TypeScript, the jsdom environment, `vitest.setup.ts`, and the matcher type
+  augmentation are all wired. Screen tests arrive with the ported components (`FE-03` onward).
+
 ### Planned (from the plan's Testing Plan)
 
 **Intake management (INTAKE / RESOLVED-20):**
@@ -333,6 +348,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `api/spec/requests/api/digest_spec.rb` | API (Rails) | `GET /api/digest` latest digest of recently scored JobPosts (no scoring/LLM on read), empty-jobs case, and 401 auth gating |
 | `api/spec/requests/api/ingestion_batches_spec.rb` | API (Rails) | `GET /api/ingestion_batches` ingestion history grouped into source+arrival-time batches newest-first (no scoring/LLM on read), empty case, and 401 auth gating |
 | `api/spec/services/ingestion_batch_builder_spec.rb` | API (Rails) | `IngestionBatchBuilder` clustering: same-source within-gap grouping, gap-break into new batches, cross-source separation, window cutoff, empty case, and synthetic batch id |
+| `client/src/toolchain.test.tsx` | client (Vitest) | scaffold smoke test: React render into jsdom via Testing Library with a jest-dom matcher, proving the Vite/TS/Vitest/setup wiring |
 | `api/spec/requests/api/push_subscriptions_spec.rb` | API (Rails) | `GET /api/push/vapid_public_key` public VAPID key read; `POST`/`DELETE /api/push_subscription` authenticated subscribe/unsubscribe, idempotent endpoint update, and 401 auth gating |
 | `api/spec/requests/api/worker_tasks_spec.rb` | API (Rails) | `GET /api/worker_tasks` worker-shaped task pull with bearer-only auth; `POST /api/worker_tasks/:id/report` status updates, audit screenshots/log refs, and human-session rejection |
 | `api/spec/requests/api/profile_spec.rb` | API (Rails) | `POST /api/profile/resume` JSON Resume → Profile + primary ResumeDocument mapping, PDF Active Storage attachment, encrypted-at-rest contact/raw_text check, idempotent re-sync, 401 unauth, 422 invalid/malformed; `GET`/`PATCH /api/profile` structured read/update with PII presence-flags only |

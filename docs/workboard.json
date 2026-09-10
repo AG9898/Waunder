@@ -1904,7 +1904,7 @@
       "id": "FE-01",
       "title": "Scaffold client/ with Vite + React + TypeScript toolchain",
       "description": "Create the shadow client/ project: Vite + React + strict TypeScript, Vitest + Testing Library (jsdom), ESLint + Prettier, and npm scripts for dev/build/typecheck/test/lint. Configure the Vite dev server to proxy /api/* and /webhooks/resend/inbound to a local Rails so the app is developed same-origin exactly as production. No application code and no assets in this task. web/ is production and must not be touched.",
-      "status": "todo",
+      "status": "done",
       "priority": "critical",
       "group_id": "FE",
       "depends_on": [],
