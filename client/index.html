@@ -3,7 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#2d2c2c" />
     <title>Waunder</title>
+    <!-- Static assets live in public/ and are served from the site root, so the go-app
+         "/web/<path>" prefix becomes "/<path>" (see docs/GO_MIGRATION.md). app.css is a
+         verbatim copy of web/web/app.css and is linked here rather than imported from
+         src/, so it loads without waiting on the JS bundle and stays outside Vite's
+         asset hashing — the same always-same-URL behavior go-app's Styles handler had. -->
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
+    <link
+      rel="preload"
+      href="/fonts/hanken-grotesk.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="/app.css" />
   </head>
   <body>
     <div id="root"></div>

@@ -18,6 +18,13 @@ source of truth; the stylesheet is integrated through go-app's `app.Handler`.
 > class name in it are carried over **verbatim** by the port, so this visual system survives
 > unchanged; only the component language changes. Styling upgrades (Tailwind, component
 > libraries) are a separate later phase. See [`GO_MIGRATION.md`](GO_MIGRATION.md).
+>
+> The stylesheet, the Hanken Grotesk WOFF2, the app icon, and the brand logos now also live
+> as byte-identical copies under `client/public/`, linked from `client/index.html`. Vite
+> serves that directory at the site root, so every asset URL loses go-app's `/web/` prefix:
+> `/web/app.css` → `/app.css`, `/web/fonts/…` → `/fonts/…`, `/web/icons/…` → `/icons/…`,
+> `/web/icon.svg` → `/icon.svg`. Until the cutover, `web/web/` is still what production
+> serves and both copies must stay in sync; edit neither for styling reasons.
 
 ---
 

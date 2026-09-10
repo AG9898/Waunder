@@ -1,3 +1,7 @@
 node_modules/
 dist/
 coverage/
+
+# app.css is a verbatim copy of web/web/app.css (FE-02). The screenshot parity gate depends on
+# it not being reformatted, so Prettier must never touch it.
+public/app.css

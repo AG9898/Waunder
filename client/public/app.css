@@ -1,0 +1,2284 @@
+/* ==========================================================================
+   Waunder — app.css
+   Personal job-application assistant. Quiet, warm, utilitarian.
+   Mobile-first; static load via <link rel="stylesheet" href="/app.css"> in index.html.
+
+   Visual direction
+   ----------------
+   - Warm paper background, sage-green accent, charcoal ink.
+   - Soft, generous rounding (12–22px) for a personal, friendly feel.
+   - Humanist sans throughout. Tiny uppercase labels for an ops-tool cadence.
+   - Restrained color; spacing and hairlines do the structural work, not cards
+     stacked inside cards. No hero sections, no gradient decoration.
+   ========================================================================== */
+
+/* No live Google Fonts @import: the PWA app shell is offline-tolerant, so
+   Hanken Grotesk is self-hosted as a single variable-font WOFF2 asset under
+   client/public/fonts/ (latin subset, weights 400-700) instead of a live
+   third-party dependency (see docs/STYLE_GUIDE.md, docs/CONVENTIONS.md). The
+   system-sans stack below remains the fallback while the asset loads or if
+   it is unavailable. */
+@font-face {
+  font-family: "Hanken Grotesk";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/hanken-grotesk.woff2") format("woff2");
+}
+
+/* --------------------------------------------------------------------------
+   1. Tokens
+   -------------------------------------------------------------------------- */
+:root {
+  /* Surfaces & ink (warm paper) */
+  --color-bg:            #f4efe8; /* page — warm paper */
+  --color-surface:       #fbf8f3; /* raised: cards, inputs */
+  --color-surface-sunken:#ece5da; /* wells: read-only panels */
+  --color-ink:           #2d2c2c; /* primary text (matches PWA theme color) */
+  --color-ink-soft:      #5d584f; /* secondary text */
+  --color-ink-faint:     #8c8579; /* labels, meta, placeholders */
+  --color-border:        #e4dccd; /* hairlines */
+  --color-border-strong: #d4c9b6; /* input borders, dividers */
+
+  /* Sage accent */
+  --color-accent:        #5e7d6a; /* primary action, links */
+  --color-accent-strong: #4c6a58; /* hover / active */
+  --color-accent-soft:   #e7ede7; /* tinted fill (pills, link wash) */
+  --color-accent-ink:    #3a5446; /* text on tinted fill */
+
+  /* Status */
+  --color-danger:        #a8533f;
+  --color-danger-soft:   #f4e3dc;
+  --color-danger-ink:    #843d2c;
+  --color-success:       #4c6a58;
+  --color-success-soft:  #e3ece4;
+  --color-success-ink:   #36513f;
+  --color-warning:       #b07d35;
+  --color-warning-soft:  #f5ecd9;
+  --color-warning-ink:   #8a601f;
+
+  /* Typography
+     "Hanken Grotesk" is the target typeface (docs/STYLE_GUIDE.md), self-hosted
+     as a WOFF2 under client/public/fonts/ (see @font-face above) rather than loaded
+     via a live Google Fonts dependency (offline-tolerant PWA shell). The
+     remaining stack is the documented system-font fallback for the brief
+     window before the asset loads, or if it is unavailable. */
+  --font-sans: "Hanken Grotesk", ui-sans-serif, system-ui, -apple-system,
+               "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --text-xs:   0.75rem;   /* 12 — meta */
+  --text-sm:   0.8125rem; /* 13 — labels */
+  --text-base: 0.9375rem; /* 15 — body */
+  --text-md:   1.0625rem; /* 17 — emphasis */
+  --text-lg:   1.375rem;  /* 22 — screen title */
+  --text-xl:   1.75rem;   /* 28 — login wordmark */
+  --leading:   1.55;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+
+  /* Radius — soft */
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius-xl:   22px;
+  --radius-pill: 999px;
+
+  /* Shadows — soft, warm-tinted */
+  --shadow-sm: 0 1px 2px rgba(45,44,44,.04), 0 1px 3px rgba(45,44,44,.05);
+  --shadow-md: 0 2px 6px rgba(45,44,44,.05), 0 10px 28px rgba(45,44,44,.06);
+  --focus-ring: 0 0 0 3px rgba(94,125,106,.30);
+
+  /* Layout */
+  --page-max: 560px;
+  --page-pad: 20px;
+}
+
+/* --------------------------------------------------------------------------
+   2. Base / reset
+   -------------------------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* LLM-generated copy (job summaries, alignment/strategy notes, cover letters,
+   structured answer values) is free text and may contain long unbroken tokens
+   (e.g. a pasted URL with no spaces). Apply overflow-wrap everywhere as a safe
+   no-op default so that copy wraps inside its container at mobile widths
+   instead of overflowing the page — explicit raw-URL fields additionally use
+   word-break: break-all where the text itself is the link. */
+p, li, h1, h2, span { overflow-wrap: break-word; }
+
+a { color: var(--color-accent); text-decoration: none; }
+a:hover { color: var(--color-accent-strong); }
+
+button { font-family: inherit; }
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+/* --------------------------------------------------------------------------
+   3. Screen shell
+   Every routed screen root behaves as the page container: a single readable
+   column, centered on wide viewports, comfortably padded on small ones.
+   -------------------------------------------------------------------------- */
+.app-shell,
+.digest,
+.job-list,
+.applications,
+.job-detail,
+.draft-review,
+.profile,
+.manual-entry,
+.contacts-view {
+  width: 100%;
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: calc(var(--page-pad) + 4px) var(--page-pad) var(--space-8);
+}
+
+/* Screen titles */
+.digest > h1,
+.job-list > h1,
+.applications-header h1,
+.profile > h1,
+.manual-entry > h1,
+.contacts-title,
+.job-detail .job-title,
+.draft-title {
+  margin: 0 0 var(--space-5);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+/* Section sub-headings — tiny uppercase, ops-tool cadence */
+.job-detail h2,
+.job-pipeline-status h2,
+.draft-body h2,
+.profile-contact h2,
+.profile-resume h2,
+.push-toggle h2,
+.intake-control h2,
+.draft-submit h2,
+.draft-autofill h2 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-ink-faint);
+}
+
+/* --------------------------------------------------------------------------
+   4. List rows — digest & jobs feed (gentle cards)
+   -------------------------------------------------------------------------- */
+.digest-content,
+.digest-body { display: flex; flex-direction: column; gap: var(--space-4); }
+
+.intake-control {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.intake-control-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.intake-control h2 { margin-bottom: var(--space-1); }
+.intake-control-note,
+.intake-held-count {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-sm);
+}
+.intake-status {
+  flex: 0 0 auto;
+  display: inline-flex;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.intake-status--on {
+  background: var(--color-success-soft);
+  color: var(--color-success-ink);
+}
+.intake-status--paused {
+  background: var(--color-warning-soft);
+  color: var(--color-warning-ink);
+}
+
+.app-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-5);
+  padding-bottom: var(--space-2);
+  overflow-x: auto;
+  border-bottom: 1px solid var(--color-border);
+}
+.app-tab {
+  flex: 0 0 auto;
+  padding: 8px 11px;
+  border-radius: var(--radius-md);
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.app-tab:hover {
+  background: var(--color-surface-sunken);
+  color: var(--color-ink);
+}
+.app-tab-active {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+}
+
+.digest-date {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-ink-faint);
+}
+
+/* ingestion batch: a collapsible card grouping one alert/digest email's
+   postings. The <summary> is the clickable header; postings reveal on open. */
+.digest-batch-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.digest-batch {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.digest-batch-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  transition: background .14s ease;
+}
+.digest-batch-summary::-webkit-details-marker { display: none; }
+.digest-batch-summary::after {
+  content: "›";
+  margin-left: auto;
+  font-size: var(--text-md);
+  line-height: 1;
+  color: var(--color-ink-faint);
+  transform: rotate(90deg);
+  transition: transform .14s ease;
+}
+.digest-batch[open] .digest-batch-summary::after { transform: rotate(-90deg); }
+.digest-batch-summary:hover { background: var(--color-surface-sunken); }
+
+/* source pill in the batch header (mirrors the row origin tag) */
+.digest-batch-summary .job-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunken, var(--color-accent-soft));
+  color: var(--color-ink-soft);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.digest-batch-count {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.digest-batch-time {
+  font-size: var(--text-xs);
+  color: var(--color-ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* postings revealed inside an open batch */
+.digest-batch .digest-items {
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+/* empty feed/list states — quiet sunken well, not an error */
+.digest-empty,
+.job-list-empty,
+.tracker-empty,
+.contacts-empty {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-5);
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-lg);
+  color: var(--color-ink-faint);
+  font-size: var(--text-base);
+  text-align: center;
+}
+.job-list-empty p { margin: 0; }
+.job-list-empty-action {
+  display: inline-flex;
+  margin-top: var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.digest-items,
+.job-list-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.digest-item { margin: 0; }
+
+.job-list-item {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.digest-link,
+.job-list-link {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  color: var(--color-ink);
+  transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease;
+}
+.digest-link:hover,
+.job-list-link:hover {
+  transform: translateY(-1px);
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-md);
+  color: var(--color-ink);
+}
+.digest-link:active,
+.job-list-link:active { transform: translateY(0); }
+
+/* row text */
+.job-list-link .job-title,
+.digest-link .job-title {
+  grid-column: 1;
+  font-size: var(--text-md);
+  font-weight: 600;
+  line-height: 1.3;
+}
+.job-list-link .job-company,
+.digest-link .job-company {
+  grid-column: 1;
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+}
+
+/* origin tag (where the posting was ingested from) */
+.job-list-link .job-source,
+.digest-link .job-source {
+  grid-column: 1;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunken, var(--color-accent-soft));
+  color: var(--color-ink-soft);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* source brand logo / emoji — sits inline before the source label */
+.job-source-logo {
+  width: 1em;
+  height: 1em;
+  display: block;
+  flex: none;
+}
+.job-source-emoji {
+  font-size: 1em;
+  line-height: 1;
+  flex: none;
+}
+
+/* score + status pills, stacked top-right of the card */
+.job-list-link .job-pills,
+.digest-link .job-pills {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+}
+
+/* match-score pill (list context) */
+.job-list-link .job-score,
+.digest-link .job-score {
+  padding: 5px 11px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* lifecycle status pill (Active / Backlog / Removed) — sits under the score */
+.job-status {
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.job-status--active {
+  background: var(--color-success-soft);
+  color: var(--color-success-ink);
+}
+.job-status--backlog {
+  background: var(--color-warning-soft);
+  color: var(--color-warning-ink);
+}
+.job-status--removed {
+  background: var(--color-danger-soft);
+  color: var(--color-danger-ink);
+}
+
+/* color-coded score bands (apply in both list and detail contexts) */
+.job-score--high {
+  background: var(--color-success-soft);
+  color: var(--color-success-ink);
+}
+.job-score--mid {
+  background: var(--color-warning-soft);
+  color: var(--color-warning-ink);
+}
+.job-score--low {
+  background: var(--color-danger-soft);
+  color: var(--color-danger-ink);
+}
+.job-score--pending {
+  background: var(--color-surface-sunken, var(--color-bg));
+  color: var(--color-ink-soft);
+}
+
+.job-list-score-action {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.job-list-score-button {
+  appearance: none;
+  min-width: 88px;
+  padding: 9px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
+.job-list-score-button:disabled {
+  cursor: default;
+  opacity: .65;
+}
+
+.job-list-score-error {
+  margin: 0;
+  max-width: 220px;
+  font-size: var(--text-xs);
+  color: var(--color-danger-ink);
+  text-align: right;
+}
+
+/* intake (backlog / remove / restore) controls — per-row, bulk, and detail */
+
+/* per-row manage bar: the select checkbox grouped with the lifecycle actions */
+.job-list-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  padding: 0 var(--space-2);
+}
+
+.job-select-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-ink-soft);
+  cursor: pointer;
+  user-select: none;
+}
+
+.job-select {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  flex: none;
+  accent-color: var(--color-accent);
+}
+
+.job-lifecycle-actions {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-2);
+}
+.job-lifecycle-actions > div {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.job-lifecycle-backlog,
+.job-lifecycle-remove,
+.job-lifecycle-restore,
+.job-bulk-backlog,
+.job-bulk-remove,
+.job-bulk-restore {
+  appearance: none;
+  padding: 7px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+.job-lifecycle-remove,
+.job-bulk-remove {
+  color: var(--color-danger-ink);
+  border-color: var(--color-danger-soft);
+}
+.job-lifecycle-backlog:disabled,
+.job-lifecycle-remove:disabled,
+.job-lifecycle-restore:disabled,
+.job-bulk-backlog:disabled,
+.job-bulk-remove:disabled,
+.job-bulk-restore:disabled {
+  cursor: default;
+  opacity: .55;
+}
+
+.job-bulk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.job-bulk-actions > div {
+  display: flex;
+  gap: var(--space-2);
+}
+.job-bulk-count {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-ink-soft);
+}
+
+/* job-detail intake block */
+.job-lifecycle {
+  margin-top: var(--space-4);
+}
+.job-lifecycle-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+/* --------------------------------------------------------------------------
+   5. Job detail
+   Sections separated by space + hairlines — not nested cards.
+   -------------------------------------------------------------------------- */
+.job-detail-body { display: flex; flex-direction: column; }
+
+.job-detail .job-company {
+  margin: -8px 0 var(--space-4);
+  font-size: var(--text-base);
+  color: var(--color-ink-soft);
+}
+
+.job-detail .job-source,
+.job-detail .job-compensation {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+}
+.job-detail .job-source {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.job-detail .job-compensation { font-weight: 600; }
+
+.job-detail .job-score {
+  display: inline-flex;
+  align-self: flex-start;
+  margin: 0 0 var(--space-5);
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.job-summary {
+  margin: 0 0 var(--space-6);
+  color: var(--color-ink-soft);
+}
+
+.job-relevant,
+.job-missing,
+.job-red-flags,
+.job-route,
+.draft-resume-emphasis,
+.draft-cover-letter,
+.draft-answers,
+.draft-autofill {
+  padding: var(--space-5) 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.job-relevant ul,
+.job-missing ul,
+.job-red-flags ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.job-relevant li,
+.job-missing li,
+.job-red-flags li {
+  position: relative;
+  padding-left: var(--space-5);
+  font-size: var(--text-base);
+  color: var(--color-ink-soft);
+}
+.job-relevant li::before,
+.job-missing li::before,
+.job-red-flags li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 0.62em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.job-relevant li::before { background: var(--color-accent); }
+.job-missing li::before  { background: var(--color-ink-faint); }
+.job-red-flags li::before { background: var(--color-danger); }
+
+.job-alignment,
+.job-strategy,
+.job-cover-letter {
+  margin: 0;
+  padding: var(--space-5) 0;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-ink-soft);
+}
+
+/* How to apply */
+.job-route-type {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-md);
+  font-weight: 500;
+  color: var(--color-ink);
+  text-transform: capitalize;
+}
+
+/* In-flow action links rendered as outline buttons */
+.job-route-link,
+.job-contacts-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: var(--space-2);
+  padding: 11px 18px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-accent);
+  font-size: var(--text-base);
+  font-weight: 600;
+  transition: background .14s ease, color .14s ease;
+}
+.job-route-link:hover,
+.job-contacts-link:hover {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-ink);
+}
+.job-contacts-link {
+  margin-top: var(--space-6);
+  border-top: none;
+}
+
+/* --------------------------------------------------------------------------
+   6. Back links (all screens)
+   -------------------------------------------------------------------------- */
+.job-detail-back,
+.draft-back,
+.manual-entry-back,
+.contacts-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: var(--space-5);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-ink-soft);
+}
+.job-detail-back:hover,
+.draft-back:hover,
+.manual-entry-back:hover,
+.contacts-back:hover { color: var(--color-accent); }
+
+/* --------------------------------------------------------------------------
+   7. Draft review
+   -------------------------------------------------------------------------- */
+.draft-body { display: flex; flex-direction: column; }
+
+.draft-status,
+.draft-pipeline-status {
+  margin: -8px 0 var(--space-5);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-ink-faint);
+  text-transform: capitalize;
+}
+
+.draft-resume-emphasis p,
+.draft-cover-letter p {
+  margin: 0;
+  color: var(--color-ink-soft);
+  white-space: pre-line;
+}
+
+/* structured answers (job answers + autofill fields) */
+.draft-answers ul,
+.draft-autofill-answers,
+.draft-worker-logs,
+.draft-worker-screenshots {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.draft-answer {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.draft-answer-field {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-ink-faint);
+}
+.draft-answer-value {
+  font-size: var(--text-base);
+  color: var(--color-ink);
+}
+
+/* autofill preview — one sunken panel (not nested cards) */
+.draft-autofill { }
+.draft-autofill-ats {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+}
+.draft-autofill-url {
+  display: inline-block;
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-sm);
+  word-break: break-all;
+}
+.draft-autofill-pending {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-ink-faint);
+}
+.draft-autofill-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.draft-autofill-form h2 { margin-top: var(--space-2); }
+.draft-autofill-answer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.draft-autofill-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.draft-autofill-value {
+  width: 100%;
+  min-height: 72px;
+  padding: 10px 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: var(--text-base);
+  line-height: 1.45;
+  resize: vertical;
+  overflow-wrap: break-word;
+}
+.draft-autofill-value:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: var(--focus-ring);
+}
+.draft-autofill-warnings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.draft-autofill-warning {
+  margin: 0;
+  padding: 9px 12px;
+  background: var(--color-danger-soft);
+  border-radius: var(--radius-md);
+  color: var(--color-danger-ink);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.draft-worker-report {
+  padding: var(--space-5);
+  background: var(--color-danger-soft);
+  border-radius: var(--radius-lg);
+}
+.draft-worker-reason,
+.draft-worker-logs li,
+.draft-worker-screenshots li {
+  margin: 0;
+  color: var(--color-danger-ink);
+  font-size: var(--text-sm);
+}
+.draft-worker-logs,
+.draft-worker-screenshots { margin-top: var(--space-3); }
+
+/* approve & submit block */
+.draft-submit {
+  margin-top: var(--space-6);
+  padding: var(--space-5);
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-lg);
+}
+.draft-submit-note {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+}
+
+/* apply control on the job-detail screen */
+.job-apply {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+.job-apply-note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+}
+
+.job-pipeline-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+  padding: var(--space-5);
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-lg);
+}
+.job-pipeline-status h2 {
+  flex-basis: 100%;
+}
+
+.pipeline-select-label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 150px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--color-ink-faint);
+  text-transform: uppercase;
+}
+.pipeline-status-select,
+.pipeline-stage-select {
+  min-width: 150px;
+  padding: 9px 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  text-transform: none;
+}
+.pipeline-status-select:focus,
+.pipeline-stage-select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: var(--focus-ring);
+}
+.application-status-saving,
+.job-pipeline-saving {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-ink-faint);
+}
+
+/* Applications header — title left, stats cluster top-right */
+.applications-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-4);
+}
+.applications-header h1 { margin: 0; }
+.applications-stats {
+  display: flex;
+  gap: var(--space-3);
+  flex: none;
+}
+.applications-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 6px 12px;
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-md);
+}
+.applications-stat-value {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+.applications-stat-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-ink-faint);
+}
+
+/* Application tracker — group tabs (All / Not applied / Applied / …).
+   Horizontally scrollable so five tabs stay reachable on a phone. */
+.tracker-tabs {
+  display: flex;
+  gap: 2px;
+  margin: 0 0 var(--space-4);
+  padding: 3px;
+  overflow-x: auto;
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-md);
+  scrollbar-width: none;
+}
+.tracker-tabs::-webkit-scrollbar { display: none; }
+.tracker-tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 7px 13px;
+  border-radius: calc(var(--radius-md) - 3px);
+  color: var(--color-ink-soft);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background .14s ease, color .14s ease;
+}
+.tracker-tab:hover { color: var(--color-ink); }
+.tracker-tab.view-selector-option-active {
+  background: var(--color-surface);
+  color: var(--color-accent-strong);
+  box-shadow: var(--shadow-sm);
+}
+.tracker-tab:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.tracker-tab-count {
+  color: var(--color-ink-faint);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+.tracker-tab.view-selector-option-active .tracker-tab-count {
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+}
+
+/* Tracker secondary controls — lifecycle bin and row order */
+.tracker-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-4);
+}
+.tracker-control {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-ink-faint);
+}
+.tracker-bin-select,
+.tracker-sort-select,
+.tracker-status-select {
+  min-height: 44px;
+  padding: 9px 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.tracker-bin-select:focus,
+.tracker-sort-select:focus,
+.tracker-status-select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: var(--focus-ring);
+}
+.tracker-status-select:disabled { opacity: .6; cursor: wait; }
+
+/* Jobs feed — lifecycle bin tabs (Active / Backlog / Removed) */
+.job-bin-tabs {
+  display: inline-flex;
+  gap: 2px;
+  margin: 0 0 var(--space-4);
+  padding: 3px;
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-md);
+}
+.job-bin-tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 6px 14px;
+  border-radius: calc(var(--radius-md) - 3px);
+  color: var(--color-ink-soft);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .14s ease, color .14s ease;
+}
+.job-bin-tab:hover { color: var(--color-ink); }
+.job-bin-tab.view-selector-option-active {
+  background: var(--color-surface);
+  color: var(--color-accent-strong);
+  box-shadow: var(--shadow-sm);
+}
+.job-bin-tab:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Jobs feed — collapsible filter + sort panel */
+.job-filters-panel {
+  margin: 0 0 var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.job-filters-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 10px var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-ink);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.job-filters-summary::-webkit-details-marker { display: none; }
+.job-filters-summary::after {
+  content: "▾";
+  margin-left: auto;
+  color: var(--color-ink-soft);
+  transition: transform .14s ease;
+}
+.job-filters-panel[open] .job-filters-summary::after { transform: rotate(180deg); }
+.job-filters-summary:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-md);
+}
+.job-filters-summary-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.job-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  padding: 0 var(--space-4) var(--space-4);
+}
+.job-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-ink-soft);
+}
+.job-filter select,
+.job-filter input {
+  appearance: none;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-ink);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 7px 10px;
+  min-width: 0;
+  width: 100%;
+}
+.job-filter select:focus-visible,
+.job-filter input:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: var(--focus-ring);
+}
+
+.job-filters-reset {
+  appearance: none;
+  display: block;
+  margin: 0 var(--space-4) var(--space-4);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-ink-soft);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background .14s ease, border-color .14s ease;
+}
+.job-filters-reset:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  background: var(--color-surface-sunken);
+}
+.job-filters-reset:disabled {
+  opacity: .5;
+  cursor: default;
+}
+.job-filters-reset:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* The Jobs screen keeps import visible even when the current filters have no
+   results, complementing the shared-header entry point. */
+.job-list-import {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: calc(-1 * var(--space-2)) 0 var(--space-5);
+  padding: 9px 14px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.job-list-import:hover { background: var(--color-accent); color: #fff; }
+
+/* Jobs feed — Prev/Next pagination */
+.job-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  margin: var(--space-5) 0 0;
+}
+.job-page-prev,
+.job-page-next,
+.tracker-page-prev,
+.tracker-page-next {
+  appearance: none;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: 7px 16px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background .14s ease, border-color .14s ease;
+}
+.job-page-prev:hover:not(:disabled),
+.job-page-next:hover:not(:disabled),
+.tracker-page-prev:hover:not(:disabled),
+.tracker-page-next:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  background: var(--color-surface-sunken);
+}
+.job-page-prev:disabled,
+.job-page-next:disabled,
+.tracker-page-prev:disabled,
+.tracker-page-next:disabled {
+  opacity: .5;
+  cursor: default;
+}
+.job-page-prev:focus-visible,
+.job-page-next:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.job-page-indicator {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-ink-soft);
+}
+
+/* Application tracker rows.
+   Mobile-first: each job is a card whose cells carry their own labels. The
+   desktop container query below turns the same markup back into a real table. */
+.tracker-wrap { width: 100%; }
+.tracker-table {
+  display: block;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+/* Each cell labels itself on mobile, so the header row is visually redundant
+   while staying available to assistive tech. */
+.tracker-table thead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.tracker-table tbody,
+.tracker-row,
+.tracker-cell { display: block; }
+.tracker-row {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+/* The left edge carries the tracker group, so applied and closed rows separate
+   at a glance without spending a column on it. */
+.tracker-row--applied { border-left-color: var(--color-accent); }
+.tracker-row--in_progress { border-left-color: var(--color-warning); }
+.tracker-row--closed { border-left-color: var(--color-ink-faint); }
+.tracker-cell {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 3px 0;
+}
+.tracker-cell::before {
+  content: attr(data-label);
+  flex: none;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-ink-faint);
+}
+/* The title leads the card, so it spans the width without a label. */
+.tracker-cell-job {
+  display: block;
+  padding: 0 0 var(--space-2);
+}
+.tracker-cell-job::before { content: none; }
+.tracker-job-link {
+  font-size: var(--text-md);
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--color-ink);
+}
+.tracker-job-link:hover { color: var(--color-accent-strong); }
+.tracker-cell-company { color: var(--color-ink-soft); }
+.tracker-cell-date {
+  color: var(--color-ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.tracker-cell-status { align-items: center; padding-top: var(--space-2); }
+.tracker-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+.tracker-stage {
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--color-success-soft);
+  color: var(--color-ink-soft);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.tracker-saving {
+  font-size: var(--text-xs);
+  color: var(--color-ink-faint);
+}
+.tracker-status-error {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-soft);
+  color: var(--color-danger-ink);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+/* --------------------------------------------------------------------------
+   8. Forms — profile & manual entry
+   -------------------------------------------------------------------------- */
+.profile-body { display: flex; flex-direction: column; gap: var(--space-7); }
+
+.profile-form,
+.manual-entry-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.profile-field,
+.manual-entry-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.profile-field-label,
+.manual-entry-label > span {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-ink-soft);
+}
+
+/* inputs */
+.profile-input,
+.profile-full-name,
+.profile-headline,
+.profile-summary,
+.profile-location,
+.profile-linkedin,
+.profile-github,
+.profile-portfolio,
+.manual-entry-url,
+.manual-entry-application-url,
+.manual-entry-title,
+.manual-entry-company,
+.manual-entry-text,
+.contact-outreach-template,
+.contact-outreach-message {
+  width: 100%;
+  padding: 11px 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: var(--text-base);
+  line-height: 1.45;
+  transition: border-color .14s ease, box-shadow .14s ease, background .14s ease;
+}
+.manual-entry-text,
+.contact-outreach-template,
+.contact-outreach-message {
+  min-height: 104px;
+  resize: vertical;
+}
+
+/* Pasted job postings and generated outreach drafts are free text that can
+   contain a long unbroken token (e.g. a URL with no spaces). The base
+   p/li/h1/h2/span overflow-wrap reset (see above) does not reach <textarea>
+   elements, and a textarea's default wrapping does not guarantee breaking an
+   unbroken token, so set it explicitly here to keep these fields usable at
+   mobile widths. */
+.manual-entry-text,
+.contact-outreach-template,
+.contact-outreach-message {
+  overflow-wrap: break-word;
+}
+
+input::placeholder,
+textarea::placeholder { color: var(--color-ink-faint); }
+
+.profile-input:focus,
+.profile-full-name:focus,
+.profile-headline:focus,
+.profile-summary:focus,
+.profile-location:focus,
+.profile-linkedin:focus,
+.profile-github:focus,
+.profile-portfolio:focus,
+.manual-entry-url:focus,
+.manual-entry-application-url:focus,
+.manual-entry-title:focus,
+.manual-entry-company:focus,
+.manual-entry-text:focus,
+.contact-outreach-template:focus,
+.login-passphrase:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: var(--focus-ring);
+  background: var(--color-surface);
+}
+
+input:disabled,
+textarea:disabled { opacity: .6; cursor: not-allowed; }
+
+/* read-the-posting control under the job URL field */
+.manual-entry-lookup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  /* pulled up under the URL field so it reads as that field's control */
+  margin: calc(var(--space-2) - var(--space-4)) 0 0;
+}
+.manual-entry-lookup-note,
+.manual-entry-lookup-warning {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+}
+.manual-entry-lookup-warning { color: var(--color-danger-ink); }
+
+.manual-entry-note,
+.contacts-note,
+.push-toggle-note,
+.profile-contact-note {
+  margin: -8px 0 var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+}
+.contacts-note,
+.push-toggle-note { margin-top: 0; }
+
+/* profile contact presence + resume meta */
+.profile-contact,
+.profile-resume,
+.push-toggle {
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-border);
+}
+.profile-contact ul,
+.profile-resume-meta {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.profile-contact-row,
+.profile-resume-meta li {
+  font-size: var(--text-base);
+  color: var(--color-ink-soft);
+}
+.profile-resume-empty {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-ink-faint);
+}
+
+/* resume parse status — a quiet pill, same idiom as the match-score pill */
+.profile-resume-status-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.profile-resume-status {
+  display: inline-flex;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: capitalize;
+}
+.profile-resume-status-parsed {
+  background: var(--color-success-soft);
+  color: var(--color-success-ink);
+}
+.profile-resume-status-pending {
+  background: var(--color-surface-sunken);
+  color: var(--color-ink-faint);
+}
+
+/* manual-entry success result */
+.manual-entry-result {
+  margin-top: var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-success-soft);
+  border: 1px solid #cfe0d3;
+  border-radius: var(--radius-md);
+}
+.manual-entry-result-msg {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-base);
+  color: var(--color-success-ink);
+}
+.manual-entry-result-link {
+  font-weight: 600;
+  color: var(--color-success-ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   9. Contacts & outreach
+   -------------------------------------------------------------------------- */
+.contacts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.contact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.contact-name {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+.contact-role {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+}
+.contact-relevance {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+}
+.contact-linkedin {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.contact-outreach {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+.contact-outreach-draft {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.contact-outreach-manual {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-ink-faint);
+}
+.contact-outreach-message { background: var(--color-surface-sunken); }
+
+/* --------------------------------------------------------------------------
+   10. Buttons
+   -------------------------------------------------------------------------- */
+.login-submit,
+.manual-entry-submit,
+.draft-submit-button,
+.draft-preview-save,
+.job-apply-button,
+.job-cover-letter-generate,
+.profile-save,
+.contact-outreach-generate,
+.intake-toggle,
+.push-toggle-enable {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  padding: 12px 22px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: #fff;
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .14s ease, box-shadow .14s ease, transform .1s ease;
+}
+.login-submit:hover,
+.manual-entry-submit:hover,
+.draft-submit-button:hover,
+.draft-preview-save:hover,
+.job-apply-button:hover,
+.job-cover-letter-generate:hover,
+.profile-save:hover,
+.contact-outreach-generate:hover,
+.intake-toggle:hover,
+.push-toggle-enable:hover { background: var(--color-accent-strong); }
+
+.login-submit:active,
+.manual-entry-submit:active,
+.draft-submit-button:active,
+.draft-preview-save:active,
+.job-apply-button:active,
+.job-cover-letter-generate:active,
+.profile-save:active,
+.contact-outreach-generate:active,
+.intake-toggle:active,
+.push-toggle-enable:active { transform: translateY(1px); }
+
+/* secondary / outline */
+.push-toggle-disable,
+.contact-outreach-copy,
+.manual-entry-lookup-button,
+.push-toggle-busy {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  padding: 11px 20px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .14s ease, border-color .14s ease;
+}
+.push-toggle-disable:hover,
+.contact-outreach-copy:hover,
+.manual-entry-lookup-button:hover {
+  background: var(--color-surface-sunken);
+  border-color: var(--color-ink-faint);
+}
+.manual-entry-lookup-button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+/* loading / disabled buttons */
+.login-submit:disabled,
+.manual-entry-submit:disabled,
+.draft-submit-button:disabled,
+.draft-preview-save:disabled,
+.job-apply-button:disabled,
+.job-cover-letter-generate:disabled,
+.profile-save:disabled,
+.contact-outreach-generate:disabled,
+.intake-toggle:disabled,
+.push-toggle-busy {
+  opacity: .55;
+  cursor: progress;
+  background: var(--color-accent);
+}
+.push-toggle-busy { background: var(--color-surface); opacity: .7; cursor: progress; }
+
+/* submitted / done state holds steady */
+.draft-submit-button:disabled { cursor: default; }
+
+/* form-level buttons go full width on the narrowest screens */
+.login-submit,
+.manual-entry-submit,
+.profile-save { align-self: stretch; }
+
+/* --------------------------------------------------------------------------
+   11. Status messages — loading / error / success
+   -------------------------------------------------------------------------- */
+.loading {
+  margin: var(--space-7) 0;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--color-ink-faint);
+  animation: waunder-pulse 1.3s ease-in-out infinite;
+}
+@keyframes waunder-pulse { 0%,100% { opacity: .5; } 50% { opacity: 1; } }
+
+.load-error {
+  margin: var(--space-6) 0;
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-danger-soft);
+  border: 1px solid #e8c9bf;
+  border-radius: var(--radius-md);
+  color: var(--color-danger-ink);
+}
+.load-error p { margin: 0 0 var(--space-2); }
+.load-error p:last-child { margin: 0; }
+.sign-in-link { font-weight: 600; color: var(--color-danger-ink); text-decoration: underline; }
+
+.login-status,
+.profile-save-error,
+.manual-entry-error,
+.draft-submit-error,
+.draft-preview-error,
+.job-apply-error,
+.job-cover-letter-error,
+.application-status-error,
+.job-pipeline-error,
+.job-lifecycle-error,
+.contact-outreach-error,
+.intake-error,
+.push-toggle-error {
+  margin: var(--space-3) 0 0;
+  padding: 10px 14px;
+  background: var(--color-danger-soft);
+  border-radius: var(--radius-md);
+  color: var(--color-danger-ink);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.profile-save-ok,
+.draft-submit-result,
+.draft-preview-ok {
+  margin: var(--space-3) 0 0;
+  padding: 10px 14px;
+  background: var(--color-success-soft);
+  border-radius: var(--radius-md);
+  color: var(--color-success-ink);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.intake-message {
+  margin: 0;
+  color: var(--color-success-ink);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.push-toggle-unsupported {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-ink-faint);
+}
+
+/* push "on" state — quiet status pill beside the disable button, same idiom
+   as the resume parse-status pill, so "subscribed" is legible without color
+   coding the whole control. */
+.push-toggle-control {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.push-toggle-status {
+  display: inline-flex;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.push-toggle-status-on {
+  background: var(--color-success-soft);
+  color: var(--color-success-ink);
+}
+
+/* --------------------------------------------------------------------------
+   12. Home shell + install/notification guide
+   The Home root ("/") is a thin skeleton wrapper that renders InstallGuide
+   directly (not a routed screen like .digest/.job-list), so it gets its own
+   small section rather than joining the screen-shell selector group.
+   -------------------------------------------------------------------------- */
+.app-shell > h1 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.app-shell > p {
+  margin: 0 0 var(--space-6);
+  color: var(--color-ink-soft);
+}
+
+.install-guide {
+  margin-top: var(--space-5);
+  padding: var(--space-5);
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-lg);
+  color: var(--color-ink-soft);
+}
+.install-guide p { margin: 0; }
+.install-guide ol {
+  margin: var(--space-3) 0 0;
+  padding-left: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.install-guide ol li { color: var(--color-ink-soft); }
+
+.enable-notifications {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 22px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: #fff;
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .14s ease, transform .1s ease;
+}
+.enable-notifications:hover { background: var(--color-accent-strong); }
+.enable-notifications:active { transform: translateY(1px); }
+
+.install-status {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-ink-faint);
+}
+
+/* --------------------------------------------------------------------------
+   13. Login
+   -------------------------------------------------------------------------- */
+.login-screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+  max-width: 380px;
+  margin: 0 auto;
+  padding: var(--space-8) var(--page-pad);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-5);
+}
+.login-screen h1 {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+.login-form { display: flex; flex-direction: column; gap: var(--space-3); }
+.login-passphrase {
+  width: 100%;
+  padding: 13px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  font-family: inherit;
+  font-size: var(--text-md);
+  color: var(--color-ink);
+  text-align: center;
+}
+.login-status { text-align: center; }
+
+/* The shared sage-soft :focus-visible ring is too low-contrast against the
+   sage-filled primary button itself (.login-submit) to read as a focus
+   indicator. Layer a light inset ring under the sage outer ring so keyboard
+   focus stays visible on this screen's only interactive button. */
+.login-submit:focus-visible {
+  box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-accent-strong);
+}
+
+/* --------------------------------------------------------------------------
+   14. Responsive — desktop refinements (mobile-first base above)
+   -------------------------------------------------------------------------- */
+/* Layout is based on usable window width, independent of OS or PWA install.
+   The explicit preference overrides Auto, with shared variables keeping both
+   paths identical. Even Desktop can shrink safely into a narrow window. */
+:root {
+  --nav-position: fixed;
+  --nav-width: min(100%, 560px);
+  --nav-margin: 0;
+  --nav-justify: space-around;
+  --nav-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --screen-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  --nav-transform: translateX(-50%);
+}
+
+:root[data-layout="desktop"] {
+  --page-max: 1280px;
+  --page-pad: 32px;
+  --nav-position: static;
+  --nav-width: auto;
+  --nav-margin: 16px 0 0;
+  --nav-justify: flex-start;
+  --nav-safe-bottom: 0px;
+  --screen-bottom: 48px;
+  --nav-transform: none;
+}
+
+@media (min-width: 960px) {
+  :root:not([data-layout="mobile"]) {
+    --page-max: 1280px;
+    --page-pad: 32px;
+    --nav-position: static;
+    --nav-width: auto;
+    --nav-margin: 16px 0 0;
+    --nav-justify: flex-start;
+    --nav-safe-bottom: 0px;
+    --screen-bottom: 48px;
+    --nav-transform: none;
+  }
+}
+
+:is(.digest, .job-list, .applications, .job-detail, .draft-review, .profile, .manual-entry, .contacts-view) {
+  padding-top: max(var(--page-pad), env(safe-area-inset-top, 0px));
+  padding-bottom: var(--screen-bottom);
+  padding-left: max(var(--page-pad), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--page-pad), env(safe-area-inset-right, 0px));
+}
+
+.app-chrome { margin-bottom: 28px; }
+html { scroll-padding-bottom: var(--screen-bottom); }
+.app-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.app-brand { margin-right: auto; font-size: 21px; font-weight: 700; color: var(--color-ink); }
+.app-add-job { font-size: var(--text-sm); font-weight: 600; padding: 12px 0; }
+.layout-control { display: flex; align-items: center; gap: 6px; font-size: var(--text-sm); color: var(--color-ink-soft); }
+.layout-select {
+  min-height: 44px;
+  max-width: 110px;
+  padding: 8px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 16px;
+}
+.layout-error { font-size: var(--text-sm); color: var(--color-danger); }
+/* Pending-update banner. The service worker is cache-first, so a downloaded
+   build only runs after an explicit reload — this makes that visible. */
+.app-update {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.app-update-reload {
+  appearance: none;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-accent-strong);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.app-update-reload:hover { background: var(--color-surface-sunken); }
+.app-update-reload:focus-visible { outline: 2px solid var(--color-accent-strong); outline-offset: 3px; }
+.app-chrome .app-tabs {
+  position: var(--nav-position);
+  left: 50%;
+  bottom: 0;
+  transform: var(--nav-transform);
+  z-index: 20;
+  width: var(--nav-width);
+  margin: var(--nav-margin);
+  justify-content: var(--nav-justify);
+  gap: 2px;
+  padding: 8px 4px calc(8px + var(--nav-safe-bottom));
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+.app-chrome .app-tab { min-height: 44px; display: flex; align-items: center; padding: 8px 10px; }
+.layout-select:focus-visible, .app-add-job:focus-visible, .app-tab:focus-visible {
+  outline: 2px solid var(--color-accent-strong);
+  outline-offset: 3px;
+}
+
+/* iOS must not zoom when focusing a form control. */
+@media (pointer: coarse) {
+  input, textarea, select { font-size: max(16px, 1em); }
+}
+
+/* Workspaces respond to the selected page width, so forced Mobile on a large
+   monitor stays a single column and forced Desktop on a phone never overflows. */
+:is(.digest, .job-list, .applications, .job-detail, .draft-review, .profile, .manual-entry, .contacts-view) {
+  container-type: inline-size;
+}
+.job-feed-workspace { display: grid; gap: 24px; }
+.job-workspace { display: flex; flex-direction: column; gap: 24px; }
+.job-feed-controls, .job-list-results, .job-assessment, .job-workspace-actions { min-width: 0; }
+.job-workspace-actions { display: contents; }
+.manual-application { order: 0; padding: 20px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
+.job-assessment { order: 1; }
+.job-workspace .job-pipeline-status { order: 2; }
+.job-optional-actions { order: 3; }
+.job-workspace .job-lifecycle { order: 4; }
+.manual-application .job-route { padding-top: 0; border-top: 0; padding-bottom: 0; }
+.manual-application .job-route-link { display: flex; background: var(--color-accent); color: #fff; }
+.manual-application .job-route-link:hover { background: var(--color-accent-strong); }
+.manual-application-note, .draft-manual-intro { color: var(--color-ink-soft); font-size: var(--text-sm); }
+.job-mark-applied, .copy-button {
+  min-height: 44px; padding: 10px 14px; border: 1px solid var(--color-accent); border-radius: var(--radius-md);
+  background: var(--color-surface); color: var(--color-accent-strong); font: inherit; font-weight: 600; cursor: pointer;
+}
+.job-mark-applied { width: 100%; }
+.job-mark-applied:hover, .copy-button:hover { background: var(--color-accent-soft); }
+.job-mark-applied:disabled, .copy-button:disabled { opacity: .6; cursor: wait; }
+.job-mark-applied:focus-visible, .copy-button:focus-visible, .job-route-link:focus-visible {
+  outline: 2px solid var(--color-accent-strong); outline-offset: 3px;
+}
+.job-workspace-actions .job-pipeline-status { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.job-pipeline-status > :is(h2, p) { grid-column: 1 / -1; }
+.job-workspace-actions .pipeline-select-label { min-width: 0; margin: 0; }
+.job-workspace-actions select { width: 100%; min-width: 0; }
+.job-tracker-current { color: var(--color-success-ink); margin: 0; font-weight: 600; }
+.manual-tracker-current { color: var(--color-success-ink); font-weight: 600; }
+.manual-status-error { color: var(--color-danger); font-size: var(--text-sm); }
+.job-optional-actions, .draft-automation { padding: 16px 0; border-top: 1px solid var(--color-border); }
+.job-optional-actions > summary, .draft-automation > summary { cursor: pointer; min-height: 44px; padding: 10px 0; font-weight: 600; }
+.job-optional-actions .job-apply { margin: 0; padding: 12px 0; border: 0; }
+.job-optional-actions .job-contacts-link { margin-top: 0; padding: 10px 0; font-size: var(--text-sm); }
+.job-assessment { padding-top: 20px; }
+.job-alignment p, .job-strategy p, .job-cover-letter p { margin: 0; }
+.draft-cover-letter p, .job-cover-letter-body, .draft-answer-value { white-space: pre-wrap; }
+.job-cover-letter { display: flex; flex-direction: column; gap: 12px; }
+.job-cover-letter-empty { color: var(--color-ink-soft); }
+.job-cover-letter-draft { color: var(--color-ink-soft); }
+.job-cover-letter-error { margin: 0; color: var(--color-danger); font-size: var(--text-sm); }
+.copy-control { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
+.copy-status { font-size: var(--text-sm); color: var(--color-ink-soft); }
+.draft-materials > * { min-width: 0; }
+.draft-manual-intro { margin-bottom: 24px; }
+.tracker-wrap { max-width: 100%; }
+.job-list-link, .digest-link { min-width: 0; grid-template-columns: minmax(0, 1fr) auto; }
+
+@container (min-width: 800px) {
+  .job-feed-workspace { grid-template-columns: 260px minmax(0, 1fr); align-items: start; gap: 32px; }
+  .job-feed-controls { position: sticky; top: 24px; }
+  .job-feed-controls .job-filters { grid-template-columns: minmax(0, 1fr); }
+  .job-list-items { gap: 20px; }
+  .job-list-link { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) auto; padding: 18px 20px; }
+  .job-list-link .job-title { grid-column: 1; grid-row: 1 / span 2; }
+  .job-list-link .job-company { grid-column: 2; grid-row: 1; }
+  .job-list-link .job-source { grid-column: 2; grid-row: 2; }
+  .job-list-link .job-pills { grid-column: 3; grid-row: 1 / span 2; }
+  .job-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 48px; align-items: start; }
+  .job-assessment { grid-column: 1; grid-row: 1; padding-top: 0; }
+  .job-workspace-actions { display: block; grid-column: 2; grid-row: 1; position: sticky; top: 24px; max-height: calc(100dvh - 48px); overflow-y: auto; padding: 20px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
+  .manual-application { padding: 0; border: 0; background: transparent; }
+  .digest-items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* Wide enough for real columns: the same markup becomes a table again. */
+  .tracker-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-sm);
+  }
+  .tracker-table { display: table; }
+  .tracker-table thead {
+    position: static;
+    display: table-header-group;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip-path: none;
+  }
+  .tracker-table tbody { display: table-row-group; }
+  .tracker-table th {
+    text-align: left;
+    padding: 10px var(--space-4);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-ink-faint);
+    background: var(--color-surface-sunken);
+    border-bottom: 1px solid var(--color-border);
+    white-space: nowrap;
+  }
+  .tracker-col-date { width: 1%; }
+  .tracker-row {
+    display: table-row;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .tracker-row:hover .tracker-cell { background: var(--color-surface-sunken); }
+  .tracker-cell {
+    display: table-cell;
+    padding: 11px var(--space-4);
+    border-bottom: 1px solid var(--color-border);
+    vertical-align: middle;
+  }
+  .tracker-row:last-child .tracker-cell { border-bottom: none; }
+  .tracker-cell::before { content: none; }
+  /* A table row cannot carry the group's left border with collapsed borders,
+     so the leading cell paints it instead. */
+  .tracker-cell-job {
+    box-shadow: inset 3px 0 0 var(--color-border-strong);
+    padding-left: calc(var(--space-4) + 3px);
+  }
+  .tracker-row--applied .tracker-cell-job { box-shadow: inset 3px 0 0 var(--color-accent); }
+  .tracker-row--in_progress .tracker-cell-job { box-shadow: inset 3px 0 0 var(--color-warning); }
+  .tracker-row--closed .tracker-cell-job { box-shadow: inset 3px 0 0 var(--color-ink-faint); }
+  .tracker-job-link { font-size: var(--text-sm); font-weight: 600; }
+  .tracker-cell-status { padding-top: 11px; }
+  .tracker-status { justify-content: flex-start; }
+  .tracker-cell-date { white-space: nowrap; }
+  .draft-materials { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 40px; align-items: start; }
+  .draft-resume-emphasis { grid-column: 1 / -1; }
+  .profile-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+  .profile-field:has(.profile-summary), .profile-form > :is(button, p) { grid-column: 1 / -1; }
+  .profile-save { justify-self: start; }
+  .contacts-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .manual-entry-form { max-width: 800px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

@@ -1147,3 +1147,18 @@ printing `config.server.proxy`. TS is strict + `noUncheckedIndexedAccess`, so ar
 indexing yields `T | undefined` — ported Go code cannot assume a zero value. ESLint is
 deliberately syntactic (`tseslint.configs.recommended`, not type-checked) since `npm run
 typecheck` owns type errors.
+
+### 2026-09-10 — Verbatim app.css copy needs a Prettier ignore, and Vite's public/ drops the /web prefix
+FE-02 copied `web/web/{app.css,fonts/,icons/,icon.svg}` into `client/public/`. Vite serves
+`public/` at the **site root**, so every go-app `/web/<path>` URL becomes `/<path>` (the mapping
+table is in `docs/GO_MIGRATION.md`) — the later `SourceIconPath` port must emit `/icons/x.svg`, and
+a stale `/web/` prefix 404s silently, dropping only the logo from the origin pill. `app.css` is
+linked from `index.html`, NOT imported from `src/`, so it keeps the constant `/app.css` URL instead
+of a hashed asset name (`FE-26`'s precache list must name it explicitly — it is not in the module
+graph). Gotcha: `npm run format` (`prettier --write .`) reformats the 2,284-line stylesheet and
+silently destroys the byte-for-byte parity the screenshot gate depends on, so `public/app.css` is
+listed in `client/.prettierignore`. Verify the copy with `diff -u web/web/app.css
+client/public/app.css` — it should show exactly four changed lines (the `@font-face` `src` plus
+three go-app wiring comments) — and confirm the URLs resolve in both `vite` and `vite preview` with
+`curl -o /dev/null -w '%{http_code} %{content_type} %{size_download}'`, comparing sizes against the
+originals.

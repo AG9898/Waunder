@@ -1942,7 +1942,7 @@
       "id": "FE-02",
       "title": "Copy app.css, fonts, and brand icons into client/public verbatim",
       "description": "Move the visual system across unchanged. Copy web/web/app.css, web/web/fonts/hanken-grotesk.woff2, web/web/icons/*.svg, and web/web/icon.svg into client/public/. The only permitted edits to app.css are the asset path prefix (/web/... becomes /...) in the @font-face src and the header comments that describe go-app wiring. Do not restyle, reorder, reformat, or rename anything: the parity gate depends on this stylesheet and its class names being unchanged.",
-      "status": "todo",
+      "status": "done",
       "priority": "critical",
       "group_id": "FE",
       "depends_on": [

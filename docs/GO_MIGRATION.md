@@ -256,8 +256,37 @@ the task that owns it.
 | Session cookie | `waunder_session`, httponly ⇒ unreadable from JS. Auth state derives from a 401 on any request, exactly as `IsUnauthorized` does today | Login loop, or a UI that thinks it is signed in |
 | Manifest identity | `name`/`short_name` `Waunder`, `start_url` `/`, `scope` `/`, `display` `standalone`, `theme_color` and `background_color` `#2d2c2c`, same icon, served at `/manifest.webmanifest`, and **no `id`** (go-app emits none, so identity falls back to `start_url`) | iOS 16.4+ keys a home-screen web app on name + manifest `id`, so the owner's existing icon stops matching and a re-add creates a duplicate |
 | Web Push payload | `{title, body, data: {url, count}}` — see below | Notification click goes nowhere |
-| Asset paths | 5 references: `app.css:26` `@font-face`, `main.go:96-101` styles/icon, `client.go:635-639` source logos | Missing font, missing brand logos |
+| Asset paths | 5 references: `app.css:26` `@font-face`, `main.go:96-101` styles/icon, `client.go:635-639` source logos — all re-pointed from `/web/<path>` to `/<path>`, see below | Missing font, missing brand logos |
 | Proxy paths | `/api/*` and `/webhooks/resend/inbound` → `API_INTERNAL_URL` | Inbound email ingestion stops |
+
+### Static asset paths: `/web/<path>` becomes `/<path>`
+
+go-app's `app.Handler` serves the whole `web/web/` directory tree under a `/web/` URL prefix, so
+every static asset reference in the Go app is prefixed. Vite serves `public/` at the **site root**
+instead, so `FE-02` drops the prefix and nothing else: the files themselves are byte-identical
+copies.
+
+| Asset | go-app URL | New URL | File | Referenced from |
+|---|---|---|---|---|
+| Stylesheet | `/web/app.css` | `/app.css` | `client/public/app.css` | `client/index.html` `<link rel="stylesheet">` (was `main.go` `Styles`) |
+| Font | `/web/fonts/hanken-grotesk.woff2` | `/fonts/hanken-grotesk.woff2` | `client/public/fonts/` | `app.css` `@font-face` `src`, plus an `index.html` preload |
+| App icon | `/web/icon.svg` | `/icon.svg` | `client/public/icon.svg` | `index.html` favicon + apple-touch-icon, and the manifest (`FE-26`) |
+| Source logos | `/web/icons/{linkedin,glassdoor,indeed}.svg` | `/icons/{linkedin,glassdoor,indeed}.svg` | `client/public/icons/` | `SourceIconPath` (`client.go:635-639`) → `src/lib/labels.ts` |
+
+Two consequences for later tasks:
+
+- The component that ports `SourceIconPath` must return the **unprefixed** `/icons/<name>.svg`.
+  A stale `/web/` prefix 404s silently and the origin pill simply loses its logo — the label still
+  renders, so it is easy to miss.
+- `app.css` is linked from `index.html` rather than imported from `src/`, so it stays out of Vite's
+  asset hashing and keeps the same always-`/app.css` URL go-app served. `FE-26`'s precache list must
+  therefore include it explicitly; it is not in the JS module graph.
+
+The permitted `app.css` edits are exactly this path change plus the header comments that described
+go-app wiring — four lines, verifiable with
+`diff -u web/web/app.css client/public/app.css`. `client/.prettierignore` excludes
+`public/app.css` so `npm run format` cannot reformat the verbatim copy out from under the parity
+gate.
 
 ### A free simplification
 
