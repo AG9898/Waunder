@@ -139,6 +139,8 @@ A standalone npm project (no monorepo workspace), exactly like `workers/`. Node 
 - `index.html` is the Vite entry; `src/main.tsx` mounts the React root.
 - `vite.config.ts` holds the dev server, proxy, and Vitest config in one file.
 - `vitest.setup.ts` registers the jest-dom matchers.
+- `src/api/` is the Rails boundary and nothing else: `schemas.ts` (zod schemas + inferred types for
+  every payload and response envelope), then the transport, endpoint functions, and query keys.
 - Tests are colocated with their subject as `*.test.ts` / `*.test.tsx` under `src/`.
 
 ### Scripts
@@ -165,6 +167,18 @@ A standalone npm project (no monorepo workspace), exactly like `workers/`. Node 
 - Rails stays the source of truth for validation, normalization, scoring, route resolution, and
   submit safety. The client does trim-only hints, exactly as the Go client did — porting is not an
   occasion to move logic forward.
+- **Every response parses through a schema in `src/api/schemas.ts`.** Never hand-write an interface
+  for a Rails payload and never cast a response — the schema is the single declaration, and its
+  `z.infer` type is what the rest of the app imports. New wire fields are added there first.
+- Schemas reproduce Go's decode semantics on purpose: a missing key and an explicit `null` both
+  resolve to the zero value (Rails' serializers legitimately vary per endpoint), a Go pointer field
+  resolves to `null` and **never** to the zero value, unknown keys are stripped rather than
+  rejected, and a wrong *type* fails parsing rather than defaulting. Use the `go*` helpers at the
+  top of that file instead of writing raw `z.string()` for a response field.
+- Request schemas mirror the Go struct's own optionality instead. A `,omitempty` field stays
+  `.optional()` and must be **omitted**, never sent as `""` — for `ApplicationStatusUpdate` an
+  empty string erases a note or follow-up date Rails is holding, and for a feed filter an empty or
+  `"All"` sentinel is matched literally by Rails and returns nothing.
 
 ---
 

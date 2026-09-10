@@ -256,7 +256,19 @@ Be honest about the current state — most of the suite is still to be written.
 - **client/** — `src/toolchain.test.tsx`: the `FE-01` scaffold smoke test. Renders a React element
   through Testing Library into jsdom and asserts it with a jest-dom matcher, so a green run proves
   Vite + React + TypeScript, the jsdom environment, `vitest.setup.ts`, and the matcher type
-  augmentation are all wired. Screen tests arrive with the ported components (`FE-03` onward).
+  augmentation are all wired. Screen tests arrive with the ported components (`FE-08` onward).
+
+- **client/** — `src/api/schemas.test.ts` (`FE-03`): the API boundary contract. Fixtures are copied
+  from what the Rails serializers actually emit, **including the keys they leave out** — the
+  digest's six-key row, the job feed's abbreviated tracker, an `unavailable` posting lookup that
+  carries only `status` and `error`, an application whose draft has not generated yet. Three
+  properties are pinned deliberately: a missing key and an explicit `null` resolve identically (Go
+  decode parity); `match_score: null` stays `null` and never becomes `0`; and a wrong *type*
+  (`match_score: "82"`, `job_posts: {}`, `triage_reasons: [1]`, a fractional id) fails parsing
+  instead of silently defaulting. Unknown keys are asserted to be *stripped*, not rejected, because
+  Rails already sends fields the client never declared. An `expectTypeOf` block pins the same
+  nullability at the type level, so `npm run typecheck` catches a widened or collapsed field even
+  when no runtime assertion covers it.
 
 ### Planned (from the plan's Testing Plan)
 
@@ -349,6 +361,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `api/spec/requests/api/ingestion_batches_spec.rb` | API (Rails) | `GET /api/ingestion_batches` ingestion history grouped into source+arrival-time batches newest-first (no scoring/LLM on read), empty case, and 401 auth gating |
 | `api/spec/services/ingestion_batch_builder_spec.rb` | API (Rails) | `IngestionBatchBuilder` clustering: same-source within-gap grouping, gap-break into new batches, cross-source separation, window cutoff, empty case, and synthetic batch id |
 | `client/src/toolchain.test.tsx` | client (Vitest) | scaffold smoke test: React render into jsdom via Testing Library with a jest-dom matcher, proving the Vite/TS/Vitest/setup wiring |
+| `client/src/api/schemas.test.ts` | client (Vitest) | zod API boundary schemas: Go decode parity (missing key == `null` == zero value, unknown keys stripped), `match_score: null` kept distinct from `0`, partial serializer payloads (digest six-key row, feed's abbreviated tracker, undrafted application, `unavailable`/`unsupported` lookup), wrong-type rejection, `,omitempty` request fields staying absent, `JobFeedParams` rejecting an empty/`"All"` sentinel, and `expectTypeOf` type-level nullability parity |
 | `api/spec/requests/api/push_subscriptions_spec.rb` | API (Rails) | `GET /api/push/vapid_public_key` public VAPID key read; `POST`/`DELETE /api/push_subscription` authenticated subscribe/unsubscribe, idempotent endpoint update, and 401 auth gating |
 | `api/spec/requests/api/worker_tasks_spec.rb` | API (Rails) | `GET /api/worker_tasks` worker-shaped task pull with bearer-only auth; `POST /api/worker_tasks/:id/report` status updates, audit screenshots/log refs, and human-session rejection |
 | `api/spec/requests/api/profile_spec.rb` | API (Rails) | `POST /api/profile/resume` JSON Resume → Profile + primary ResumeDocument mapping, PDF Active Storage attachment, encrypted-at-rest contact/raw_text check, idempotent re-sync, 401 unauth, 422 invalid/malformed; `GET`/`PATCH /api/profile` structured read/update with PII presence-flags only |

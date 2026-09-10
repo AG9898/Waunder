@@ -1162,3 +1162,16 @@ client/public/app.css` — it should show exactly four changed lines (the `@font
 three go-app wiring comments) — and confirm the URLs resolve in both `vite` and `vite preview` with
 `curl -o /dev/null -w '%{http_code} %{content_type} %{size_download}'`, comparing sizes against the
 originals.
+
+### 2026-09-10 — Zod 4 object-key optionality: `.nullish().transform()` is the only form that works
+FE-03's `client/src/api/schemas.ts` reproduces Go's `json.Unmarshal` semantics (missing key ==
+`null` == zero value; `*int`/`*T` stay `null`; wrong type fails) with helpers built on
+`z.string().nullish().transform((v) => v ?? "")`. Zod 4 decides whether an object key may be
+**absent** from `_zod.optin`, which propagates through `ZodPipe` — so `.nullish().transform()`
+(and `.nullable().default(null).transform()`) accept a missing key, but the otherwise-equivalent
+`z.union([z.string(), z.null(), z.undefined()]).transform(...)` does **not**: it fails a missing
+key with "expected nonoptional, received undefined". Probe any new combinator against `{}` before
+trusting it. Zod objects strip unknown keys by default, which is the behavior we want (Rails sends
+`profile.work_history` and `contact_candidates[].created_at`, which no Go struct declared) — never
+add `.strict()` to a response schema. `expectTypeOf` from Vitest is checked by plain
+`tsc --noEmit`, so type-level assertions live in the normal test file and need no `vitest typecheck`.

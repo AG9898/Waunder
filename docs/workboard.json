@@ -1977,7 +1977,7 @@
       "id": "FE-03",
       "title": "Port API payload types as zod schemas",
       "description": "Translate every payload type in web/components/client.go into zod schemas in client/src/api/schemas.ts with inferred TypeScript types exported. Match Go's optionality exactly: pointer and omitempty fields become optional or nullable, a null match_score stays distinguishable from zero. Schemas only, no fetch code. Runtime validation at the boundary is deliberate: Go's json.Unmarshal silently zero-values a shape mismatch, which is how the empty Applications table bug hid.",
-      "status": "todo",
+      "status": "done",
       "priority": "critical",
       "group_id": "FE",
       "depends_on": [

@@ -136,6 +136,44 @@ introduced. `changeOrigin` is explicitly `false`: Rails must receive the browser
 default (unlike the Go server's `httputil` rewrite). The dev server listens on 8000, matching the
 Go server's default.
 
+#### API boundary schemas (`FE-03`)
+
+`client/src/api/schemas.ts` holds a zod schema and an inferred type for every payload in
+`web/components/client.go`, plus the anonymous envelope structs its methods declare inline
+(`{job_post: …}`, `{application: …}`, `{lookup: …}`, …). It is the only new runtime dependency so
+far: `zod` 4.
+
+Runtime validation at the boundary is a deliberate upgrade, not a port. `json.Unmarshal`
+zero-values a shape mismatch in silence, so a renamed or retyped field arrives at a screen as
+`""`/`0`/`nil` and every symptom shows up somewhere else — that is the failure mode behind the
+empty Applications table. These schemas reproduce Go's decode semantics for *absence* while
+rejecting a wrong *type*:
+
+| Wire value | Go | Schema |
+|---|---|---|
+| Key missing, or explicit `null`, on a value field | zero value | same — `""`, `0`, `false`, `[]` |
+| Key missing, or `null`, on a pointer field (`*int`, `*ApplicationTracker`) | `nil` | `null`, never the zero value |
+| Wrong type (`match_score: "82"`, `job_posts: {}`, `triage_reasons: [1]`) | zero-valued or a decode error, depending on the field | **always** a parse failure |
+| Unknown key | ignored | stripped, not rejected |
+
+The absence tolerance is load-bearing, not defensive padding: Rails' serializers genuinely differ
+per endpoint. `Api::DigestController` emits 6 of `JobSummary`'s 13 keys; the job-feed's
+`serialize_application` omits five keys the applications controller sends; an `unavailable`
+posting lookup splats an empty field hash and carries only `status` and `error`. Unknown keys must
+be stripped for the same reason — `profile` already ships `work_history`/`education`/`skills`,
+which the Go struct never declared.
+
+Keeping `match_score: null` distinct from `0` is the one that matters visually: `MatchScoreLabel`
+renders the first as "Scoring…" and the second as "0%", so collapsing them tells the owner a
+posting scored zero when it was never scored. A `expectTypeOf` block in `schemas.test.ts` pins
+that at the type level too, so a later edit cannot quietly widen it.
+
+Request-side schemas mirror the Go struct's own optionality instead: `ApplicationStatusUpdate`'s
+`,omitempty` note and follow-up date stay `.optional()` because sending `""` would *erase* values
+Rails is holding. `JobFeedParams` goes further and types its filters as literal unions — an unset
+filter must be omitted, and `""` or an `"All"` sentinel is now a type error rather than the
+silently empty feed the go-app `<select>` produced.
+
 ### Server: Caddy, and Go is removed entirely
 
 The Go server does four things: serve static files, SPA fallback, proxy `/api/*` to Rails, proxy
