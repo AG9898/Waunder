@@ -356,6 +356,53 @@ A not-found screen is new: go-app's handler 404'd an unrouted path server-side a
 navigation to one rendered nothing. Caddy will answer every path with the app shell (`FE-27`), so
 without a catch-all route a typo or a stale bookmark would render a blank page.
 
+#### App chrome and the layout preference (`FE-08`)
+
+`client/src/components/app-chrome.tsx` is the toolbar, the navigation, and the layout selector;
+`client/src/lib/layout.ts` is the preference itself (read, write, normalize, apply). The markup and
+every class are unchanged from `chrome.go`, and the selector still does exactly one thing: write
+`data-layout` on the document root.
+
+Four things this port settles:
+
+- **The stored value is JSON-quoted, and that is the contract.** go-app's `BrowserStorage`
+  JSON-encodes everything it writes (`storage.go`: `jsStorage.Set` → `json.Marshal`), so a Go
+  `string` lands in `localStorage` **with quotes** — the owner's devices hold `"desktop"`, not
+  `desktop`. `writeLayout` therefore writes `JSON.stringify` and produces byte-identical values,
+  and `readLayout` accepts the quoted form as well as a bare one. This matters in both directions
+  while the chain is in flight: the Go build is still production and reads the same key on the same
+  devices until `FE-30`, so an unquoted write would reset the preference on the next Go load, and a
+  read that did not unquote would reset it on the first React load. `waunder.jobFilters` (`FE-16`)
+  is unaffected — it stored a struct, and `json.Marshal` of a struct already matches
+  `JSON.stringify` of an object.
+- **The chrome renders inside each screen's page container, not above the routes.** `renderAppTabs()`
+  emitted it as the first child of `.digest` / `.job-list` / …, and that nesting is load-bearing:
+  the screen roots carry `container-type: inline-size`, which makes them the containing block for
+  the `position: fixed` bottom bar, and they own the `padding-bottom: var(--screen-bottom)` that
+  reserves room for the bar plus the iPhone safe area. Hoisting `AppChrome` into a route layout
+  element would position the bar against the viewport and leave the last row of every feed
+  underneath it. `FE-15` … `FE-26` each render `<AppChrome />` as the first child of their screen
+  root; the login and not-found screens render none, as today.
+- **The active tab is derived from the route instead of passed in.** `chrome.go` took an `Active`
+  field and eight call sites passed a literal — `"jobs"` from four different screens. The port maps
+  the first path segment to the section, which is exactly what those literals encoded, so a ported
+  screen cannot light up the wrong tab.
+- **Auto stays a CSS breakpoint with no JavaScript.** `app.css` declares the desktop overrides
+  twice, for `:root[data-layout="desktop"]` and for `:root:not([data-layout="mobile"])` inside
+  `@media (min-width: 960px)`, and the two blocks must stay identical or Auto and Desktop drift
+  apart on a resize. `app-chrome.test.tsx` parses both out of the stylesheet and compares them, and
+  asserts the component queries no `matchMedia` and registers no resize listener.
+
+Storage failure is a first-class case, not a guard: `localStorage` can be absent, can throw on
+*access* in a browser configured to block site data, and can throw on write in private mode.
+Reads degrade to Auto and the chrome still renders; a failed write is returned to the caller, which
+applies the choice for the session anyway and surfaces `chrome.go`'s exact `.layout-error` copy so
+the owner knows it will not survive a reload.
+
+`chrome.go`'s `OnAppUpdate` / `goappTryUpdate` update banner is **not** ported here — `FE-10`
+replaces it with Workbox's `needRefresh` signal in `update-banner.tsx`. The `.app-update` CSS is
+already in place.
+
 ### Server: Caddy, and Go is removed entirely
 
 The Go server does four things: serve static files, SPA fallback, proxy `/api/*` to Rails, proxy
@@ -472,7 +519,7 @@ the task that owns it.
 
 | Contract | Exact value | Symptom if changed |
 |---|---|---|
-| Layout preference storage | key `waunder.layout`; same values (Auto/Desktop/Mobile) | Owner's layout choice silently resets |
+| Layout preference storage | key `waunder.layout`; same values (Auto/Desktop/Mobile), stored **JSON-quoted** (`"desktop"`) because go-app's storage `json.Marshal`s what it writes | Owner's layout choice silently resets |
 | Jobs feed filter storage | key `waunder.jobFilters`; same JSON shape | Owner's saved filters silently reset |
 | Session cookie | `waunder_session`, httponly ⇒ unreadable from JS. Auth state derives from a 401 on any request, exactly as `IsUnauthorized` does today | Login loop, or a UI that thinks it is signed in |
 | Manifest identity | `name`/`short_name` `Waunder`, `start_url` `/`, `scope` `/`, `display` `standalone`, `theme_color` and `background_color` `#2d2c2c`, same icon, served at `/manifest.webmanifest`, and **no `id`** (go-app emits none, so identity falls back to `start_url`) | iOS 16.4+ keys a home-screen web app on name + manifest `id`, so the owner's existing icon stops matching and a re-add creates a duplicate |
@@ -653,6 +700,10 @@ production runs Go would be false. `FE-30` owns all of it:
 - `app.css` is copied **verbatim** in `FE-02`. Do not restyle, tidy, or reformat it, and do not
   change a class name in any component — the parity gate depends on both being unchanged. Styling
   changes belong to `UI-01` and later.
+- Every ported screen renders `<AppChrome />` (`FE-08`) as the **first child of its own page
+  container**, the way `renderAppTabs()` did — not in a route layout above the screens, or the fixed
+  bottom bar loses its containing block and the reserved safe-area space. Login and not-found render
+  no chrome.
 - Rails is the source of truth for all validation, normalization, scoring, route resolution, and
   submit safety. The frontend does trim-only client hints, exactly as the Go client did. Porting is
   not an occasion to move logic forward.

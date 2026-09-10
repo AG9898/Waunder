@@ -2135,7 +2135,7 @@
       "id": "FE-08",
       "title": "Port AppChrome: bottom navigation and layout preference",
       "description": "Port web/components/chrome.go: the bottom navigation with active state, and the Auto/Desktop/Mobile layout selector. The preference persists to localStorage under the key waunder.layout with the same stored values as today, and is applied as data-layout on the document root so CSS resolves Auto at 960px with no JS listener. Reserve bottom-navigation and safe-area space in mobile layouts.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FE",
       "depends_on": [

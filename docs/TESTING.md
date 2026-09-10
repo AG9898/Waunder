@@ -354,6 +354,27 @@ Be honest about the current state — most of the suite is still to be written.
   Route *order* is deliberately not asserted — React Router ranks a static segment above a dynamic
   one, verified by reversing the array, so the outcome is asserted instead of the mechanism.
 
+- **client/** — `src/components/app-chrome.test.tsx` (`FE-08`): the shared chrome, in three layers.
+  Markup and navigation are transcribed from `TestChromeNavigationAndLayout` and
+  `TestNormalizeLayout` in `web/components/chrome_test.go`, with the active-tab table covering all
+  nine paths plus an unknown one — the mapping the Go build spread across eight literal
+  `renderAppTabs("…")` call sites, so `/jobs/new`, `/jobs/:id`, and `/jobs/:id/contacts` are each
+  asserted to light up Jobs.
+
+  The layout preference is pinned to the **exact stored bytes**: a seeded `"desktop"` (JSON-quoted,
+  as go-app's `json.Marshal` left it) loads and selects Desktop, and choosing Mobile writes
+  `"mobile"` back. Unavailable storage is covered from both ends — `readLayout`/`writeLayout`
+  against `null` and against stubs that throw, plus a render with `Storage.prototype` throwing on
+  both `getItem` and `setItem`, which must still render the chrome, still apply the choice, and
+  surface the `.layout-error` copy.
+
+  Two assertions cover what the DOM cannot show. `public/app.css` is parsed to prove Auto's
+  `@media (min-width: 960px)` block declares *identical* variables to explicit
+  `:root[data-layout="desktop"]` and that the bar and screen containers reserve
+  `env(safe-area-inset-bottom)` — both drift invisibly in jsdom. And a stubbed `matchMedia` plus an
+  `addEventListener` spy prove Auto is resolved by CSS with no viewport listener; jsdom implements
+  no `matchMedia` at all, so the stub is what makes that an observation rather than a crash.
+
 ### Planned (from the plan's Testing Plan)
 
 **Intake management (INTAKE / RESOLVED-20):**
@@ -450,6 +471,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `client/src/api/endpoints.test.ts` | client (Vitest) | endpoint/query-key/QueryClient contract over MSW: method, path, and request body of all 25 ported `RailsClient` endpoints (bodyless `POST` for score/submit, `{}` for cover-letter generate, form-encoded login, answers-only draft update, member-vs-bulk lifecycle split), an exported-set coverage check against the Go interface, non-integer id refusal, `jobFeedQuery` parity fixtures produced by running Go's `Encode()` (omitted unset filters, untrimmed values, `+`/`!*'()` escaping, sorted keys, `page` only above 1), query-key prefix hierarchy and feed-page key identity, the retry matrix (transport/5xx retried; 401/403/422 and `ResponseFormatError` not) with mutations never retried, and a round trip of every endpoint through the shared handlers |
 | `client/src/lib/labels.test.ts` | client (Vitest) | display-helper parity: the Go case tables for `matchScoreLabel` (unscored statuses vs a real `0%`), `matchScoreBand` (75/50 thresholds, `null` ⇒ pending, exhaustive 0–100 sweep), `sourceLabel`, `sourceIconPath`, and `sourceEmoji` (logo-or-emoji, never both), a derived `lifecycleLabel` table, brand-logo paths resolved against `client/public/icons/` on disk to catch the `/web/` prefix drop, and `trackerGroup` checked against `APPLICATION_GROUPS` parsed out of the Rails controller source |
 | `client/src/routes.test.tsx` | client (Vitest) | route table over `createMemoryRouter` driving the app's own exported `routes`: the exact ten paths, each path rendering its screen asserted on the `app.css` page-container class transcribed from the Go screens, `/jobs/new` winning over `/jobs/:id`, the former `\d+` regexp ids arriving as route params, and an unknown path rendering the not-found screen with a link home |
+| `client/src/components/app-chrome.test.tsx` | client (Vitest) | shared chrome parity: the Go navigation/`normalizeLayout` tables, the active tab derived from all nine paths (plus `/login` and an unknown path marking none), `waunder.layout` read and written as go-app's JSON-quoted value, unquoted/garbage/non-string stored values degrading to Auto, absent and throwing storage on both read and write (chrome still renders, choice still applied, `.layout-error` shown), `data-layout` on the document root, `public/app.css` parsed to prove Auto's 960px block matches explicit Desktop exactly and that the bottom bar and screen containers reserve the iPhone safe area, and no `matchMedia`/resize listener |
 | `client/src/test/handlers.ts` | client (Vitest, harness) | shared fake Rails: `apiHandlers()` covers every endpoint (echoing the requested page, the URL id, and the posted intake value) and `fixtures` exports schema-typed canned payloads, including an unscored row whose `match_score` stays `null` |
 | `api/spec/requests/api/push_subscriptions_spec.rb` | API (Rails) | `GET /api/push/vapid_public_key` public VAPID key read; `POST`/`DELETE /api/push_subscription` authenticated subscribe/unsubscribe, idempotent endpoint update, and 401 auth gating |
 | `api/spec/requests/api/worker_tasks_spec.rb` | API (Rails) | `GET /api/worker_tasks` worker-shaped task pull with bearer-only auth; `POST /api/worker_tasks/:id/report` status updates, audit screenshots/log refs, and human-session rejection |
@@ -534,6 +556,7 @@ Keep this table up to date — add a row when adding a new test file.
    - Rails: `spec/<type>/<area>/<name>_spec.rb` (e.g. `spec/requests/api/jobs_spec.rb`).
    - Web: `<name>_test.go`, colocated with the package under test.
    - Workers: `src/<name>.test.ts`, colocated with the module under test.
+   - Client: `src/<name>.test.ts` / `.test.tsx`, colocated with the module or component under test.
 2. Place it in the correct directory for its stack.
 3. Add a row to the Test File Inventory table above.
 4. Run that stack's suite before committing to confirm no regressions.

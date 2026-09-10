@@ -1241,3 +1241,19 @@ render of their own — which keeps `npm run lint` at zero warnings without a di
 each swap one line in `routes.tsx` and change nothing in `routes.test.tsx`, and a ported screen that
 drops its root class fails the route test rather than the FE-28 screenshot gate. Also note `\d+` → `:id`
 widens matching — `/jobs/abc` now reaches job detail and gets its not-found state from Rails' 404.
+
+### 2026-09-10 — go-app stored localStorage values JSON-encoded, so a Go string is quoted on disk
+FE-08 ported the chrome + layout preference (`client/src/components/app-chrome.tsx`,
+`client/src/lib/layout.ts`). go-app's `BrowserStorage` `json.Marshal`s everything it writes
+(`pkg/app/storage.go` `jsStorage.Set`), so the owner's browsers hold `waunder.layout` as `"desktop"`
+**with quotes** — the port must write `JSON.stringify` and accept the quoted form on read, or the
+preference silently resets (and it resets in both directions, because the Go build is still
+production on the same devices until FE-30). `waunder.jobFilters` (FE-16) is unaffected: it stored a
+struct, and Go's marshalled object already matches `JSON.stringify`. Two more facts: the chrome must
+render as the **first child of each screen's page container** (as `renderAppTabs()` did) because the
+containers' `container-type: inline-size` is what makes them the containing block for the
+`position: fixed` bottom bar and they own the `padding-bottom: var(--screen-bottom)` safe-area
+reservation — a route-layout wrapper would break both; and **jsdom implements no `window.matchMedia`
+at all** (`vi.spyOn(window, "matchMedia")` fails with "can only spy on a function"), so assert
+"Auto is CSS-only, no JS breakpoint" by installing a `vi.stubGlobal("matchMedia", vi.fn())` and
+checking it was never called, with `vi.unstubAllGlobals()` in `afterEach`.
