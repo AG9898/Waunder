@@ -327,7 +327,7 @@ describe("endpoint functions", () => {
     }
   });
 
-  it("exports exactly one function per RailsClient method", () => {
+  it("exports exactly one function per RailsClient method, plus sign-out", () => {
     // Keys are the Go interface's 25 methods; values are the ported names.
     const ported: Record<string, string> = {
       Login: "login",
@@ -358,13 +358,17 @@ describe("endpoint functions", () => {
     };
     // The two query-string helpers are not endpoints; every other export must be one.
     const helpers = ["jobFeedQuery", "jobsPath"];
+    // Endpoints with no Go counterpart. `DELETE /api/session` is served by Rails but the Go
+    // build never called it: sign-out arrives with the login port (`FE-09`), which owns its
+    // method/path assertion in `src/lib/auth.test.tsx`.
+    const added = ["logout"];
 
     const exported = Object.entries(endpoints)
       .filter(([, value]) => typeof value === "function")
       .map(([name]) => name);
 
     expect(Object.keys(ported)).toHaveLength(25);
-    expect(exported.sort()).toEqual([...Object.values(ported), ...helpers].sort());
+    expect(exported.sort()).toEqual([...Object.values(ported), ...helpers, ...added].sort());
     // Every case above names a real Go method, so the table cannot drift from the interface.
     for (const testCase of cases) {
       expect(Object.keys(ported)).toContain(testCase.name.split(" ")[0]);

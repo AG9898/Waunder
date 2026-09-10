@@ -1257,3 +1257,22 @@ reservation — a route-layout wrapper would break both; and **jsdom implements 
 at all** (`vi.spyOn(window, "matchMedia")` fails with "can only spy on a function"), so assert
 "Auto is CSS-only, no JS breakpoint" by installing a `vi.stubGlobal("matchMedia", vi.fn())` and
 checking it was never called, with `vi.unstubAllGlobals()` in `afterEach`.
+
+### 2026-09-10 — The 401 boundary hangs off the router object; TanStack caches the passphrase
+FE-09 ported the login screen (`client/src/components/login.tsx`) plus the auth boundary
+(`client/src/lib/auth.ts`). Two React-specific traps. (1) **Login must not use `useMutation`**:
+TanStack keeps a mutation's last `variables` in its cache (and exposes them to devtools), so the
+owner's passphrase would sit in memory for the life of the tab — the screen instead reads an
+*uncontrolled* input once on submit, resets the form, and keeps only `submitting`/`status` in state
+(the same two fields `login.go` had). (2) `installUnauthorizedRedirect(queryClient, router)`
+subscribes to `getQueryCache()` + `getMutationCache()` and calls `router.navigate("/login", {replace:
+true})` — it takes the **router object** from `createBrowserRouter`, not `useNavigate`, so it needs no
+layout route, no tree re-render, and the test drives a `createMemoryRouter` over the app's own
+`routes` array through the same function `main.tsx` calls. Read only the terminal `updated`/`error`
+cache action (a retried read also dispatches `failed` per attempt). Testing notes: a hook using
+router hooks cannot be rendered beside `<RouterProvider>` (`useNavigate` throws "may be used only in
+the context of a <Router>") — swap one element into a copy of the real route table instead; and wrap
+a `client.fetchQuery` that triggers the redirect in `act()` or React warns about the out-of-band
+state update. Also: `DELETE /api/session` was never called by any Go screen, so sign-out is new
+(`useSignOut`, rendered by FE-25) — and because `destroy` is session-guarded, a 401 from it means
+"already signed out" and must be treated as success, not as an error.

@@ -403,6 +403,63 @@ the owner knows it will not survive a reload.
 replaces it with Workbox's `needRefresh` signal in `update-banner.tsx`. The `.app-update` CSS is
 already in place.
 
+#### Login and the 401 auth boundary (`FE-09`)
+
+`client/src/components/login.tsx` is the passphrase screen — markup, classes, copy, and all three
+status strings unchanged from `login.go` — and `client/src/lib/auth.ts` is the boundary that
+decides when the owner is sent to it.
+
+**Signed-in state is not something this client can read.** The session is a signed, httponly
+cookie, so it can only be *derived from responses*: a 401 from any request means the session is
+gone. The Go build spread that check across twenty-odd call sites — every `IsUnauthorized(err)`
+branch set `sessionExpiredMessage` and `renderLoadError` drew a panel with a `/login` link — which
+means a screen could simply forget it, and the panel left the owner to notice and click.
+`installUnauthorizedRedirect(queryClient, router)` replaces all of it with one subscription over
+the query cache and the mutation cache: any read or write whose terminal `error` action carries a
+401 navigates to `/login` with `replace: true`, since the screen behind it cannot be rendered
+without a session. `main.tsx` installs it once, for the life of the app.
+
+It hangs off the **router object** rather than a layout component on purpose. A layout route
+rendering `<Outlet />` would need the route tree restructured and would re-render every screen on
+each navigation, while driving the same two subscriptions; navigating through the router object is
+the framework's own escape hatch for code outside the tree, and it lets `auth.test.tsx` drive a
+`createMemoryRouter` over the app's own `routes` array through the *same* function `main.tsx`
+calls. Only the terminal `error` action is read: a retried read also dispatches `failed` per
+attempt, but the `FE-05` retry policy refuses to retry any 4xx, so a 401 arrives at `error`
+immediately. A 403 deliberately does not redirect — `isUnauthorized` is 401-only, because that is
+an authorization decision about an *authenticated* owner and hiding it behind a login screen would
+be a lie.
+
+**The passphrase is never held anywhere this app owns.** `login.go` kept it in a controlled field
+and cleared it after each attempt; the port never puts it in React state at all. The input is
+uncontrolled, so the value lives only in the DOM node the browser already owns, is read once into
+a local on submit, and the form is reset on both outcomes. This is also why login does **not** go
+through `useMutation`: TanStack keeps a mutation's last `variables` in its cache (and hands them
+to devtools), which would park the owner's passphrase there for the life of the tab. Login has no
+cached read to invalidate either, so the local `submitting` / `status` pair is the whole state —
+the same two fields the Go component had. A 401 from `POST /api/session` is *not* the session
+boundary: it means the passphrase was wrong, so it stays on the screen as `Incorrect passphrase.`
+rather than reaching the redirect above (which only ever sees TanStack-managed traffic).
+
+**Sign-out is new.** `DELETE /api/session` has always existed in Rails
+(`resource :session, only: %i[create destroy]`), but no Go screen ever called it, so the only way
+out of a session was to wait out the 90-day cookie. `logout()` joins `endpoints.ts` as the one
+function with no `RailsClient` counterpart, and `useSignOut()` wraps it: on success it returns to
+`/login` and *then* clears the query cache — clearing first would notify the observers still
+mounted on the screen being left and fire a round of refetches against a session that no longer
+exists. A 401 from the sign-out itself counts as success, because `destroy` is session-guarded and
+an already-expired cookie answers 401 while leaving the owner just as signed out.
+
+Two consequences for later tasks:
+
+- **`FE-25` renders the control.** `useSignOut()` ships here with no UI, because the profile screen
+  is where it belongs and `app.css` has no rule for it yet — the same way `FE-06`'s helpers landed
+  before the screens that call them. The new button is therefore a **deliberate** difference from
+  the Go build at `/profile` for the `FE-28` parity gate, not a defect.
+- **`auth.ts` is a `.ts`, and the boundary is not a component.** The task sketched
+  `src/lib/auth.tsx`; there is no JSX in it, since the boundary is a subscription and sign-out is a
+  hook.
+
 ### Server: Caddy, and Go is removed entirely
 
 The Go server does four things: serve static files, SPA fallback, proxy `/api/*` to Rails, proxy
@@ -498,7 +555,7 @@ No Go toolchain, no `go.mod`, no `Makefile`, no `app.wasm`.
 | `web/components/profile.go` | 266 | `src/components/profile/` |
 | `web/components/install_guide.go` + `pwa.go` | 281 | `src/components/install-guide.tsx` + `src/lib/platform.ts` |
 | `web/components/chrome.go` | 134 | `src/components/app-chrome.tsx` |
-| `web/components/login.go` | 113 | `src/components/login.tsx` |
+| `web/components/login.go` | 113 | `src/components/login.tsx` + `src/lib/auth.ts` (the 401 boundary the Go screens each checked by hand, plus the sign-out Go never had) |
 | `web/components/copy_button.go` | 50 | `src/components/copy-button.tsx` |
 | `web/web/app.css` | 64 KB | `web/public/app.css` — **copied verbatim** |
 | `web/web/fonts/`, `web/web/icons/`, `web/web/icon.svg` | — | `web/public/` — copied verbatim |
@@ -521,7 +578,7 @@ the task that owns it.
 |---|---|---|
 | Layout preference storage | key `waunder.layout`; same values (Auto/Desktop/Mobile), stored **JSON-quoted** (`"desktop"`) because go-app's storage `json.Marshal`s what it writes | Owner's layout choice silently resets |
 | Jobs feed filter storage | key `waunder.jobFilters`; same JSON shape | Owner's saved filters silently reset |
-| Session cookie | `waunder_session`, httponly ⇒ unreadable from JS. Auth state derives from a 401 on any request, exactly as `IsUnauthorized` does today | Login loop, or a UI that thinks it is signed in |
+| Session cookie | `waunder_session`, httponly ⇒ unreadable from JS. Auth state derives from a 401 on any request, exactly as `IsUnauthorized` does today; `FE-09` centralizes that into one subscription (`src/lib/auth.ts`) | Login loop, or a UI that thinks it is signed in |
 | Manifest identity | `name`/`short_name` `Waunder`, `start_url` `/`, `scope` `/`, `display` `standalone`, `theme_color` and `background_color` `#2d2c2c`, same icon, served at `/manifest.webmanifest`, and **no `id`** (go-app emits none, so identity falls back to `start_url`) | iOS 16.4+ keys a home-screen web app on name + manifest `id`, so the owner's existing icon stops matching and a re-add creates a duplicate |
 | Web Push payload | `{title, body, data: {url, count}}` — see below | Notification click goes nowhere |
 | Asset paths | 5 references: `app.css:26` `@font-face`, `main.go:96-101` styles/icon, `client.go:635-639` source logos — all re-pointed from `/web/<path>` to `/<path>`, see below | Missing font, missing brand logos |

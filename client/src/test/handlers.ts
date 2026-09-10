@@ -331,8 +331,9 @@ export const emptyJobPage: JobPage = {
  */
 export function apiHandlers(): HttpHandler[] {
   return [
-    // Session — Rails answers 204 with no body.
+    // Session — both writes answer 204 with no body.
     http.post("/api/session", () => new HttpResponse(null, { status: 204 })),
+    http.delete("/api/session", () => new HttpResponse(null, { status: 204 })),
 
     // Intake
     http.get("/api/intake", () => HttpResponse.json({ intake })),

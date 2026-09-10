@@ -27,13 +27,14 @@
  *
  * ## Placeholders
  *
- * Every element below is a placeholder until its screen task lands (`FE-08` … `FE-26`; the
- * task id is on each route). A placeholder carries the **real root class** the Go screen
- * renders, because that class is what `public/app.css` styles the page container with and
- * what the parity gate compares. Keeping it here means the route test asserts the same
- * thing before and after each port: swapping a placeholder for the real screen is a
- * one-line change in this file and no change in the test, and a ported screen that drops
- * its root class fails immediately rather than at the screenshot gate.
+ * Every element below is a placeholder until its screen task lands (`FE-15` … `FE-26`; the
+ * task id is on each route — `/login` is ported, so it carries none). A placeholder carries
+ * the **real root class** the Go screen renders, because that class is what
+ * `public/app.css` styles the page container with and what the parity gate compares.
+ * Keeping it here means the route test asserts the same thing before and after each port:
+ * swapping a placeholder for the real screen is a one-line change in this file and no
+ * change in the test, and a ported screen that drops its root class fails immediately
+ * rather than at the screenshot gate.
  *
  * The two helpers below are deliberately lowercase element factories, not React
  * components: they are called once while this module initializes, so nothing here has
@@ -41,6 +42,8 @@
  */
 import { Link } from "react-router";
 import type { RouteObject } from "react-router";
+
+import { LoginScreen } from "./components/login";
 
 /**
  * A stand-in for a screen that has not been ported yet. `rootClass` is the screen's
@@ -73,7 +76,7 @@ function notFoundScreen() {
 
 export const routes: RouteObject[] = [
   { path: "/", element: placeholder("digest", "Recent ingestions", "FE-18") },
-  { path: "/login", element: placeholder("login-screen", "Waunder", "FE-09") },
+  { path: "/login", element: <LoginScreen /> },
   { path: "/jobs", element: placeholder("job-list", "Jobs", "FE-15") },
   // Before /jobs/:id, mirroring main.go. React Router's ranking makes this redundant
   // rather than wrong — see the module comment.

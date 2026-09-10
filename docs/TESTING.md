@@ -375,6 +375,37 @@ Be honest about the current state — most of the suite is still to be written.
   `addEventListener` spy prove Auto is resolved by CSS with no viewport listener; jsdom implements
   no `matchMedia` at all, so the stub is what makes that an observation rather than a crash.
 
+- **client/** — `src/components/login.test.tsx` (`FE-09`): the login screen, transcribed from
+  `TestLoginRendersForm`, `TestLoginErrorStatus`, and `TestLoginButtonText` in
+  `web/components/login_test.go` — the form's classes and attributes, all three status strings
+  (`Enter your passphrase.`, `Incorrect passphrase.` on a 401, `Could not sign in. Please try
+  again.` on anything else), and both button labels. It renders the app's own `routes` array at
+  `/login` through a memory router, so the route wiring is under test too, and asserts the request
+  body is the exact `passphrase=correct+horse+battery+staple` form encoding Go's `url.Values`
+  produced, that success lands on `/` with `REPLACE`, and that an empty submit sends no request at
+  all.
+
+  One test covers the rule that would be an incident rather than a bug: after a failed attempt the
+  passphrase is not in the field, not anywhere in the rendered markup, not in either web storage,
+  and has reached no `console` method (all five are spied). The screen keeps the secret out of
+  React state entirely — the input is uncontrolled and login is deliberately not a `useMutation`,
+  since TanStack retains a mutation's `variables` in its cache.
+
+- **client/** — `src/lib/auth.test.tsx` (`FE-09`): the 401 boundary and sign-out. There is no Go
+  test to transcribe — the Go build checked `IsUnauthorized` per call site and had no sign-out — so
+  this pins the replacement contract, driven through the *same* `installUnauthorizedRedirect` call
+  `main.tsx` makes over a `createMemoryRouter` built from the app's own route table. A 401 from a
+  read (through `fetchQuery`) and from a write (through a `useMutation` in the route tree) each land
+  on `/login` with the real login screen rendered and `REPLACE` as the history action; a **403 does
+  not**; the 401 is not retried first (one request); no navigation happens when `/login` is already
+  showing; and unsubscribing stops it.
+
+  Sign-out asserts the method and empty body of `DELETE /api/session`, that the query cache is
+  emptied, that a 401 (an already-expired cookie) still signs the owner out with no error shown,
+  and that any other failure reports `Could not sign out. Please try again.` and stays put. The
+  control is mounted by swapping one element into the app's route table, because `useSignOut` uses
+  router hooks and belongs where `FE-25` will render it.
+
 ### Planned (from the plan's Testing Plan)
 
 **Intake management (INTAKE / RESOLVED-20):**
@@ -468,10 +499,12 @@ Keep this table up to date — add a row when adding a new test file.
 | `client/src/toolchain.test.tsx` | client (Vitest) | scaffold smoke test: React render into jsdom via Testing Library with a jest-dom matcher, proving the Vite/TS/Vitest/setup wiring |
 | `client/src/api/schemas.test.ts` | client (Vitest) | zod API boundary schemas: Go decode parity (missing key == `null` == zero value, unknown keys stripped), `match_score: null` kept distinct from `0`, partial serializer payloads (digest six-key row, feed's abbreviated tracker, undrafted application, `unavailable`/`unsupported` lookup), wrong-type rejection, `,omitempty` request fields staying absent, `JobFeedParams` rejecting an empty/`"All"` sentinel, and `expectTypeOf` type-level nullability parity |
 | `client/src/api/http.test.ts` | client (Vitest) | API transport over MSW: schema-validated 200, Rails `{error:{code,message}}` 4xx, 401 vs 403 and 401 through a wrapped `cause`, envelope-less 500 with Go's fallback message and 2048-byte truncation, non-JSON/wrong-typed/wrong-shape 2xx raising `ResponseFormatError`, JSON vs form vs bodyless writes, no-schema writes leaving the body unread, off-origin path refusal, and a scan proving no source file reads `document.cookie` |
-| `client/src/api/endpoints.test.ts` | client (Vitest) | endpoint/query-key/QueryClient contract over MSW: method, path, and request body of all 25 ported `RailsClient` endpoints (bodyless `POST` for score/submit, `{}` for cover-letter generate, form-encoded login, answers-only draft update, member-vs-bulk lifecycle split), an exported-set coverage check against the Go interface, non-integer id refusal, `jobFeedQuery` parity fixtures produced by running Go's `Encode()` (omitted unset filters, untrimmed values, `+`/`!*'()` escaping, sorted keys, `page` only above 1), query-key prefix hierarchy and feed-page key identity, the retry matrix (transport/5xx retried; 401/403/422 and `ResponseFormatError` not) with mutations never retried, and a round trip of every endpoint through the shared handlers |
+| `client/src/api/endpoints.test.ts` | client (Vitest) | endpoint/query-key/QueryClient contract over MSW: method, path, and request body of all 25 ported `RailsClient` endpoints (bodyless `POST` for score/submit, `{}` for cover-letter generate, form-encoded login, answers-only draft update, member-vs-bulk lifecycle split), an exported-set coverage check against the Go interface (plus `logout`, the one endpoint with no Go counterpart, whose own assertions live in `auth.test.tsx`), non-integer id refusal, `jobFeedQuery` parity fixtures produced by running Go's `Encode()` (omitted unset filters, untrimmed values, `+`/`!*'()` escaping, sorted keys, `page` only above 1), query-key prefix hierarchy and feed-page key identity, the retry matrix (transport/5xx retried; 401/403/422 and `ResponseFormatError` not) with mutations never retried, and a round trip of every endpoint through the shared handlers |
 | `client/src/lib/labels.test.ts` | client (Vitest) | display-helper parity: the Go case tables for `matchScoreLabel` (unscored statuses vs a real `0%`), `matchScoreBand` (75/50 thresholds, `null` ⇒ pending, exhaustive 0–100 sweep), `sourceLabel`, `sourceIconPath`, and `sourceEmoji` (logo-or-emoji, never both), a derived `lifecycleLabel` table, brand-logo paths resolved against `client/public/icons/` on disk to catch the `/web/` prefix drop, and `trackerGroup` checked against `APPLICATION_GROUPS` parsed out of the Rails controller source |
 | `client/src/routes.test.tsx` | client (Vitest) | route table over `createMemoryRouter` driving the app's own exported `routes`: the exact ten paths, each path rendering its screen asserted on the `app.css` page-container class transcribed from the Go screens, `/jobs/new` winning over `/jobs/:id`, the former `\d+` regexp ids arriving as route params, and an unknown path rendering the not-found screen with a link home |
 | `client/src/components/app-chrome.test.tsx` | client (Vitest) | shared chrome parity: the Go navigation/`normalizeLayout` tables, the active tab derived from all nine paths (plus `/login` and an unknown path marking none), `waunder.layout` read and written as go-app's JSON-quoted value, unquoted/garbage/non-string stored values degrading to Auto, absent and throwing storage on both read and write (chrome still renders, choice still applied, `.layout-error` shown), `data-layout` on the document root, `public/app.css` parsed to prove Auto's 960px block matches explicit Desktop exactly and that the bottom bar and screen containers reserve the iPhone safe area, and no `matchMedia`/resize listener |
+| `client/src/components/login.test.tsx` | client (Vitest) | login screen parity: the Go form markup/classes/attributes and all three status strings, the exact form-encoded `POST /api/session` body, success navigating to `/` with `REPLACE`, an empty submit sending no request, the in-flight disabled `Signing in…` button, and the passphrase appearing in no markup, no web storage, and no `console` call after a failed attempt |
+| `client/src/lib/auth.test.tsx` | client (Vitest) | the 401 auth boundary and sign-out, driven through the app's own `installUnauthorizedRedirect` over a memory router built from the real route table: a 401 from a read and from a write each redirect to a rendered `/login` with `REPLACE`, a 403 does not, the 401 is not retried first, no navigation when already on `/login`, unsubscribing stops it, and `DELETE /api/session` clears the query cache and returns to login — including a 401 counting as already signed out, and a 500 reporting a failure in place |
 | `client/src/test/handlers.ts` | client (Vitest, harness) | shared fake Rails: `apiHandlers()` covers every endpoint (echoing the requested page, the URL id, and the posted intake value) and `fixtures` exports schema-typed canned payloads, including an unscored row whose `match_score` stays `null` |
 | `api/spec/requests/api/push_subscriptions_spec.rb` | API (Rails) | `GET /api/push/vapid_public_key` public VAPID key read; `POST`/`DELETE /api/push_subscription` authenticated subscribe/unsubscribe, idempotent endpoint update, and 401 auth gating |
 | `api/spec/requests/api/worker_tasks_spec.rb` | API (Rails) | `GET /api/worker_tasks` worker-shaped task pull with bearer-only auth; `POST /api/worker_tasks/:id/report` status updates, audit screenshots/log refs, and human-session rejection |

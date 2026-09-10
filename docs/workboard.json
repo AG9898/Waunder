@@ -2167,7 +2167,7 @@
       "id": "FE-09",
       "title": "Port the login screen and the 401 auth boundary",
       "description": "Port web/components/login.go and the auth handling from client.go. The passphrase posts to /api/session; Rails sets the httponly signed cookie. Because the cookie cannot be read from JavaScript, signed-in state derives from responses: any 401 from any query or mutation redirects to /login, exactly as IsUnauthorized drives it today. Never log or echo the passphrase.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FE",
       "depends_on": [

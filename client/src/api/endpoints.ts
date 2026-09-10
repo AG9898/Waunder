@@ -83,6 +83,19 @@ export function login(passphrase: string, options: ApiRequestOptions = {}): Prom
   return apiSend("POST", "/api/session", null, { ...options, form: { passphrase } });
 }
 
+/**
+ * `DELETE /api/session` — Rails clears the session cookie and answers with no payload.
+ *
+ * The one endpoint function with no `RailsClient` counterpart: the Go build shipped no
+ * sign-out at all, so the owner could only leave a session by waiting out the 90-day cookie.
+ * Rails has always served the route (`resource :session, only: %i[create destroy]`), and it is
+ * session-guarded, so an already-expired cookie answers 401 — which callers must read as
+ * "already signed out", not as a failure (see `useSignOut` in `src/lib/auth.ts`).
+ */
+export function logout(options: ApiRequestOptions = {}): Promise<void> {
+  return apiSend("DELETE", "/api/session", null, options);
+}
+
 /* -------------------------------------------------------------------------- */
 /* Intake                                                                      */
 /* -------------------------------------------------------------------------- */
