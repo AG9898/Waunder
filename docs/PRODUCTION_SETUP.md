@@ -137,6 +137,18 @@ For iOS Web Push, install the site first: Safari share button -> Add to Home Scr
 from the home-screen icon, then enable notifications from the profile/push area. Normal Safari tabs
 cannot receive iOS PWA push notifications.
 
+## PWA Cutover Recovery
+
+After the React frontend cutover, keep `/app-worker.js` deployed permanently. It is the retirement
+worker for installed go-app clients: it clears CacheStorage, unregisters the legacy cache-first
+worker, claims open windows, and best-effort reloads them. Removing that exact path can leave a
+device permanently pinned to the old app shell.
+
+This is the primary recovery path for the owner's Chrome-added iOS home-screen app, which has no
+DevTools and a version-dependent storage model. If a later launch does not recover, delete and
+re-add the home-screen icon; this loses its session, push subscription, and local layout/filter
+preferences, so the owner must sign in and enable push again.
+
 ---
 
 ## Smoke Checks

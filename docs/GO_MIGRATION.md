@@ -660,6 +660,11 @@ Service worker script fetches bypass the service worker's own fetch handler per 
 browser does retrieve the fresh file from the network; `AppChrome` additionally calls
 `goappTryUpdate()` on mount today, which forces the check.
 
+The permanent source file is `client/public/app-worker.js`, so Vite serves it at the exact legacy
+path in development and copies it to the production build root. It deliberately registers no fetch
+handler. `client/src/test/app-worker.test.ts` executes that shipped file against fake cache,
+registration, and client objects to pin the full retirement sequence without relying on a browser.
+
 Keep `/app-worker.js` deployed indefinitely — it is a few lines, and removing it re-arms the trap
 for any device that has not opened the app since cutover.
 

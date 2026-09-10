@@ -380,6 +380,11 @@ Be honest about the current state — most of the suite is still to be written.
   manifest `id`), then mocks Workbox's `needRefresh` hook to prove the banner stays hidden until an
   update is waiting and its explicit Reload action activates the new worker.
 
+- **client/** — `src/test/app-worker.test.ts` (`FE-12`): executes the permanent legacy-worker
+  retirement script against fake service-worker globals. It asserts install waits for
+  `skipWaiting`, activation deletes every named cache, unregisters and claims clients, best-effort
+  reloads each window, and registers no fetch handler.
+
 - **client/** — `src/components/login.test.tsx` (`FE-09`): the login screen, transcribed from
   `TestLoginRendersForm`, `TestLoginErrorStatus`, and `TestLoginButtonText` in
   `web/components/login_test.go` — the form's classes and attributes, all three status strings
@@ -509,6 +514,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `client/src/routes.test.tsx` | client (Vitest) | route table over `createMemoryRouter` driving the app's own exported `routes`: the exact ten paths, each path rendering its screen asserted on the `app.css` page-container class transcribed from the Go screens, `/jobs/new` winning over `/jobs/:id`, the former `\d+` regexp ids arriving as route params, and an unknown path rendering the not-found screen with a link home |
 | `client/src/components/app-chrome.test.tsx` | client (Vitest) | shared chrome parity: the Go navigation/`normalizeLayout` tables, the active tab derived from all nine paths (plus `/login` and an unknown path marking none), `waunder.layout` read and written as go-app's JSON-quoted value, unquoted/garbage/non-string stored values degrading to Auto, absent and throwing storage on both read and write (chrome still renders, choice still applied, `.layout-error` shown), `data-layout` on the document root, `public/app.css` parsed to prove Auto's 960px block matches explicit Desktop exactly and that the bottom bar and screen containers reserve the iPhone safe area, and no `matchMedia`/resize listener |
 | `client/src/components/update-banner.test.tsx` | client (Vitest) | PWA manifest identity (including four `/icon.svg` records and absent `id`) plus the Workbox `needRefresh` update banner and explicit reload action |
+| `client/src/test/app-worker.test.ts` | client (Vitest) | permanent `/app-worker.js` retirement worker through fake service-worker globals: install skip-waiting, all-cache deletion, self-unregister/client claim, best-effort window reload, and no fetch handler |
 | `client/src/components/login.test.tsx` | client (Vitest) | login screen parity: the Go form markup/classes/attributes and all three status strings, the exact form-encoded `POST /api/session` body, success navigating to `/` with `REPLACE`, an empty submit sending no request, the in-flight disabled `Signing in…` button, and the passphrase appearing in no markup, no web storage, and no `console` call after a failed attempt |
 | `client/src/lib/auth.test.tsx` | client (Vitest) | the 401 auth boundary and sign-out, driven through the app's own `installUnauthorizedRedirect` over a memory router built from the real route table: a 401 from a read and from a write each redirect to a rendered `/login` with `REPLACE`, a 403 does not, the 401 is not retried first, no navigation when already on `/login`, unsubscribing stops it, and `DELETE /api/session` clears the query cache and returns to login — including a 401 counting as already signed out, and a 500 reporting a failure in place |
 | `client/src/test/handlers.ts` | client (Vitest, harness) | shared fake Rails: `apiHandlers()` covers every endpoint (echoing the requested page, the URL id, and the posted intake value) and `fixtures` exports schema-typed canned payloads, including an unscored row whose `match_score` stays `null` |

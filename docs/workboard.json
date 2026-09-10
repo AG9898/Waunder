@@ -2268,7 +2268,7 @@
       "id": "FE-12",
       "title": "Ship the go-app service worker kill switch at /app-worker.js",
       "description": "Serve a deliberate retirement worker at the exact path go-app used, /app-worker.js. Without it an installed PWA can be pinned to the old build permanently: go-app's worker is cache-first with no revalidation and has / in its precache set, so it keeps serving cached old HTML, which loads the old bootstrap, which registers /app-worker.js; if that path 404s, the update fails and the old worker survives forever. Service worker script fetches bypass the worker's own fetch handler, so a real file at that path does get retrieved from the network. Keep it deployed permanently.",
-      "status": "todo",
+      "status": "done",
       "priority": "critical",
       "group_id": "FE",
       "depends_on": [
