@@ -289,6 +289,38 @@ Be honest about the current state — most of the suite is still to be written.
   needs. It is named `installMockApi`, not `useMockApi`, because the `react-hooks` lint rule reads
   a `use*` prefix as a hook and rejects the top-level call.
 
+- **client/** — `src/api/endpoints.test.ts` (`FE-05`): the endpoint, query-key, and QueryClient
+  contract. Each of the 25 ported `RailsClient` endpoints gets a table case registering an MSW
+  handler at the *literal* path it expects, so a wrong path fails as an unhandled request before
+  any assertion runs, and the captured `Request` pins the method, path, `Content-Type`, and body —
+  including the shapes that carry a rule: `scoreJobPost`/`submitApplication` send no body at all,
+  `generateCoverLetter` sends `{}`, `login` is form-encoded, `updateApplicationDraft` sends only
+  `answers`, and `setJobLifecycle` splits between the member and bulk endpoints on id count. A
+  coverage test asserts the exported set still matches the Go interface method for method, so a
+  dropped endpoint fails here rather than resurfacing as a missing screen feature.
+
+  The `jobFeedQuery` block is a **parity fixture**: every expected string was produced by running
+  Go's `JobFeedParams.query().Encode()` over the same input, not written by hand, which is what
+  makes it evidence rather than a mirror of the implementation. It covers the rules that produced
+  real bugs — an unset filter omitted entirely (never `""` or `"All"`), a padded value sent
+  untrimmed, space as `+`, `!*'()` percent-encoded, `~` left literal, byte-wise key sort, and
+  `page` sent only above 1.
+
+  Two policies are pinned as tests rather than comments: query keys nest so
+  `queryKeys.jobs.detail(id)` also invalidates that job's cover letter and contacts while leaving
+  another job and the profile alone, and the QueryClient retries only transport failures and Rails
+  5xx (a 401, 403, 422, or `ResponseFormatError` fails immediately) with **mutations never
+  retried**, because replaying `POST /api/applications/:id/submit` would re-dispatch a trusted
+  submit.
+
+- **client/** — `src/test/handlers.ts` (`FE-05`): not a test, the fake Rails the screen tasks build
+  against. `apiHandlers()` returns one handler per endpoint and `fixtures` the canned payloads.
+  Every fixture is typed as its schema's *output* type, so a schema change fails
+  `npm run typecheck` here rather than surfacing as a puzzling `ResponseFormatError` in an
+  unrelated screen test. The handlers answer the request, not just the path — the feed echoes the
+  requested page, detail handlers use the id from the URL, the intake toggle reflects the posted
+  value — so pagination and navigation need no per-test handler.
+
 ### Planned (from the plan's Testing Plan)
 
 **Intake management (INTAKE / RESOLVED-20):**
@@ -382,6 +414,8 @@ Keep this table up to date — add a row when adding a new test file.
 | `client/src/toolchain.test.tsx` | client (Vitest) | scaffold smoke test: React render into jsdom via Testing Library with a jest-dom matcher, proving the Vite/TS/Vitest/setup wiring |
 | `client/src/api/schemas.test.ts` | client (Vitest) | zod API boundary schemas: Go decode parity (missing key == `null` == zero value, unknown keys stripped), `match_score: null` kept distinct from `0`, partial serializer payloads (digest six-key row, feed's abbreviated tracker, undrafted application, `unavailable`/`unsupported` lookup), wrong-type rejection, `,omitempty` request fields staying absent, `JobFeedParams` rejecting an empty/`"All"` sentinel, and `expectTypeOf` type-level nullability parity |
 | `client/src/api/http.test.ts` | client (Vitest) | API transport over MSW: schema-validated 200, Rails `{error:{code,message}}` 4xx, 401 vs 403 and 401 through a wrapped `cause`, envelope-less 500 with Go's fallback message and 2048-byte truncation, non-JSON/wrong-typed/wrong-shape 2xx raising `ResponseFormatError`, JSON vs form vs bodyless writes, no-schema writes leaving the body unread, off-origin path refusal, and a scan proving no source file reads `document.cookie` |
+| `client/src/api/endpoints.test.ts` | client (Vitest) | endpoint/query-key/QueryClient contract over MSW: method, path, and request body of all 25 ported `RailsClient` endpoints (bodyless `POST` for score/submit, `{}` for cover-letter generate, form-encoded login, answers-only draft update, member-vs-bulk lifecycle split), an exported-set coverage check against the Go interface, non-integer id refusal, `jobFeedQuery` parity fixtures produced by running Go's `Encode()` (omitted unset filters, untrimmed values, `+`/`!*'()` escaping, sorted keys, `page` only above 1), query-key prefix hierarchy and feed-page key identity, the retry matrix (transport/5xx retried; 401/403/422 and `ResponseFormatError` not) with mutations never retried, and a round trip of every endpoint through the shared handlers |
+| `client/src/test/handlers.ts` | client (Vitest, harness) | shared fake Rails: `apiHandlers()` covers every endpoint (echoing the requested page, the URL id, and the posted intake value) and `fixtures` exports schema-typed canned payloads, including an unscored row whose `match_score` stays `null` |
 | `api/spec/requests/api/push_subscriptions_spec.rb` | API (Rails) | `GET /api/push/vapid_public_key` public VAPID key read; `POST`/`DELETE /api/push_subscription` authenticated subscribe/unsubscribe, idempotent endpoint update, and 401 auth gating |
 | `api/spec/requests/api/worker_tasks_spec.rb` | API (Rails) | `GET /api/worker_tasks` worker-shaped task pull with bearer-only auth; `POST /api/worker_tasks/:id/report` status updates, audit screenshots/log refs, and human-session rejection |
 | `api/spec/requests/api/profile_spec.rb` | API (Rails) | `POST /api/profile/resume` JSON Resume → Profile + primary ResumeDocument mapping, PDF Active Storage attachment, encrypted-at-rest contact/raw_text check, idempotent re-sync, 401 unauth, 422 invalid/malformed; `GET`/`PATCH /api/profile` structured read/update with PII presence-flags only |

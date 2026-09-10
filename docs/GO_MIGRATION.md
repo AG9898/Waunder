@@ -217,6 +217,78 @@ intercepted at the network layer, so the code under test runs the real `fetch` p
 hand-stubbed `fetch` would let a transport bug through untested. `onUnhandledRequest: "error"`
 means an unmocked request fails the test rather than quietly reaching a live Rails.
 
+#### Endpoints, query keys, and the QueryClient (`FE-05`)
+
+`client/src/api/endpoints.ts` is one exported function per method on the Go `RailsClient`
+interface — 25 of them, same HTTP method, same path, same request body — plus the two
+query-string helpers below. It owns call *shape* only: transport stays in `http.ts`, payload
+validation in `schemas.ts`, cache identity in `keys.ts`. Reads resolve the response envelope key
+(`{intake: …}`, `{job_post: …}`) so callers get the payload, not the wrapper; the four top-level
+responses (`JobPage`, `IngestionBatchPage`, `SubmitResult`, `ManualJobResult`) are returned whole.
+
+Naming: reads are `fetch*`, writes keep the Go verb (`setIntake`, `scoreJobPost`,
+`submitApplication`), and the push pair becomes `subscribePush` / `unsubscribePush`. The mapping is
+written out in `endpoints.test.ts`, which asserts the exported set still matches the interface
+method for method — so a dropped endpoint fails a test rather than resurfacing as a missing screen
+feature.
+
+Three call shapes are preserved deliberately, because each encodes a rule that lives in Rails:
+
+- **`updateApplicationDraft` sends only `answers`.** The ATS kind, apply URL, and resume
+  reference on the preview are Rails-owned parts of the trusted-submit contract. The parameter is
+  therefore `Pick<AutofillPreview, "answers">` rather than the whole preview the Go signature took.
+- **`scoreJobPost` and `submitApplication` send no body at all** — not `{}` — matching Go's
+  bodyless `POST`. `generateCoverLetter` does send `{}`, also matching Go. The test asserts the
+  absent `Content-Type` for the first two.
+- **`setJobLifecycle` still splits on id count**: one id uses the member endpoint, several use the
+  bulk collection endpoint so Rails keeps it in one transaction.
+
+`jobFeedQuery(params)` reproduces `JobFeedParams.query().Encode()` exactly, and this is the part
+worth being precise about, because the go-app `<select>` bug (AGENTS.md 2026-06-24) was a filter
+reaching Rails as the literal string `All`:
+
+| Rule | Reason |
+|---|---|
+| A filter that is empty *after trimming* is omitted entirely | Rails applies its own defaults; `source=` or `source=All` matches nothing |
+| The value sent is the **untrimmed** original | Go's `set` closure tested `TrimSpace(val)` but stored `val` |
+| `page` is sent only above 1 | page 1 is Rails' default; sending it forks the cache key for nothing |
+| Keys are sorted byte-wise, space is `+`, and `!*'()` are percent-encoded | `url.Values.Encode` sorts, and `encodeURIComponent` alone leaves those five literal |
+
+The expectations in `endpoints.test.ts` were produced by **running** the Go method over the same
+inputs and pasting the output, so that block is a parity fixture rather than a restatement of the
+TypeScript.
+
+`client/src/api/keys.ts` is the query key factory: `["waunder", …]` at the root, with the ten read
+endpoints nested so a mutation invalidates by prefix — `queryKeys.jobs.detail(id)` also covers that
+job's cover letter and contacts, `queryKeys.jobs.root()` covers every feed page and detail without
+touching the profile. A feed page is keyed on its exact query string, so `{}` and `{page: 1}` share
+one cache entry. The module header carries the mutation → invalidation table the screen tasks wire
+up. Keys must always come from here: one spelled out inline is how a mutation silently stops
+refreshing a screen.
+
+`client/src/api/query-client.ts` adds `@tanstack/react-query` 5 and configures three things
+against its defaults:
+
+- **Retries are error-aware.** The default retries any failure three times, which would retry a
+  401 before sending the owner to login and would retry a `ResponseFormatError` that is
+  deterministic by construction. `shouldRetryQuery` retries only transport failures and Rails
+  5xx — every 4xx and every format error fails immediately — for at most three attempts.
+- **Mutations never retry, at all.** `submitApplication` dispatches a trusted submit to the
+  Playwright worker; a replay of a request that reached Rails but whose response was lost would
+  re-dispatch it, which no amount of owner approval covers. It is off for every mutation rather
+  than an allowlist, so whoever adds the next write inherits the safe default.
+- **Refetch on focus and reconnect stay on**, with a 30-second `staleTime`. This is an installed
+  mobile PWA usually resumed from memory rather than reloaded (AGENTS.md 2026-09-08).
+
+`client/src/test/handlers.ts` is the fake Rails the rest of the chain builds screens against:
+`apiHandlers()` returns one MSW handler per endpoint and `fixtures` exports the canned payloads.
+Every fixture is typed as its schema's *output* type, so a schema change breaks `npm run typecheck`
+there instead of surfacing as a confusing `ResponseFormatError` inside an unrelated screen test.
+The handlers answer the request rather than just the path — the feed echoes the requested page, the
+detail handlers use the id from the URL, the intake toggle reflects the posted value — so
+pagination and navigation are testable without a per-test handler.
+
+
 ### Server: Caddy, and Go is removed entirely
 
 The Go server does four things: serve static files, SPA fallback, proxy `/api/*` to Rails, proxy
@@ -281,7 +353,7 @@ web/           Vite + React + TypeScript PWA (was Go + go-app)
   Caddyfile         static + SPA fallback + /api and Resend webhook proxy
   public/           app.css, fonts/, icons/, icon.svg, app-worker.js (kill switch)
   src/
-    api/            zod schemas, transport, endpoint functions, query keys
+    api/            zod schemas, transport, endpoint functions, query keys, query client
     components/     screens and shared UI
     lib/            label/format helpers, platform detection
     sw.ts           custom service worker (precache + push)
@@ -300,7 +372,7 @@ No Go toolchain, no `go.mod`, no `Makefile`, no `app.wasm`.
 |---|---|---|
 | `web/main.go` (routes) | 121 | `src/main.tsx` + React Router route table |
 | `web/main.go` (proxy, PWA handler) | — | `Caddyfile` + `vite-plugin-pwa` config |
-| `web/components/client.go` | 1,115 | `src/api/{schemas,client,endpoints,keys}.ts` + `src/lib/labels.ts` |
+| `web/components/client.go` | 1,115 | `src/api/{schemas,errors,http,endpoints,keys,query-client}.ts` + `src/lib/labels.ts` |
 | `web/components/jobs.go` — `JobList` | ~920 | `src/components/jobs/` (list, filters, lifecycle) |
 | `web/components/jobs.go` — `JobDetailView` | ~570 | `src/components/job-detail/` |
 | `web/components/jobs.go` — `DigestView` | ~450 | `src/components/ingestion-batches/` |

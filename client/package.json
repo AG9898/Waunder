@@ -19,6 +19,7 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.102.8",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "zod": "^4.6.1"

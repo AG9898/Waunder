@@ -2040,7 +2040,7 @@
       "id": "FE-05",
       "title": "Port all API endpoint functions and set up TanStack Query",
       "description": "Port every method on the Go RailsClient interface into typed endpoint functions, plus a query key factory and a configured QueryClient. Reproduce the jobs feed query string exactly as JobFeedParams.query() builds it, including how an unset filter is omitted rather than sent as an empty or sentinel value. Add MSW handlers covering every endpoint so later screen tasks have a working fake backend.",
-      "status": "todo",
+      "status": "done",
       "priority": "critical",
       "group_id": "FE",
       "depends_on": [
