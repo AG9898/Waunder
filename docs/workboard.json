@@ -2007,7 +2007,7 @@
       "id": "FE-04",
       "title": "Build the API transport layer and typed errors",
       "description": "Port the request plumbing from client.go: a same-origin fetch wrapper that sends the session cookie, JSON get and send helpers, and an APIError carrying the code and message from Rails' {error:{code,message}} envelope plus an isUnauthorized helper for 401. Add the MSW server harness the rest of the suite will use. The session cookie is httponly and must never be read from JavaScript.",
-      "status": "todo",
+      "status": "done",
       "priority": "critical",
       "group_id": "FE",
       "depends_on": [

@@ -48,7 +48,7 @@ cd client && npm run build                               # vite build
 | api (Rails) | RSpec (`rspec-rails ~> 8.0`) | Ruby 3.2.3 / Rails 8.1.3 | `api/spec/` | `cd api && bundle exec rspec` |
 | web (go-app) | Go testing (`go test`) | Go 1.26 | `web/**/*_test.go` | `cd web && go test ./...` |
 | workers | Node built-in test runner (`node --test`) + tsx | Node 22 / TS 5.7 | `workers/src/*.test.ts`, `workers/src/**/*.test.ts` | `cd workers && npm test` |
-| client (shadow frontend) | Vitest 5 + jsdom + Testing Library + `@testing-library/jest-dom` | Node 22 / TS 5.9 / React 19 | `client/src/**/*.{test,spec}.{ts,tsx}` | `cd client && npm test` |
+| client (shadow frontend) | Vitest 5 + jsdom + Testing Library + `@testing-library/jest-dom` + MSW 2 | Node 22 / TS 5.9 / React 19 | `client/src/**/*.{test,spec}.{ts,tsx}` | `cd client && npm test` |
 
 ---
 
@@ -270,6 +270,25 @@ Be honest about the current state — most of the suite is still to be written.
   nullability at the type level, so `npm run typecheck` catches a widened or collapsed field even
   when no runtime assertion covers it.
 
+- **client/** — `src/api/http.test.ts` (`FE-04`): the transport contract, run against MSW rather
+  than a stubbed `fetch`, so headers, credentials, status handling, and body parsing all execute
+  for real. The status matrix is the spine of the file: a 200 (schema-validated, and still
+  absence-tolerant for a partial serializer payload), a 4xx carrying Rails'
+  `{error: {code, message}}` envelope, a 401 (and a 403 asserted *not* to sign the owner out, plus
+  a 401 found through a wrapping error's `cause`), a 500 with no envelope (falling back to Go's
+  `api request failed: status N[: body]` text, and truncating at 2048 bytes), and a 2xx whose body
+  is unusable — non-JSON, wrong-typed, or the wrong shape entirely — raising `ResponseFormatError`.
+  Two safety properties are pinned as tests, not comments: the transport refuses an off-origin
+  path, and no non-test file under `client/src/` may mention `document.cookie`, because the session
+  cookie is httponly.
+
+- **client/** — `src/test/msw.ts` (`FE-04`): not a test, the shared harness the rest of the chain
+  builds on. `installMockApi()` installs the MSW lifecycle for a file (`listen` /
+  `resetHandlers` / `close`) with `onUnhandledRequest: "error"`, and `jsonResponse` /
+  `errorResponse` / `textResponse` / `captureRequest` cover the four shapes a Rails endpoint test
+  needs. It is named `installMockApi`, not `useMockApi`, because the `react-hooks` lint rule reads
+  a `use*` prefix as a hook and rejects the top-level call.
+
 ### Planned (from the plan's Testing Plan)
 
 **Intake management (INTAKE / RESOLVED-20):**
@@ -362,6 +381,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `api/spec/services/ingestion_batch_builder_spec.rb` | API (Rails) | `IngestionBatchBuilder` clustering: same-source within-gap grouping, gap-break into new batches, cross-source separation, window cutoff, empty case, and synthetic batch id |
 | `client/src/toolchain.test.tsx` | client (Vitest) | scaffold smoke test: React render into jsdom via Testing Library with a jest-dom matcher, proving the Vite/TS/Vitest/setup wiring |
 | `client/src/api/schemas.test.ts` | client (Vitest) | zod API boundary schemas: Go decode parity (missing key == `null` == zero value, unknown keys stripped), `match_score: null` kept distinct from `0`, partial serializer payloads (digest six-key row, feed's abbreviated tracker, undrafted application, `unavailable`/`unsupported` lookup), wrong-type rejection, `,omitempty` request fields staying absent, `JobFeedParams` rejecting an empty/`"All"` sentinel, and `expectTypeOf` type-level nullability parity |
+| `client/src/api/http.test.ts` | client (Vitest) | API transport over MSW: schema-validated 200, Rails `{error:{code,message}}` 4xx, 401 vs 403 and 401 through a wrapped `cause`, envelope-less 500 with Go's fallback message and 2048-byte truncation, non-JSON/wrong-typed/wrong-shape 2xx raising `ResponseFormatError`, JSON vs form vs bodyless writes, no-schema writes leaving the body unread, off-origin path refusal, and a scan proving no source file reads `document.cookie` |
 | `api/spec/requests/api/push_subscriptions_spec.rb` | API (Rails) | `GET /api/push/vapid_public_key` public VAPID key read; `POST`/`DELETE /api/push_subscription` authenticated subscribe/unsubscribe, idempotent endpoint update, and 401 auth gating |
 | `api/spec/requests/api/worker_tasks_spec.rb` | API (Rails) | `GET /api/worker_tasks` worker-shaped task pull with bearer-only auth; `POST /api/worker_tasks/:id/report` status updates, audit screenshots/log refs, and human-session rejection |
 | `api/spec/requests/api/profile_spec.rb` | API (Rails) | `POST /api/profile/resume` JSON Resume → Profile + primary ResumeDocument mapping, PDF Active Storage attachment, encrypted-at-rest contact/raw_text check, idempotent re-sync, 401 unauth, 422 invalid/malformed; `GET`/`PATCH /api/profile` structured read/update with PII presence-flags only |

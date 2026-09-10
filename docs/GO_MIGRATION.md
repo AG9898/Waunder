@@ -174,6 +174,49 @@ Rails is holding. `JobFeedParams` goes further and types its filters as literal 
 filter must be omitted, and `""` or an `"All"` sentinel is now a type error rather than the
 silently empty feed the go-app `<select>` produced.
 
+#### Transport and typed errors (`FE-04`)
+
+`client/src/api/http.ts` is the whole request layer, ported from `httpRailsClient`'s
+`get`/`sendJSON`/`do`: `apiGet(path, schema)` and `apiSend(method, path, schema | null, options)`,
+where a `null` schema means "Rails answers with no payload" and the body is never read — the same
+distinction Go drew by passing a `nil` destination. `client/src/api/errors.ts` holds the two error
+kinds. Nothing above this layer touches `fetch`.
+
+Four properties are enforced here rather than left to convention:
+
+- **The session cookie is httponly and is never read.** Auth is entirely the browser attaching a
+  signed cookie Rails set on `POST /api/session`. `credentials` is pinned to `"same-origin"`,
+  explicitly and never `"include"` — `include` would carry the owner's cookie to another origin.
+  `http.test.ts` scans every non-test file under `client/src/` and fails on a `document.cookie`
+  reference, so the rule survives a later screen author who does not know it.
+- **Paths cannot leave the origin.** `assertApiPath` rejects an absolute URL, a protocol-relative
+  `//host` URL, and a bare relative segment. The transport is the one place the cookie is attached,
+  so the destination must not be caller-controllable.
+- **Every response is validated through its FE-03 schema before it reaches a caller.** This is
+  where the schemas stop being decoration: a 2xx body that is not JSON, or that a schema rejects,
+  raises `ResponseFormatError` instead of handing a screen a zero-value.
+- **`APIError` carries the Rails envelope, not just a status.** `code` is the machine-readable
+  `error.code` the screens branch on (`draft.go` maps `unsafe_payload`/`unsupported_ats`/
+  `draft_required` to owner copy), and `message` is Rails' own text when it sent any, falling back
+  to the exact `api request failed: status N[: body]` string Go produced. `isUnauthorized(err)`
+  matches **401 only** — a 403 is an authorization decision about an authenticated owner and must
+  not sign them out — and walks the `cause` chain, replacing Go's `errors.As` unwrap loop.
+
+`ResponseFormatError` has no Go counterpart on purpose. Go had no way to say "the server answered,
+but with something I cannot use", so it did not distinguish that from success. Separating it from
+`APIError` keeps a contract break out of the retry/sign-out paths that `APIError` drives.
+
+Transport failures are deliberately *not* wrapped: `fetch` rejects with the platform's own
+`TypeError` (offline, DNS) or abort error, matching Go returning the transport error unwrapped.
+
+**Test harness.** `client/src/test/msw.ts` sets up MSW (`msw` 2, the first devDependency added
+since the scaffold) and is the shared harness for the rest of the chain. `installMockApi()`
+installs the lifecycle for a test file — it is deliberately *not* named `use*`, because the
+`react-hooks` lint rule reads that prefix as a hook and rejects a top-level call. Requests are
+intercepted at the network layer, so the code under test runs the real `fetch` path; a
+hand-stubbed `fetch` would let a transport bug through untested. `onUnhandledRequest: "error"`
+means an unmocked request fails the test rather than quietly reaching a live Rails.
+
 ### Server: Caddy, and Go is removed entirely
 
 The Go server does four things: serve static files, SPA fallback, proxy `/api/*` to Rails, proxy

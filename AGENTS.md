@@ -1175,3 +1175,16 @@ trusting it. Zod objects strip unknown keys by default, which is the behavior we
 `profile.work_history` and `contact_candidates[].created_at`, which no Go struct declared) — never
 add `.strict()` to a response schema. `expectTypeOf` from Vitest is checked by plain
 `tsc --noEmit`, so type-level assertions live in the normal test file and need no `vitest typecheck`.
+
+### 2026-09-10 — MSW harness must not be named `use*`; jsdom + Node fetch is what MSW intercepts
+FE-04's shared MSW harness (`client/src/test/msw.ts`) was first written as `useMockApi()` and
+failed `npm run lint`: the `react-hooks/rules-of-hooks` rule treats any `use*` identifier as a hook
+and rejects a top-level call, which is exactly how a test-file lifecycle installer must be used.
+Renamed to `installMockApi()`. Two things that DO work without configuration: MSW's `msw/node`
+`setupServer` intercepts the request even though the Vitest environment is jsdom (jsdom ships no
+`fetch`, so Vitest leaves Node's global `fetch` in place and MSW patches that), and relative
+handler paths (`http.get("/api/intake", …)`) resolve against jsdom's `window.location.origin`, so
+no host is hardcoded anywhere. Also: a test that greps the source tree for a forbidden token (here
+`document.cookie`, since the session cookie is httponly) must exclude `*.test.ts` — the assertion
+file necessarily contains the token it forbids, and so does any doc comment explaining the rule,
+which is why `http.ts`'s comment says "the browser's cookie jar" instead.
