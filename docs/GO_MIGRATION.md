@@ -320,6 +320,42 @@ Three details are worth knowing before the screens consume it:
   copy exists only to tint a row, and a screen that recomputes a tab total from the rows it holds
   would silently be counting one page.
 
+#### Router and the nine routes (`FE-07`)
+
+`client/src/routes.tsx` is the route table and `client/src/main.tsx` is the app root:
+`StrictMode` → `QueryClientProvider` → `RouterProvider` over `createBrowserRouter(routes)`.
+React Router 7 is added here; the route array is exported rather than declared inline as JSX so
+`routes.test.tsx` drives the *same* array through `createMemoryRouter` that the browser drives
+through `createBrowserRouter` — the test cannot pass against a route table the app does not use.
+The nine paths are unchanged, because they are a contract with the manifest `start_url`, the push
+notification's `data.url`, the owner's existing history, and the `FE-28` parity gate.
+
+Three things this pass settled:
+
+- **Route order is no longer load-bearing, and the test says so instead of the order.** go-app
+  matched its exact routes before its regexps, so `main.go` had to register `/jobs/new` above
+  `^/jobs/\d+$`. React Router ranks matches by specificity and a static segment always outranks a
+  dynamic one — verified by reversing the array and re-asserting, not assumed. The declaration
+  order still mirrors `main.go`, but `/jobs/new` resolving to manual entry is an assertion, not a
+  consequence of line numbers.
+- **`\d+` → `:id` widens what matches, deliberately.** `/jobs/abc` was unrouted under go-app and
+  now reaches the job detail screen, which asks Rails for the posting and renders its own
+  not-found state from the 404. Rails was already the authority on whether an id exists (nothing
+  stopped `/jobs/999999`), so this trades a client-side regexp for the answer that is actually
+  correct.
+- **Placeholders carry the real root class.** Each of the nine screens renders one page-container
+  class that `public/app.css` styles — `.digest`, `.login-screen`, `.job-list`, `.manual-entry`,
+  `.job-detail`, `.contacts-view`, `.applications`, `.draft-review`, `.profile` — so the
+  placeholder elements carry them too and the route test asserts on them. That assertion is
+  identical before and after each screen port: `FE-08` … `FE-26` swap one line in `routes.tsx` and
+  change nothing in `routes.test.tsx`, and a ported screen that quietly drops its root class fails
+  the route test rather than surfacing at the screenshot gate. The not-found screen uses
+  `.app-shell`, the generic screen-shell class already in that selector group.
+
+A not-found screen is new: go-app's handler 404'd an unrouted path server-side and an in-app
+navigation to one rendered nothing. Caddy will answer every path with the app shell (`FE-27`), so
+without a catch-all route a typo or a stale bookmark would render a blank page.
+
 ### Server: Caddy, and Go is removed entirely
 
 The Go server does four things: serve static files, SPA fallback, proxy `/api/*` to Rails, proxy
@@ -401,7 +437,7 @@ No Go toolchain, no `go.mod`, no `Makefile`, no `app.wasm`.
 
 | Go source | LOC | Becomes |
 |---|---|---|
-| `web/main.go` (routes) | 121 | `src/main.tsx` + React Router route table |
+| `web/main.go` (routes) | 121 | `src/main.tsx` (app root) + `src/routes.tsx` (React Router route table) |
 | `web/main.go` (proxy, PWA handler) | — | `Caddyfile` + `vite-plugin-pwa` config |
 | `web/components/client.go` | 1,115 | `src/api/{schemas,errors,http,endpoints,keys,query-client}.ts` + `src/lib/labels.ts` |
 | `web/components/jobs.go` — `JobList` | ~920 | `src/components/jobs/` (list, filters, lifecycle) |
@@ -423,8 +459,9 @@ No Go toolchain, no `go.mod`, no `Makefile`, no `app.wasm`.
 | `web/scripts/layout-smoke.cjs` | — | extended into the parity gate (`FE-28`) |
 
 Nine routes carry over unchanged: `/`, `/login`, `/jobs`, `/jobs/new`, `/jobs/:id`,
-`/jobs/:id/contacts`, `/applications`, `/applications/:id`, `/profile`. The two go-app
-`RouteWithRegexp` patterns become ordinary React Router params.
+`/jobs/:id/contacts`, `/applications`, `/applications/:id`, `/profile`, plus a catch-all
+not-found screen that go-app had no equivalent for. The three go-app `RouteWithRegexp` patterns
+become ordinary React Router params — see [Router and the nine routes](#router-and-the-nine-routes-fe-07).
 
 ---
 

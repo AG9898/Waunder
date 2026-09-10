@@ -1225,3 +1225,19 @@ empty map. (3) Go's `MatchScoreBand(score, scoringStatus)` ignored its second ar
 score; the Go case table is still run with its status column to prove the result never depended on
 it. Note the two vocabularies that look interchangeable: the unscored *band* is `pending`
 (a CSS state) while the unscored *feed filter* is `score_band=unscored` (a Rails query value).
+
+### 2026-09-10 — React Router ranks routes by specificity, so go-app's order rule doesn't carry over
+FE-07's route table (`client/src/routes.tsx`) ports the nine go-app paths, and the migration note that
+"`/jobs/new` must resolve before `/jobs/:id`" is a go-app carryover: go-app tested exact routes before
+`RouteWithRegexp`, but React Router 7 *ranks* matches by specificity and a static segment always
+outranks a dynamic one — verified by reversing the whole array and re-asserting, not assumed. Two other
+findings: (1) `eslint-plugin-react-refresh` warns on a module that merely *defines* capitalized
+components while exporting only data, so the placeholder screens are lowercase element factories
+(`placeholder(...)`, `notFoundScreen()`) — honest, since they run once at module init and have no
+render of their own — which keeps `npm run lint` at zero warnings without a disable comment.
+(2) The durable per-path assertion is the screen's `app.css` page-container root class (`.digest`,
+`.login-screen`, `.job-list`, `.manual-entry`, `.job-detail`, `.contacts-view`, `.applications`,
+`.draft-review`, `.profile`), transcribed from `web/components/*.go`: placeholders carry it, so FE-08…FE-26
+each swap one line in `routes.tsx` and change nothing in `routes.test.tsx`, and a ported screen that
+drops its root class fails the route test rather than the FE-28 screenshot gate. Also note `\d+` → `:id`
+widens matching — `/jobs/abc` now reaches job detail and gets its not-found state from Rails' 404.

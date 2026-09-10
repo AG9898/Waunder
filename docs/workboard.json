@@ -2104,7 +2104,7 @@
       "id": "FE-07",
       "title": "Set up the router and all nine route paths",
       "description": "Add React Router with the nine routes the Go app serves, rendering placeholder screens for now. The two go-app RouteWithRegexp patterns become ordinary params: /jobs/:id and /jobs/:id/contacts. Route order matters, since /jobs/new must resolve before /jobs/:id.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FE",
       "depends_on": [

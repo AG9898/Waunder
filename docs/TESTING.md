@@ -337,6 +337,23 @@ Be honest about the current state — most of the suite is still to be written.
   asserting nothing. Reading a repo file from a Vitest test is fine — the jsdom environment still
   runs in Node, and `src/api/http.test.ts` already scans the source tree.
 
+- **client/** — `src/routes.test.tsx` (`FE-07`): the route table, driven through
+  `createMemoryRouter` over the **same exported `routes` array** the app hands
+  `createBrowserRouter`, so the test cannot pass against a table the app does not use. It asserts
+  the exact ten paths (nine plus the catch-all), that each path renders its screen, that
+  `/jobs/new` resolves to manual entry and not to `/jobs/:id`, that the ids go-app matched with
+  `\d+` regexps arrive as route params, and that an unknown path renders the not-found screen with
+  a working link home rather than a blank page.
+
+  The per-path assertion is on the **page-container class** each screen root carries (`.digest`,
+  `.login-screen`, `.job-list`, `.manual-entry`, `.job-detail`, `.contacts-view`, `.applications`,
+  `.draft-review`, `.profile`), transcribed from `web/components/*.go` rather than read off
+  `routes.tsx`. That makes it a parity fixture that survives the screen ports: `FE-08` … `FE-26`
+  replace a placeholder with the real screen and change nothing here, and a ported screen that
+  drops its root class fails this test instead of surfacing at the `FE-28` screenshot gate.
+  Route *order* is deliberately not asserted — React Router ranks a static segment above a dynamic
+  one, verified by reversing the array, so the outcome is asserted instead of the mechanism.
+
 ### Planned (from the plan's Testing Plan)
 
 **Intake management (INTAKE / RESOLVED-20):**
@@ -432,6 +449,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `client/src/api/http.test.ts` | client (Vitest) | API transport over MSW: schema-validated 200, Rails `{error:{code,message}}` 4xx, 401 vs 403 and 401 through a wrapped `cause`, envelope-less 500 with Go's fallback message and 2048-byte truncation, non-JSON/wrong-typed/wrong-shape 2xx raising `ResponseFormatError`, JSON vs form vs bodyless writes, no-schema writes leaving the body unread, off-origin path refusal, and a scan proving no source file reads `document.cookie` |
 | `client/src/api/endpoints.test.ts` | client (Vitest) | endpoint/query-key/QueryClient contract over MSW: method, path, and request body of all 25 ported `RailsClient` endpoints (bodyless `POST` for score/submit, `{}` for cover-letter generate, form-encoded login, answers-only draft update, member-vs-bulk lifecycle split), an exported-set coverage check against the Go interface, non-integer id refusal, `jobFeedQuery` parity fixtures produced by running Go's `Encode()` (omitted unset filters, untrimmed values, `+`/`!*'()` escaping, sorted keys, `page` only above 1), query-key prefix hierarchy and feed-page key identity, the retry matrix (transport/5xx retried; 401/403/422 and `ResponseFormatError` not) with mutations never retried, and a round trip of every endpoint through the shared handlers |
 | `client/src/lib/labels.test.ts` | client (Vitest) | display-helper parity: the Go case tables for `matchScoreLabel` (unscored statuses vs a real `0%`), `matchScoreBand` (75/50 thresholds, `null` ⇒ pending, exhaustive 0–100 sweep), `sourceLabel`, `sourceIconPath`, and `sourceEmoji` (logo-or-emoji, never both), a derived `lifecycleLabel` table, brand-logo paths resolved against `client/public/icons/` on disk to catch the `/web/` prefix drop, and `trackerGroup` checked against `APPLICATION_GROUPS` parsed out of the Rails controller source |
+| `client/src/routes.test.tsx` | client (Vitest) | route table over `createMemoryRouter` driving the app's own exported `routes`: the exact ten paths, each path rendering its screen asserted on the `app.css` page-container class transcribed from the Go screens, `/jobs/new` winning over `/jobs/:id`, the former `\d+` regexp ids arriving as route params, and an unknown path rendering the not-found screen with a link home |
 | `client/src/test/handlers.ts` | client (Vitest, harness) | shared fake Rails: `apiHandlers()` covers every endpoint (echoing the requested page, the URL id, and the posted intake value) and `fixtures` exports schema-typed canned payloads, including an unscored row whose `match_score` stays `null` |
 | `api/spec/requests/api/push_subscriptions_spec.rb` | API (Rails) | `GET /api/push/vapid_public_key` public VAPID key read; `POST`/`DELETE /api/push_subscription` authenticated subscribe/unsubscribe, idempotent endpoint update, and 401 auth gating |
 | `api/spec/requests/api/worker_tasks_spec.rb` | API (Rails) | `GET /api/worker_tasks` worker-shaped task pull with bearer-only auth; `POST /api/worker_tasks/:id/report` status updates, audit screenshots/log refs, and human-session rejection |
