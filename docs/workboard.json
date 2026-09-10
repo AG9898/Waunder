@@ -2213,7 +2213,8 @@
         "Built assets are content-hashed and precached, so a redeploy is picked up without a constant-URL cache trap",
         "An update-available signal renders a reload banner in the app chrome, and acting on it loads the new build",
         "Tests assert the manifest identity fields and that the banner renders on the update signal",
-        "The manifest keeps scope /, display standalone, the /manifest.webmanifest filename, and no id field: go-app emits none so identity falls back to start_url, and iOS 16.4+ keys a home-screen web app on name plus manifest id, so introducing a non-equivalent id would orphan the owner existing home-screen icon"
+        "The manifest keeps scope /, display standalone, the /manifest.webmanifest filename, and no id field: go-app emits none so identity falls back to start_url, and iOS 16.4+ keys a home-screen web app on name plus manifest id, so introducing a non-equivalent id would orphan the owner existing home-screen icon",
+        "/app.css and the other public/ assets keep constant unhashed URLs by design (app.css is linked from index.html, not imported from src/, so it is not in the module graph and never gets a content hash): they must still be listed in the precache manifest with a Workbox revision hash, so a redeploy invalidates them by content rather than by filename"
       ],
       "docs": [
         "docs/GO_MIGRATION.md",
