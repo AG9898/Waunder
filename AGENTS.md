@@ -1206,3 +1206,22 @@ of the TypeScript — do the same if the encoder is ever touched. Also: TanStack
 login redirect, and retrying any mutation could re-dispatch a trusted submit — so
 `query-client.ts` sets `mutations.retry = false` for every write and retries reads only on a
 transport failure or a Rails 5xx.
+
+### 2026-09-10 — Ported label helpers are a CSS contract; test them against their real sources
+FE-06 moved the seven pure display helpers into `client/src/lib/labels.ts` (`matchScoreLabel`,
+`matchScoreBand`, `sourceLabel`, `sourceIconPath`, `sourceEmoji`, `lifecycleLabel`,
+`trackerGroup`). Their return values are not prose: they are the `.job-score--<band>`,
+`.job-status--<state>`, and `.tracker-row--<group>` class suffixes and the `/icons/*.svg` asset
+paths, so a reworded label is a silent unstyled pill and the `FE-28` screenshot gate reads it as a
+regression. Three things learned worth reusing: (1) `sourceIconPath` is where the migration's
+`/web/` prefix drop becomes code, and a string-only assertion cannot catch a stale prefix — the
+test resolves each returned path against `client/public/` with `existsSync`, which works because a
+jsdom Vitest test still runs in Node. (2) `trackerGroup` mirrors Rails' `APPLICATION_GROUPS`, so
+the test *parses that constant out of* `api/app/controllers/api/job_posts_controller.rb` (regex,
+resolving `UNTRACKED_GROUP` from its own assignment) instead of hand-copying it a second time —
+with a key-set guard so a moved or renamed constant fails loudly rather than asserting over an
+empty map. (3) Go's `MatchScoreBand(score, scoringStatus)` ignored its second argument, and
+`noUnusedParameters` rejects carrying a dead parameter across, so the TS version takes only the
+score; the Go case table is still run with its status column to prove the result never depended on
+it. Note the two vocabularies that look interchangeable: the unscored *band* is `pending`
+(a CSS state) while the unscored *feed filter* is `score_band=unscored` (a Rails query value).

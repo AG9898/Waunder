@@ -2074,7 +2074,7 @@
       "id": "FE-06",
       "title": "Port label, score band, and source helpers",
       "description": "Port the pure display helpers from client.go: MatchScoreLabel, MatchScoreBand, SourceLabel, SourceIconPath, SourceEmoji, LifecycleLabel, and TrackerGroup. These are pure functions with no dependencies and they unblock every screen task, so they land early. Keep the exact thresholds and the exact returned class and path strings, because app.css and the parity gate depend on them.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FE",
       "depends_on": [

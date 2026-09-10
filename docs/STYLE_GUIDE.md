@@ -25,6 +25,12 @@ source of truth; the stylesheet is integrated through go-app's `app.Handler`.
 > `/web/app.css` → `/app.css`, `/web/fonts/…` → `/fonts/…`, `/web/icons/…` → `/icons/…`,
 > `/web/icon.svg` → `/icon.svg`. Until the cutover, `web/web/` is still what production
 > serves and both copies must stay in sync; edit neither for styling reasons.
+>
+> The class *suffixes* this file specifies — `.job-score--high|mid|low|pending`,
+> `.job-status--active|backlog|removed`, `.tracker-row--<group>` — plus the brand-logo paths
+> are produced by `client/src/lib/labels.ts` in the ported app (`web/components/client.go` in
+> production), with identical thresholds and strings. Renaming a band or a state there
+> silently unstyles a pill, so treat those return values as part of this style contract.
 
 ---
 

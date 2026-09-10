@@ -288,6 +288,37 @@ The handlers answer the request rather than just the path — the feed echoes th
 detail handlers use the id from the URL, the intake toggle reflects the posted value — so
 pagination and navigation are testable without a per-test handler.
 
+#### Display helpers (`FE-06`)
+
+`client/src/lib/labels.ts` ports the seven pure display helpers out of `client.go` and
+`applications.go`: `matchScoreLabel`, `matchScoreBand`, `sourceLabel`, `sourceIconPath`,
+`sourceEmoji`, `lifecycleLabel`, and `trackerGroup` (camelCase, otherwise unchanged). No
+dependencies beyond two schema types, so it unblocks every screen task and lands before the
+router.
+
+The return values are a contract with `public/app.css` and with the `FE-28` screenshot gate, not
+prose: bands feed `.job-score--high|mid|low|pending`, lifecycle states feed
+`.job-status--active|backlog|removed`, groups feed `.tracker-row--<group>`, and every threshold
+(high ≥ 75, mid 50–74, low < 50, `null` ⇒ pending) is transcribed rather than re-derived. The
+band and the feed filter are separate vocabularies and the module says so: an unscored pill is
+`pending`, while the equivalent filter value is `score_band=unscored`.
+
+Three details are worth knowing before the screens consume it:
+
+- **`sourceIconPath` is where the `/web/` prefix drop becomes code** —
+  `/web/icons/linkedin.svg` → `/icons/linkedin.svg`. A stale prefix 404s silently and costs only
+  the logo inside an origin pill, so `labels.test.ts` resolves each returned path against
+  `client/public/` on disk rather than only comparing strings.
+- **`matchScoreBand` drops Go's second parameter.** `MatchScoreBand(score, scoringStatus)` never
+  read the status — `score == nil` already covers every unscored status — and
+  `noUnusedParameters` rejects carrying a dead parameter across. The Go case table is still run
+  with its status column to show the result never depended on it.
+- **`trackerGroup` is checked against the Rails constant, not a second copy of it.** The test
+  parses `Api::JobPostsController::APPLICATION_GROUPS` out of the controller source and asserts
+  every status maps to its group, because Rails owns membership: `application=` filtering and the
+  `application_counts` tally are computed server-side over the whole result set. The TypeScript
+  copy exists only to tint a row, and a screen that recomputes a tab total from the rows it holds
+  would silently be counting one page.
 
 ### Server: Caddy, and Go is removed entirely
 

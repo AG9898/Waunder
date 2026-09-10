@@ -321,6 +321,22 @@ Be honest about the current state — most of the suite is still to be written.
   requested page, detail handlers use the id from the URL, the intake toggle reflects the posted
   value — so pagination and navigation need no per-test handler.
 
+- **client/** — `src/lib/labels.test.ts` (`FE-06`): the display helpers, tested as *transcriptions*
+  of the Go case tables (`TestMatchScoreLabel`, `TestMatchScoreBand`, `TestSourceLabel`,
+  `TestSourceIconPath`, `TestSourceEmoji`, `TestTrackerGroupMapsPipelineStatus`) rather than as
+  freshly reasoned expectations, because every returned string is consumed by `app.css` and by the
+  `FE-28` screenshot gate — the test's job is to reject a rewording. `lifecycleLabel` had no Go
+  test, so its table is derived from `client.go` and the pill states `app.css` styles.
+
+  Two assertions go past what a transcribed table can see. The brand-logo paths are resolved
+  against `client/public/icons/` **on disk**, because the migration-wide `/web/` prefix drop 404s
+  silently and costs only the logo inside an origin pill. And `trackerGroup` is checked against
+  the Rails source: the test parses `Api::JobPostsController::APPLICATION_GROUPS` out of the
+  controller (resolving `UNTRACKED_GROUP` from its own assignment) and asserts every status maps
+  to its group, with a key-set guard so a moved or renamed constant fails loudly instead of
+  asserting nothing. Reading a repo file from a Vitest test is fine — the jsdom environment still
+  runs in Node, and `src/api/http.test.ts` already scans the source tree.
+
 ### Planned (from the plan's Testing Plan)
 
 **Intake management (INTAKE / RESOLVED-20):**
@@ -415,6 +431,7 @@ Keep this table up to date — add a row when adding a new test file.
 | `client/src/api/schemas.test.ts` | client (Vitest) | zod API boundary schemas: Go decode parity (missing key == `null` == zero value, unknown keys stripped), `match_score: null` kept distinct from `0`, partial serializer payloads (digest six-key row, feed's abbreviated tracker, undrafted application, `unavailable`/`unsupported` lookup), wrong-type rejection, `,omitempty` request fields staying absent, `JobFeedParams` rejecting an empty/`"All"` sentinel, and `expectTypeOf` type-level nullability parity |
 | `client/src/api/http.test.ts` | client (Vitest) | API transport over MSW: schema-validated 200, Rails `{error:{code,message}}` 4xx, 401 vs 403 and 401 through a wrapped `cause`, envelope-less 500 with Go's fallback message and 2048-byte truncation, non-JSON/wrong-typed/wrong-shape 2xx raising `ResponseFormatError`, JSON vs form vs bodyless writes, no-schema writes leaving the body unread, off-origin path refusal, and a scan proving no source file reads `document.cookie` |
 | `client/src/api/endpoints.test.ts` | client (Vitest) | endpoint/query-key/QueryClient contract over MSW: method, path, and request body of all 25 ported `RailsClient` endpoints (bodyless `POST` for score/submit, `{}` for cover-letter generate, form-encoded login, answers-only draft update, member-vs-bulk lifecycle split), an exported-set coverage check against the Go interface, non-integer id refusal, `jobFeedQuery` parity fixtures produced by running Go's `Encode()` (omitted unset filters, untrimmed values, `+`/`!*'()` escaping, sorted keys, `page` only above 1), query-key prefix hierarchy and feed-page key identity, the retry matrix (transport/5xx retried; 401/403/422 and `ResponseFormatError` not) with mutations never retried, and a round trip of every endpoint through the shared handlers |
+| `client/src/lib/labels.test.ts` | client (Vitest) | display-helper parity: the Go case tables for `matchScoreLabel` (unscored statuses vs a real `0%`), `matchScoreBand` (75/50 thresholds, `null` ⇒ pending, exhaustive 0–100 sweep), `sourceLabel`, `sourceIconPath`, and `sourceEmoji` (logo-or-emoji, never both), a derived `lifecycleLabel` table, brand-logo paths resolved against `client/public/icons/` on disk to catch the `/web/` prefix drop, and `trackerGroup` checked against `APPLICATION_GROUPS` parsed out of the Rails controller source |
 | `client/src/test/handlers.ts` | client (Vitest, harness) | shared fake Rails: `apiHandlers()` covers every endpoint (echoing the requested page, the URL id, and the posted intake value) and `fixtures` exports schema-typed canned payloads, including an unscored row whose `match_score` stays `null` |
 | `api/spec/requests/api/push_subscriptions_spec.rb` | API (Rails) | `GET /api/push/vapid_public_key` public VAPID key read; `POST`/`DELETE /api/push_subscription` authenticated subscribe/unsubscribe, idempotent endpoint update, and 401 auth gating |
 | `api/spec/requests/api/worker_tasks_spec.rb` | API (Rails) | `GET /api/worker_tasks` worker-shaped task pull with bearer-only auth; `POST /api/worker_tasks/:id/report` status updates, audit screenshots/log refs, and human-session rejection |
