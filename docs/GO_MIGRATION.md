@@ -219,7 +219,7 @@ the task that owns it.
 | Layout preference storage | key `waunder.layout`; same values (Auto/Desktop/Mobile) | Owner's layout choice silently resets |
 | Jobs feed filter storage | key `waunder.jobFilters`; same JSON shape | Owner's saved filters silently reset |
 | Session cookie | `waunder_session`, httponly ⇒ unreadable from JS. Auth state derives from a 401 on any request, exactly as `IsUnauthorized` does today | Login loop, or a UI that thinks it is signed in |
-| Manifest identity | `name`/`short_name` `Waunder`, `start_url` `/`, `theme_color` and `background_color` `#2d2c2c`, same icon | Some platforms treat it as a different installed app |
+| Manifest identity | `name`/`short_name` `Waunder`, `start_url` `/`, `scope` `/`, `display` `standalone`, `theme_color` and `background_color` `#2d2c2c`, same icon, served at `/manifest.webmanifest`, and **no `id`** (go-app emits none, so identity falls back to `start_url`) | iOS 16.4+ keys a home-screen web app on name + manifest `id`, so the owner's existing icon stops matching and a re-add creates a duplicate |
 | Web Push payload | `{title, body, data: {url, count}}` — see below | Notification click goes nowhere |
 | Asset paths | 5 references: `app.css:26` `@font-face`, `main.go:96-101` styles/icon, `client.go:635-639` source logos | Missing font, missing brand logos |
 | Proxy paths | `/api/*` and `/webhooks/resend/inbound` → `API_INTERNAL_URL` | Inbound email ingestion stops |
@@ -258,8 +258,41 @@ browser does retrieve the fresh file from the network; `AppChrome` additionally 
 Keep `/app-worker.js` deployed indefinitely — it is a few lines, and removing it re-arms the trap
 for any device that has not opened the app since cutover.
 
-**Manual fallback**, if a device is still stuck: uninstall and reinstall the PWA from the browser.
-Documented in [`PRODUCTION_SETUP.md`](PRODUCTION_SETUP.md).
+### The owner's actual client is an iOS home-screen web app
+
+The owner runs Waunder as a web app added to the iOS home screen from Chrome. This makes the
+handoff **harder**, not easier, and the automated check cannot fully cover it.
+
+- **Storage on iOS is fragmented and version-dependent.** Cookies, Web Storage, and IndexedDB are
+  isolated per home-screen icon, while service worker registration and CacheStorage have been
+  reported as shared with the browser since iOS 14. A Chrome-added web app on iOS 16.4+ runs in its
+  own WKWebView instance with its own storage. Do not build a recovery procedure on any assumption
+  about which container is which — it is not reliably knowable across versions.
+- **Therefore the kill switch is the primary recovery, not a convenience.** It is the only path that
+  works without knowing the storage topology, and the device has no DevTools.
+- **The only manual fallback that can be stated with confidence is deleting the home-screen icon and
+  re-adding it.** Clearing site data inside Chrome may or may not reach the web app's container.
+- **That fallback is not free.** Because cookies and Web Storage are isolated per icon, deleting it
+  loses the session cookie (re-enter the passphrase), the push subscription (Rails prunes the dead
+  endpoint on the next send; re-enable it from Profile), and the `waunder.layout` and
+  `waunder.jobFilters` values. Recoverable in under a minute, but not invisible.
+- **Manifest identity is load-bearing on iOS.** iOS 16.4+ identifies a home-screen web app by its
+  name combined with the manifest `id`. go-app emits **no `id`** today, so identity falls back to
+  `start_url`. If the new manifest introduces an `id` that does not resolve to the same identity,
+  iOS can treat it as a different web app — the existing icon stops matching and a re-add creates a
+  duplicate. Keep `id` absent, or set it to a value that resolves identically.
+- **Forcing a reload is best-effort.** The kill switch's contract is to unregister and clear caches;
+  `WindowClient.navigate()` behavior on WebKit is not something to depend on, and the already-loaded
+  page is the old go-app page with no listener of ours. Once the worker is gone and the caches are
+  cleared, the next app launch fetches from the network anyway — worst case the owner opens the app
+  twice.
+- **Automation cannot verify this.** `FE-29`'s handoff check runs desktop Chromium through
+  Playwright, which proves the logic but not iOS WebKit. Run it against Playwright's `webkit` build
+  as a closer proxy, and treat a manual check on the actual phone after cutover as the real gate.
+
+`FE-29` records both the fallback and the post-cutover on-device check in
+[`PRODUCTION_SETUP.md`](PRODUCTION_SETUP.md); `FE-30` confirms the owner's icon actually picks up
+the new build after the push.
 
 **Verification trap:** Playwright's `serviceWorkers: 'block'` (used today by
 `web/scripts/layout-smoke.cjs`) bypasses this entire path, so a screenshot can look perfect while

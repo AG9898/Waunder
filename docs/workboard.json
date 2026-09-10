@@ -2212,7 +2212,8 @@
         "Manifest identity matches today exactly: name and short_name Waunder, start_url /, theme_color and background_color #2d2c2c, and the same icon used for default, large, SVG, and maskable",
         "Built assets are content-hashed and precached, so a redeploy is picked up without a constant-URL cache trap",
         "An update-available signal renders a reload banner in the app chrome, and acting on it loads the new build",
-        "Tests assert the manifest identity fields and that the banner renders on the update signal"
+        "Tests assert the manifest identity fields and that the banner renders on the update signal",
+        "The manifest keeps scope /, display standalone, the /manifest.webmanifest filename, and no id field: go-app emits none so identity falls back to start_url, and iOS 16.4+ keys a home-screen web app on name plus manifest id, so introducing a non-equivalent id would orphan the owner existing home-screen icon"
       ],
       "docs": [
         "docs/GO_MIGRATION.md",
@@ -2278,7 +2279,9 @@
         "On install it calls skipWaiting; on activate it deletes every cache key, unregisters itself, claims clients, and reloads them",
         "It registers no fetch handler, so it can never serve stale content itself",
         "Its logic is unit-tested against fake caches, registration, and clients objects",
-        "docs/GO_MIGRATION.md records that this file is permanent and why removing it re-arms the trap"
+        "docs/GO_MIGRATION.md records that this file is permanent and why removing it re-arms the trap",
+        "The contract is unregister plus clear every cache; forcing a reload of the already-loaded old page is best-effort only, because WindowClient.navigate() behaviour on WebKit cannot be depended on and the old go-app page has no listener of ours. Once the worker is gone and caches are cleared the next app launch fetches from the network anyway",
+        "The iOS situation is recorded: the owner runs a Chrome-added iOS home-screen web app with no DevTools and a fragmented, version-dependent storage model, so this kill switch is the primary recovery path rather than a convenience"
       ],
       "docs": [
         "docs/GO_MIGRATION.md",
@@ -2851,7 +2854,9 @@
         "The raw request body and svix-* headers are confirmed to arrive unmodified through the proxy",
         "A launchPersistentContext browser that first loaded the Go app is shown to unregister the go-app worker and clear its caches after visiting the new build",
         "Both procedures and their results are recorded in docs/GO_MIGRATION.md, and the PWA-stuck manual fallback is documented in docs/PRODUCTION_SETUP.md",
-        "No Railway service or variable is changed by this task"
+        "No Railway service or variable is changed by this task",
+        "The handoff check is also run against Playwright webkit as a closer proxy to iOS, and the writeup states explicitly that no desktop automation can prove iOS WebKit behaviour",
+        "docs/PRODUCTION_SETUP.md documents the manual post-cutover check on the owner iOS home-screen web app as the real gate, plus the delete-and-re-add fallback and what it costs: the session cookie, the push subscription, and the waunder.layout and waunder.jobFilters values"
       ],
       "docs": [
         "docs/GO_MIGRATION.md",
@@ -2887,7 +2892,8 @@
         "ARCHITECTURE, CONVENTIONS, TESTING, ENV_VARS, STYLE_GUIDE, PRODUCTION_SETUP, PRD, README, and AGENTS.md are rewritten per the docs/GO_MIGRATION.md cutover checklist, with every forward-pointer note replaced by the real content",
         "AGENTS.md Quick Start, Build and Verification table, Repository Structure, Architecture summary, and the obsolete go-app gotchas are all corrected",
         "docs/INDEX.md is consistent and docs/GO_MIGRATION.md status is flipped to done with the actual deltas recorded",
-        "The change lands as a single commit and the live deploy is verified after push"
+        "The change lands as a single commit and the live deploy is verified after push",
+        "After the push, the owner iOS home-screen web app is confirmed to pick up the new build, or is recovered with the documented delete-and-re-add fallback and the push subscription re-enabled"
       ],
       "docs": [
         "docs/GO_MIGRATION.md",
