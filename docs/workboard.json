@@ -2302,7 +2302,7 @@
       "id": "FE-13",
       "title": "Port push subscribe/unsubscribe and the PushToggle control",
       "description": "Port web/components/push.go and push_browser.go. The 157-line go-app JS bridge, with its FuncOf/Release and promise-to-channel await adapter, becomes a small plain-TypeScript module over the PushManager. Fetch the VAPID public key from GET /api/push/vapid_public_key rather than a build-time env var, which lets the web service drop VAPID_PUBLIC_KEY entirely. Never subscribe without an explicit user action.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FE",
       "depends_on": [

@@ -422,6 +422,23 @@ Be honest about the current state — most of the suite is still to be written.
   control is mounted by swapping one element into the app's route table, because `useSignOut` uses
   router hooks and belongs where `FE-25` will render it.
 
+- **client/** — `src/lib/push.test.ts` and `src/components/push-toggle.test.tsx` (`FE-13`): the
+  push flow, in two layers. **Nothing in either file can send a push or show a permission prompt.**
+  `push.test.ts` drives the real subscriber against a fake `PushEnvironment` — a plain object
+  standing in for service-worker readiness, the permission prompt, and a `PushManager` — which is
+  what makes the two orderings assertable: permission is requested *before* `pushManager.subscribe`
+  (a denied or dismissed prompt subscribes nothing), and the browser `unsubscribe` runs *before*
+  Rails is told, so a browser that refuses to cancel never leaves Rails believing the subscription
+  is gone. The Go `browserPusher` had no test at all, being pure go-app JS interop; this is new
+  coverage rather than a transcription. `push-toggle.test.tsx` mocks one layer higher — a
+  `PushSubscriber` with call counters — and lets MSW answer Rails, so the toggle's own rule is a
+  counter assertion: **zero subscribe calls, zero `POST /api/push_subscription` calls, and zero
+  VAPID fetches after a plain render**, in both a supported and an unsupported browser. Asking for
+  notification permission without a user gesture is how an origin gets permanently blocked, so that
+  is the property worth a test rather than a comment. The four owner-visible states (unsupported,
+  off, on, denied) are asserted as distinct renderings, and the VAPID key is asserted to come from
+  `GET /api/push/vapid_public_key` — never a build-time value.
+
 ### Planned (from the plan's Testing Plan)
 
 **Intake management (INTAKE / RESOLVED-20):**
@@ -526,6 +543,8 @@ Keep this table up to date — add a row when adding a new test file.
 | `client/scripts/handoff-check.cjs` | client (local integration) | signed Resend replay through the Caddy image into Rails, raw body and `svix-*` header preservation, `InboundEmail` persistence, and Go-worker retirement/cache clearing in persistent Chromium and Playwright WebKit contexts; the required iOS home-screen check remains manual |
 | `client/src/components/login.test.tsx` | client (Vitest) | login screen parity: the Go form markup/classes/attributes and all three status strings, the exact form-encoded `POST /api/session` body, success navigating to `/` with `REPLACE`, an empty submit sending no request, the in-flight disabled `Signing in…` button, and the passphrase appearing in no markup, no web storage, and no `console` call after a failed attempt |
 | `client/src/lib/auth.test.tsx` | client (Vitest) | the 401 auth boundary and sign-out, driven through the app's own `installUnauthorizedRedirect` over a memory router built from the real route table: a 401 from a read and from a write each redirect to a rendered `/login` with `REPLACE`, a 403 does not, the 401 is not retried first, no navigation when already on `/login`, unsubscribing stops it, and `DELETE /api/session` clears the query cache and returns to login — including a 401 counting as already signed out, and a 500 reporting a failure in place |
+| `client/src/lib/push.test.ts` | client (Vitest) | browser push flow against a **mocked PushManager** (no permission prompt, no real push): the Go `initialPushState` table, unsupported/denied/failed staying distinct states, the three `pushErrorMessage` strings, `readSubscription` reading both encryption keys off `toJSON()` and rejecting a subscription Rails could never encrypt to, permission requested before `pushManager.subscribe` (and a denied or dismissed prompt subscribing nothing), an unsupported browser neither prompting nor failing a read, unsubscribe cancelling the active subscription and propagating a browser failure, and the production environment reporting unsupported wherever there is no Push API |
+| `client/src/components/push-toggle.test.tsx` | client (Vitest) | push toggle parity over MSW plus a mocked `PushSubscriber`: **zero subscribe, zero persist, and zero VAPID fetches after a plain render** in both supported and unsupported browsers, the unsupported/off/on/denied states rendering distinctly, the VAPID key read from `GET /api/push/vapid_public_key` and passed to the browser, `POST /api/push_subscription` carrying the browser subscription, the in-flight disabled `Working…` control, an empty server key and an unsupported browser both landing on unsupported without touching the other side, no persist when the browser subscribe fails, 401 and 500 messages, and unsubscribe cancelling in the browser before `DELETE /api/push_subscription` (and leaving Rails alone when it cannot) |
 | `client/src/test/handlers.ts` | client (Vitest, harness) | shared fake Rails: `apiHandlers()` covers every endpoint (echoing the requested page, the URL id, and the posted intake value) and `fixtures` exports schema-typed canned payloads, including an unscored row whose `match_score` stays `null` |
 | `api/spec/requests/api/push_subscriptions_spec.rb` | API (Rails) | `GET /api/push/vapid_public_key` public VAPID key read; `POST`/`DELETE /api/push_subscription` authenticated subscribe/unsubscribe, idempotent endpoint update, and 401 auth gating |
 | `api/spec/requests/api/worker_tasks_spec.rb` | API (Rails) | `GET /api/worker_tasks` worker-shaped task pull with bearer-only auth; `POST /api/worker_tasks/:id/report` status updates, audit screenshots/log refs, and human-session rejection |

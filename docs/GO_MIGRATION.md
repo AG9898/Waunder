@@ -479,6 +479,57 @@ Two consequences for later tasks:
   `src/lib/auth.tsx`; there is no JSX in it, since the boundary is a subscription and sign-out is a
   hook.
 
+#### Push subscription and the PushToggle (`FE-13`)
+
+`client/src/lib/push.ts` is the browser Push API and `client/src/components/push-toggle.tsx` is
+the control. Markup, classes, and copy are unchanged from `push.go`; what changes is everything
+underneath.
+
+**The JS bridge disappears.** `push_browser.go` was 157 lines, and most of it was not push. Go has
+no `await`, so every promise the PushManager returned went through a hand-written adapter that
+allocated two `app.FuncOf` callbacks, `Release`d them, and blocked a goroutine on a channel; the
+subscription itself came back as an `app.Value` that had to be `JSON.stringify`'d and then
+`json.Unmarshal`'d to get at the `p256dh` and `auth` keys. None of that is push logic. What
+survives is the four operations the toggle needs plus the two error kinds it renders differently,
+and the whole module is 121 lines of code including a testing seam the Go original did not have.
+
+**It is now tested.** `browserPusher` was pure go-app interop with no test at all — it could only
+be verified by using the app. `PushEnvironment` is the narrow slice of the browser the flow
+touches (service-worker readiness, the permission prompt, a feature check), so `push.test.ts`
+drives the real subscriber against a **mocked PushManager**: no permission is ever requested and
+no push is ever sent. That is what makes the two orderings assertable — permission before
+`pushManager.subscribe`, and browser `unsubscribe` before `DELETE /api/push_subscription`, so a
+browser that refuses to cancel never leaves Rails believing the subscription is gone.
+
+**The VAPID key comes from the API.** `GET /api/push/vapid_public_key` is fetched at click time
+rather than read from a build-time variable — see [A free simplification](#a-free-simplification--done-fe-13).
+An empty key (Rails with web push unconfigured) is treated as unsupported, exactly as `doSubscribe`
+did, and the browser is never touched in that case.
+
+**`denied` is split out of `failed`.** The Go build had one `pushFailed` state carrying a different
+message when the permission was blocked. A blocked permission is not a transient failure — retrying
+cannot fix it — so it is its own state, distinct from `unsupported`, `on`, and `off`. It renders
+the *same* markup `pushFailed` did (the enable control plus `.push-toggle-error`), so no stylesheet
+rule is involved and the `FE-28` parity gate is unaffected.
+
+**Nothing subscribes without a click.** The only call made on mount is `currentEndpoint()`, which
+reads existing browser state and never prompts; requesting notification permission unprompted is
+both against `AGENTS.md` and the way an origin gets permanently blocked. `push-toggle.test.tsx`
+asserts zero subscribe calls, zero `POST /api/push_subscription` calls, and zero VAPID fetches
+after a plain render, in both the supported and unsupported browsers. Neither write goes through
+`useMutation`: writes to Rails are never retried automatically, and there is no cached read to
+invalidate.
+
+Two smaller notes. `type="button"` is added to the three buttons, because the toggle sits inside
+`ProfileView`'s `<form className="profile-form">` where an untyped button defaults to `submit` —
+go-app bound its own click handler and never emitted the attribute, and no CSS rule keys off it.
+And `readSubscription` rejects a subscription missing its endpoint or encryption keys rather than
+zero-valuing them the way `json.Unmarshal` did: an empty key posted to Rails stores a subscription
+that can never be encrypted to, and the resulting silence is indistinguishable from a working one.
+
+`FE-25` renders the control on the profile screen; it ships here with no route of its own, the same
+way `FE-09`'s `useSignOut()` did.
+
 ### Server: Caddy, and Go is removed entirely
 
 The Go server does four things: serve static files, SPA fallback, proxy `/api/*` to Rails, proxy
@@ -581,7 +632,7 @@ No Go toolchain, no `go.mod`, no `Makefile`, no `app.wasm`.
 | `web/components/draft.go` | 576 | `src/components/draft-review/` |
 | `web/components/manual_entry.go` | 477 | `src/components/manual-entry/` |
 | `web/components/contacts.go` | 325 | `src/components/contacts/` |
-| `web/components/push.go` + `push_browser.go` | 427 | `src/components/push-toggle.tsx` + `src/lib/push.ts` (~30 lines; the `FuncOf`/`Release`/promise-to-channel `await` adapter disappears) |
+| `web/components/push.go` + `push_browser.go` | 427 | `src/components/push-toggle.tsx` + `src/lib/push.ts` (244 lines of code; the `FuncOf`/`Release`/promise-to-channel `await` adapter disappears) |
 | `web/components/profile.go` | 266 | `src/components/profile/` |
 | `web/components/install_guide.go` + `pwa.go` | 281 | `src/components/install-guide.tsx` + `src/lib/platform.ts` |
 | `web/components/chrome.go` | 134 | `src/components/app-chrome.tsx` |
@@ -643,12 +694,17 @@ go-app wiring — four lines, verifiable with
 `public/app.css` so `npm run format` cannot reformat the verbatim copy out from under the parity
 gate.
 
-### A free simplification
+### A free simplification — done (`FE-13`)
 
-`VAPID_PUBLIC_KEY` is currently injected into the WASM bundle through go-app's `Env` map
+`VAPID_PUBLIC_KEY` is injected into the WASM bundle through go-app's `Env` map
 (`main.go:104-106`) and read with `goappGetenv`. But `GET /api/push/vapid_public_key` already
-exists and `client.go:930` already calls it. Fetch it from the API and drop the environment
-variable from the `web` service entirely.
+exists and `client.go:930` already calls it.
+
+`FE-13` took the API route: `push-toggle.tsx` fetches the key at click time and the client carries
+no push configuration of its own. The variable stays on the `web` service only because the Go
+build is still production; it is dropped from `web` at the `FE-30` cutover and never reaches the
+new frontend, which means a rotated key takes effect without a frontend rebuild.
+See [`ENV_VARS.md`](ENV_VARS.md).
 
 ---
 

@@ -18,9 +18,10 @@ If any other doc mentions a variable, it should link here rather than restate it
 ## Variable Matrix
 
 > **Migrating:** the `web` service is moving to Vite + React + TypeScript, built in the shadow
-> `client/` directory until cutover. At cutover `VAPID_PUBLIC_KEY` is dropped from `web` (the PWA
-> fetches it from `GET /api/push/vapid_public_key` instead) and the no-`VITE_*` note above is
-> restated. `API_INTERNAL_URL` and `PORT` are unchanged — `client/`'s Vite dev server already
+> `client/` directory until cutover. The replacement client **already** fetches the push key from
+> `GET /api/push/vapid_public_key` at subscribe time (`FE-13`, `client/src/components/push-toggle.tsx`)
+> and carries no push configuration of its own, so `VAPID_PUBLIC_KEY` is dropped from `web` at
+> cutover and the no-`VITE_*` note above is restated. `API_INTERNAL_URL` and `PORT` are unchanged — `client/`'s Vite dev server already
 > reads `API_INTERNAL_URL` (default `http://localhost:3000`) for its `/api` and Resend-webhook
 > proxy, Node-side only, so it is never inlined into the browser bundle.
 > See [`GO_MIGRATION.md`](GO_MIGRATION.md).
@@ -53,7 +54,7 @@ If any other doc mentions a variable, it should link here rather than restate it
 | `RESEND_WEBHOOK_SECRET` | Conditional | none | Svix signing secret that validates Resend inbound (`email.received`) webhook signatures at `POST /webhooks/resend/inbound`; required for email ingestion (RESOLVED-13). | `api` runtime (secret) |
 | `RESEND_API_KEY` | Conditional | none | Resend account API key used by `ResendInboundClient` to fetch the **body** of a received email (`GET /emails/receiving/{email_id}`). The `email.received` webhook delivers only metadata — no text/html — so without this key `ParseInboundEmailJob` has no body to parse and every alert dead-ends. | `api` runtime (secret) |
 | `RESEND_INBOUND_DOMAIN` | Conditional | none | The Resend-verified receiving domain that forwarded job alerts are sent to (reference/config; e.g. `adenguo.com`). | `api` runtime |
-| `VAPID_PUBLIC_KEY` | Conditional | none | Web Push VAPID public key. **Public by design** — exposed to the browser at `GET /api/push/vapid_public_key`, and also read by the `web` server (when set) to forward into the PWA env so the go-app client can subscribe. | `api` runtime + `web` runtime (forwarded to PWA env) |
+| `VAPID_PUBLIC_KEY` | Conditional | none | Web Push VAPID public key. **Public by design** — exposed to the browser at `GET /api/push/vapid_public_key`, and also read by the `web` server (when set) to forward into the PWA env so the go-app client can subscribe. The `client/` replacement fetches it from that endpoint instead, so the `web` half goes away at the `FE-30` cutover; `api` still needs it. | `api` runtime + `web` runtime (forwarded to PWA env, until cutover) |
 | `VAPID_PRIVATE_KEY` | Conditional | none | Web Push VAPID private key; signs push messages. | `api` runtime (secret) |
 | `VAPID_SUBJECT` | Conditional | none | VAPID contact (`mailto:` address or URL). | `api` runtime |
 | `WORKER_POLL_INTERVAL_MS` | No | `15000` | Worker poll interval (ms) for fetching approved tasks. | `worker` runtime |

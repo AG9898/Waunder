@@ -1299,3 +1299,27 @@ banner posts that message and nothing acts on it). Keep worker logic in a plain 
 the scope as an argument (`src/lib/sw-nav.ts`) and declare only the slice of
 `ServiceWorkerGlobalScope` it uses: adding `/// <reference lib="webworker" />` would pull the
 WebWorker lib into the same TypeScript program as the DOM lib the app needs.
+
+### 2026-09-11 — React 19's lint rules reject two habits the Go-era port reaches for
+FE-13's `PushToggle` tripped `react-hooks/set-state-in-effect` and `react-hooks/refs` at
+`npm run lint` even though `npm run typecheck` and `npm test` were green, so run lint before
+believing a ported screen is done. Both fixes are worth copying: a `setState` called
+*synchronously* in an effect body is rejected, so branch inside the effect's async IIFE instead
+(`await (supported ? pusher.currentEndpoint() : Promise.resolve(""))` keeps one awaited path and
+feeds the pure `initialPushState` helper for both cases), and an `isMounted` ref guard around a
+post-await `setState` is rejected as "cannot access refs during render" — drop it entirely, since
+React 18+ made an unmounted `setState` a silent no-op. Also hoist inline JSX arrow handlers into
+`useCallback`s; the rule's ref analysis follows them.
+
+### 2026-09-11 — The browser Push API needs a seam, and jsdom answers "unsupported" for free
+`client/src/lib/push.ts` replaces go-app's 157-line `FuncOf`/`Release`/promise-to-channel bridge
+with a `PushEnvironment` seam — service-worker readiness, `Notification.requestPermission()`, and a
+feature check — so tests drive a fake PushManager and no permission prompt or real push is ever
+possible (the Go `browserPusher` had no test at all). The default environment reports `supported()
+=== false` in jsdom with no stubbing, because jsdom defines no `PushManager` and no `Notification`,
+so an unmocked render lands on the unsupported state rather than exploding. Two API details that
+are easy to get wrong: the `p256dh`/`auth` encryption keys exist **only** on `subscription.toJSON()`,
+not as properties of the subscription object, and `applicationServerKey` accepts the base64url
+DOMString Rails serves — no `Uint8Array` conversion. Read `currentEndpoint` off `subscription.endpoint`
+rather than through full key validation, or a browser that will not re-expose its keys flips a
+working toggle to a failure the owner cannot act on.
