@@ -658,7 +658,7 @@ the task that owns it.
 | Contract | Exact value | Symptom if changed |
 |---|---|---|
 | Layout preference storage | key `waunder.layout`; same values (Auto/Desktop/Mobile), stored **JSON-quoted** (`"desktop"`) because go-app's storage `json.Marshal`s what it writes | Owner's layout choice silently resets |
-| Jobs feed filter storage | key `waunder.jobFilters`; same JSON shape | Owner's saved filters silently reset |
+| Jobs feed filter storage | key `waunder.jobFilters`; `jobFilterState`'s exact json tags — `view`, `bin`, `sort`, `score_band`, `source`, `location`, `date_from`, `date_to`, `page_num` — as a **bare JSON object** (unlike `waunder.layout`, this value was already a struct, so `json.Marshal` and `JSON.stringify` already agree) | Owner's saved filters silently reset |
 | Session cookie | `waunder_session`, httponly ⇒ unreadable from JS. Auth state derives from a 401 on any request, exactly as `IsUnauthorized` does today; `FE-09` centralizes that into one subscription (`src/lib/auth.ts`) | Login loop, or a UI that thinks it is signed in |
 | Manifest identity | `name`/`short_name` `Waunder`, `start_url` `/`, `scope` `/`, `display` `standalone`, `theme_color` and `background_color` `#2d2c2c`, same icon, served at `/manifest.webmanifest`, and **no `id`** (go-app emits none, so identity falls back to `start_url`) | iOS 16.4+ keys a home-screen web app on name + manifest `id`, so the owner's existing icon stops matching and a re-add creates a duplicate |
 | Web Push payload | `{title, body, data: {url, count}}` — see below | Notification click goes nowhere |
@@ -753,10 +753,11 @@ guide is mounted by the profile screen (`FE-25`), next to the push toggle it exp
 
 `client/src/components/jobs/job-list.tsx` is the screen; `job-row.tsx` is one row card;
 `src/lib/job-feed.ts` holds the pure params/label helpers; `src/components/load-state.tsx` is the
-shared loading/error chrome. Filters, sort, and the `waunder.jobFilters` persistence are `FE-16`;
-bins, the manage bar, bulk actions, and score-on-demand are `FE-17`. Both extend this component —
-the `.job-feed-controls` column they fill is already rendered, because `.job-feed-workspace` is a
-two-column grid on desktop and an empty controls column is what that grid expects.
+shared loading/error chrome. Filters, sort, and the `waunder.jobFilters` persistence followed in
+`FE-16` (below); bins, the manage bar, bulk actions, and score-on-demand are `FE-17`. Both extend
+this component — the `.job-feed-controls` column they fill is already rendered, because
+`.job-feed-workspace` is a two-column grid on desktop and an empty controls column is what that
+grid expects.
 
 Five things this pass settled:
 
@@ -784,11 +785,54 @@ Five things this pass settled:
   rendered the same "Loading…" as `loadLoading`, which `isPending` already covers.
 - **Pure helpers live in `lib/`, not beside the component.** `eslint-plugin-react-refresh` warns on
   a module that exports both components and non-components, and the chain's bar is zero warnings
-  with no disable comments (`FE-07`). So `FEED_DEFAULTS`, `feedParams`, and `pageIndicatorLabel`
-  are in `src/lib/job-feed.ts`, and `load-state.tsx` keeps its message mapper module-private. The
+  with no disable comments (`FE-07`). So `feedParams`, `pageIndicatorLabel`, and (from `FE-16`)
+  `emptyFeedText` are in `src/lib/job-feed.ts`, the selection itself is in `src/lib/job-filters.ts`,
+  and `load-state.tsx` keeps its message mapper module-private. The
   shared pill components (`ScorePill`, `LifecycleStatusPill`, `SourcePill`) are exported from
   `job-row.tsx` for the ingestion batches (`FE-18`) and the job detail (`FE-19`), which rendered
   the same `sourceIcon` / `lifecycleStatusPill` helpers in Go.
+
+## The jobs feed — filters, sort, persistence — done (`FE-16`)
+
+`client/src/lib/job-filters.ts` is the selection — its shape, defaults, option tables,
+`localStorage` contract, and pure transitions; `client/src/components/jobs/job-filters.tsx` is the
+scored/unscored view selector and the collapsible filter panel. `feedParams` in
+`src/lib/job-feed.ts` widened from "which page" to "the whole selection", and `emptyFeedText`
+moved there from the screen so the empty state can finally say which bin or view is empty, as
+`emptyText` did in Go.
+
+Five things this pass settled:
+
+- **`waunder.jobFilters` needs no unquoting, and that is not an accident of this port.**
+  `waunder.layout` is stored JSON-quoted because go-app `json.Marshal`s a Go *string*; this key
+  held a *struct*, so `json.Marshal` of it and `JSON.stringify` of the equivalent object already
+  agree byte for byte. What has to be preserved instead is the **key names** — `score_band`,
+  `date_from`, `date_to`, `page_num` are `jobFilterState`'s json tags, and `encodeSelection` /
+  `decodeSelection` are the only place the in-memory camelCase and the stored snake_case meet.
+  The test transcribes those tags from `jobs.go` rather than from the code under test.
+- **Every stored field round-trips, including two this task renders no control for.** `bin` is
+  `FE-17`'s tab and `page_num` is pagination's, but both are decoded, carried in the selection,
+  sent, and re-encoded. Truncating the struct to the fields one task happens to own is how a
+  selection saved by the Go build would come back subtly different — and `bin` in particular
+  means a restored selection can open the feed on the backlog before those tabs exist, which is
+  correct rather than surprising: it is where the owner left it.
+- **The `allOption` sentinel is not ported, and its absence is asserted.** go-app omitted an empty
+  `value` attribute entirely, and a browser then reports such an `<option>`'s *text* as its value
+  — which sent `source=All` to Rails and matched nothing (AGENTS.md 2026-06-24). React renders
+  `value=""`, so carrying the sentinel would add a mapping layer that can drift. The test asserts
+  the rendered attribute is present and empty, which rules the original bug out directly, and a
+  second case asserts a filter cleared back to All sends **no parameter at all**.
+- **Restore has to happen inside the first render, not in an effect.** The router recreates the
+  feed on every navigation to `/jobs`, so `localStorage` is what survives a trip into a job and
+  back (AGENTS.md 2026-07-06). `useState(readSelection)`'s lazy initializer runs before the
+  `useQuery` in the same render body reads it, so the **first** request already carries the saved
+  filters; restoring from `useEffect` would fetch the defaults and then correct itself, which is
+  a visible flash and a wasted request. The test pins it as "exactly one request, and it already
+  has the selection".
+- **Reset clears filters, never navigation.** `applyResetFilters` cleared the five filters and the
+  sort and deliberately left the view and the bin alone, because those are tabs. A Reset that also
+  returned the owner to the scored, active feed would be a navigation wearing a filter control's
+  label. Both halves are asserted — what it clears, and what it must not touch.
 
 ---
 

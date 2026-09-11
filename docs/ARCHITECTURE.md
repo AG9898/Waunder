@@ -96,6 +96,17 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 > (`DELETE /api/session`, which Rails always served but no Go screen ever called) clears the cached
 > reads and returns to the login screen.
 >
+> The shadow client keeps a small amount of **device-local UI state** in `localStorage`, and none
+> of it is a source of truth: the layout preference (`waunder.layout`, `client/src/lib/layout.ts`)
+> and the jobs feed's filter selection (`waunder.jobFilters`, `client/src/lib/job-filters.ts` —
+> scored/unscored view, lifecycle bin, sort, score band, source, location, ingestion-date range,
+> and page). Both keys and both stored shapes are preserved from the Go build so a selection made
+> on the owner's devices survives the cutover in either direction. The selection only decides what
+> the client **asks for**: `Api::JobPostsController#index` still performs every filter, sort, and
+> page, and an unset filter is omitted from the query rather than sent as an empty value, so the
+> server can never receive a literal `""` or an "all" sentinel to match against. Every read is
+> total — absent, blocked, or corrupt storage resolves to the default selection.
+>
 > The shadow client's `vite-plugin-pwa` configuration preserves the current installed app identity:
 > `/manifest.webmanifest` retains `Waunder`, `/`, standalone display, `#2d2c2c` colors, four
 > `/icon.svg` icon records, and no `id` (so identity still derives from `start_url`). Workbox

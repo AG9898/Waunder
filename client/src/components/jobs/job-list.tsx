@@ -2,12 +2,12 @@
  * The jobs feed, ported from the list half of `JobList` in `web/components/jobs.go`
  * (see docs/GO_MIGRATION.md): one page of `GET /api/job_posts`, its rows, and Prev/Next.
  *
- * ## Rails owns the feed; this screen owns only which page it is looking at
+ * ## Rails owns the feed; this screen owns only what it is asking for
  *
  * Filtering, sorting, and paging are entirely server-side (`Api::JobPostsController#index`,
- * AGENTS.md 2026-06-23), and nothing here re-does any of it: the rows are rendered in the
- * order they arrive, and the Prev/Next buttons read the response's own `page` envelope
- * rather than counting rows. That is not a style preference — a client-side sort would
+ * AGENTS.md 2026-06-23), and nothing here re-does any of it: a filter change is a new request,
+ * the rows are rendered in the order they arrive, and the Prev/Next buttons read the response's
+ * own `page` envelope rather than counting rows. That is not a style preference — a client-side sort would
  * reorder only the 30 rows of the current page, and a client-side `has_next` guess would
  * either hide the last page or offer an empty one.
  *
@@ -17,43 +17,51 @@
  * *tracker* is the screen that asks for `status=all` — conflating the two is what left the
  * all-jobs table empty in production, AGENTS.md 2026-09-08.)
  *
+ * ## The selection is restored before the first fetch, and saved after every change
+ *
+ * The router recreates this component on every navigation to `/jobs`, so its state alone cannot
+ * survive a trip into a job and back — `localStorage` is what does (AGENTS.md 2026-07-06).
+ * `useState(readSelection)`'s lazy initializer runs during the first render, *before* the
+ * `useQuery` below reads it, so the very first request already carries the restored filters
+ * rather than fetching the defaults and correcting itself.
+ *
+ * Saving runs from an effect on every selection change, which is where `jobs.go` did it too
+ * (inside `load()`, so every fetch re-persisted). A failed write is deliberately not surfaced:
+ * filters that do not survive a reload are a much smaller surprise than a layout preference
+ * that does not, and the selection still governs this session either way.
+ *
  * ## What is deliberately not here
  *
- * - The filter panel, the sort control, the scored/unscored view toggle, and the
- *   `waunder.jobFilters` persistence: `FE-16`. The `.job-feed-controls` column they fill is
- *   rendered here because `.job-feed-workspace` is a two-column grid on desktop.
- * - The lifecycle bin tabs, the per-row manage bar, bulk actions, and score-on-demand:
- *   `FE-17`.
- *
- * Both extend this component rather than replacing it, so the page state below is kept
- * separate from the query itself: adding a filter means widening `feedParams`
- * (`src/lib/job-feed.ts`) and resetting `page` to 1, which is exactly what `resetFeed` did
- * in Go.
+ * The lifecycle bin tabs, the per-row manage bar, bulk actions, and score-on-demand are
+ * `FE-17`. The selection already carries `bin` — it is part of the saved `waunder.jobFilters`
+ * struct and is restored, sent, and re-saved faithfully — so that task adds tabs over state
+ * that already exists rather than widening the query again.
  */
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
 
 import { fetchJobs } from "../../api/endpoints";
 import { queryKeys } from "../../api/keys";
 import type { PageMeta } from "../../api/schemas";
-import { feedParams, pageIndicatorLabel } from "../../lib/job-feed";
+import { emptyFeedText, feedParams, pageIndicatorLabel } from "../../lib/job-feed";
+import { readSelection, writeSelection } from "../../lib/job-filters";
 import { AppChrome } from "../app-chrome";
 import { LoadError, Loading } from "../load-state";
+import { JobFilters } from "./job-filters";
 import { JobRow } from "./job-row";
 
-/**
- * `emptyText` for the only selection this task can reach. `FE-16` and `FE-17` make it
- * conditional on the view and the bin ("No unscored jobs.", "No jobs in the backlog.",
- * "No removed jobs.").
- */
-const EMPTY_FEED = "No scored jobs yet.";
-
 export function JobList() {
-  // 1-based, exactly as Rails and the page envelope count. Page 1 sends no `page` param at
-  // all, so it shares a cache entry with an unparameterized read.
-  const [page, setPage] = useState(1);
-  const params = feedParams(page);
+  // Restored from `waunder.jobFilters` during this first render, so the query below opens on
+  // the owner's last selection. `pageNum` is 1-based, exactly as Rails and the page envelope
+  // count; page 1 sends no `page` param at all, so it shares a cache entry with an
+  // unparameterized read.
+  const [selection, setSelection] = useState(readSelection);
+  useEffect(() => {
+    writeSelection(selection);
+  }, [selection]);
+
+  const params = feedParams(selection);
   const { data, isPending, isError, error } = useQuery({
     queryKey: queryKeys.jobs.list(params),
     queryFn: () => fetchJobs(params),
@@ -67,14 +75,16 @@ export function JobList() {
         Import job
       </Link>
       <div className="job-feed-workspace">
-        {/* The controls column: filled by FE-16 (filters, sort, view) and FE-17 (bins). */}
-        <div className="job-feed-controls" />
+        {/* FE-17 adds the lifecycle bin tabs to this column, between the two. */}
+        <div className="job-feed-controls">
+          <JobFilters selection={selection} onChange={setSelection} />
+        </div>
         {isPending ? (
           <Loading />
         ) : isError ? (
           <LoadError error={error} />
         ) : data.job_posts.length === 0 ? (
-          <EmptyFeed />
+          <EmptyFeed text={emptyFeedText(selection)} />
         ) : (
           <div className="job-list-results">
             <ul className="job-list-items">
@@ -85,10 +95,16 @@ export function JobList() {
             <Pagination
               page={data.page}
               onPrevious={() => {
-                setPage((current) => (current <= 1 ? current : current - 1));
+                setSelection((current) =>
+                  current.pageNum <= 1 ? current : { ...current, pageNum: current.pageNum - 1 },
+                );
               }}
               onNext={() => {
-                setPage((current) => (data.page.has_next ? Math.max(current, 1) + 1 : current));
+                setSelection((current) =>
+                  data.page.has_next
+                    ? { ...current, pageNum: Math.max(current.pageNum, 1) + 1 }
+                    : current,
+                );
               }}
             />
           </div>
@@ -102,10 +118,10 @@ export function JobList() {
  * The empty feed. The import link matters more than the sentence: an owner who filtered
  * everything away or has not ingested anything yet needs a way forward from here.
  */
-function EmptyFeed() {
+function EmptyFeed({ text }: { text: string }) {
   return (
     <div className="job-list-empty">
-      <p>{EMPTY_FEED}</p>
+      <p>{text}</p>
       <Link className="job-list-empty-action" to="/jobs/new">
         Import a job
       </Link>

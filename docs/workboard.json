@@ -2402,7 +2402,7 @@
       "id": "FE-16",
       "title": "Port the jobs feed filters, sort, and filter persistence",
       "description": "Port the filter panel: score band, source, location, date range, sort, and the scored/unscored view. The panel stays collapsed by default with an active-filter count badge. Persist the selection to localStorage under waunder.jobFilters using the same JSON shape jobs.go writes today, so a saved selection from the Go app still loads, and restore it before the first fetch. Reset clears only the filter controls, deliberately leaving the scored/unscored view and the lifecycle bin tabs alone.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FE",
       "depends_on": [

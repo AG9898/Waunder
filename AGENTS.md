@@ -1349,3 +1349,17 @@ exports a constant or plain function, so pure helpers belong in `client/src/lib/
 `feedParams`/`pageIndicatorLabel` are in `lib/job-feed.ts`. Finally, an error-state test that returns
 a 5xx waits out `shouldRetryQuery`'s two retries and their backoff (over a second, past
 `waitFor`'s default); use a 4xx, which Rails-considered answers never retry.
+
+### 2026-09-11 — Restore-before-first-fetch is a lazy useState, not a useEffect
+FE-16's jobs-feed filters are restored with `useState(readSelection)` — the lazy initializer runs
+during the first render, *before* the `useQuery` in the same render body reads the params, so the
+very first request already carries the saved selection; restoring from `useEffect` instead fetches
+the defaults and then corrects itself (a visible flash plus a wasted request), which a test pins as
+"exactly one request, and it already has the selection". Two more things found here: jsdom's
+`localStorage` survives across tests within a file, so any test file rendering a component that
+persists needs `localStorage.clear()` in `beforeEach` or one test's filters become the next one's
+starting state; and the go-app `allOption` sentinel (AGENTS.md 2026-06-24) must NOT be ported —
+React renders `value=""` on an `<option>`, so the fix is to assert the rendered attribute is
+present-and-empty rather than to add a mapping layer. Simulate a site-data-blocking browser with
+`vi.spyOn(globalThis, "localStorage", "get").mockImplementation(() => { throw ... })`, which throws
+from the property getter exactly as the real one does.

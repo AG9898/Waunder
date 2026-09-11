@@ -25,6 +25,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createQueryClient } from "../../api/query-client";
 import type { JobPage, JobSummary } from "../../api/schemas";
 import { feedParams, pageIndicatorLabel } from "../../lib/job-feed";
+import { DEFAULT_SELECTION } from "../../lib/job-filters";
 import { HttpResponse, errorResponse, http, installMockApi } from "../../test/msw";
 import { emptyJobPage, fixtures } from "../../test/handlers";
 import { JobList } from "./job-list";
@@ -53,6 +54,9 @@ beforeEach(() => {
   requested = [];
   answer = fixtures.jobPage;
   failWith = null;
+  // The feed persists its selection (`FE-16`), and jsdom's storage outlives a test within a
+  // file — so clear it, or one test's filters become the next one's starting state.
+  localStorage.clear();
 });
 
 function renderFeed() {
@@ -196,7 +200,12 @@ describe("server-owned filtering and sorting", () => {
     await renderedFeed();
 
     expect(requested).toEqual(["sort=oldest&state=active&status=scored"]);
-    expect(feedParams(1)).toEqual({ status: "scored", state: "active", sort: "oldest", page: 1 });
+    expect(feedParams(DEFAULT_SELECTION)).toEqual({
+      status: "scored",
+      state: "active",
+      sort: "oldest",
+      page: 1,
+    });
   });
 
   it("renders rows in the order Rails returned them, without re-sorting by score", async () => {
