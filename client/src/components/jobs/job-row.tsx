@@ -132,8 +132,11 @@ export function SourcePill({ source }: { source: string }) {
  * The logo paths are same-origin files under `public/icons/`, resolved by
  * `sourceIconPath` — they carry no `/web/` prefix any more (docs/GO_MIGRATION.md), and a
  * stale one would 404 silently and drop only the logo.
+ *
+ * Exported for the job detail (`FE-19`), which renders the same marker before a
+ * `Source: <label>` sentence rather than inside the feed's pill.
  */
-function SourceMarker({ source }: { source: string }) {
+export function SourceMarker({ source }: { source: string }) {
   const icon = sourceIconPath(source);
   if (icon !== "") {
     return <img className="job-source-logo" src={icon} alt={sourceLabel(source)} loading="lazy" />;

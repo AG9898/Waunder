@@ -109,6 +109,17 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 > rendered from the literal values Rails sent rather than converted to the browser's timezone, so
 > a batch's date header cannot disagree with the day `IngestionBatchBuilder` grouped on.
 >
+> The shadow client's job detail (`client/src/components/job-detail/`) is one
+> `GET /api/job_posts/:id` with three explicit writes and no Rails change. Opening a posting is a
+> read: nothing on the screen creates an application, generates materials, or reaches the submit
+> path on mount. `Prepare application draft` posts `POST /api/applications` and navigates to
+> `/applications/:id` for review — it approves nothing, and approve-and-submit stays the separate
+> action on that screen; the intake controls reuse the feed's lifecycle `PATCH`; and the tracker
+> quick action (`FE-20`) writes only `PATCH /api/job_posts/:id/application_status`. The outbound
+> `Open application` link is filtered through `externalApplicationURL`, which accepts only an
+> `http(s)` URL with a host — so a `javascript:` or relative `application_url` Rails resolved from
+> an email renders no link at all — and falls back to `posting_url` when the route carries none.
+>
 > The auth model is unchanged and stays entirely server-side, but the client's half of it is now in
 > one place. Because the session cookie is httponly, being signed out can only be derived from
 > responses, so `client/src/lib/auth.ts` subscribes to both TanStack caches and sends the owner to

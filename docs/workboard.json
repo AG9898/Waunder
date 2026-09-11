@@ -2500,7 +2500,7 @@
       "id": "FE-19",
       "title": "Port the job detail screen",
       "description": "Port JobDetailView from web/components/jobs.go: GET /api/job_posts/:id rendering the summary, relevant and missing requirements, red flags, resume alignment notes, application strategy, compensation, source tag, and score pill, plus the route link and contacts link. The Apply button posts /api/applications and navigates to the draft review screen; it must never fire on mount.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FE",
       "depends_on": [

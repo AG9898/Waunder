@@ -1410,3 +1410,17 @@ setting it once from `?batch=…` and never changing the prop lets a manual expa
 a browser treats as open). Also: an in-flight button label like `Updating…` is unobservable against
 MSW, which answers in the same tick — gate the handler on a promise the test resolves, rather than
 deleting the assertion.
+
+### 2026-09-11 — Reading a repo file from a jsdom Vitest test needs `import.meta.dirname`, not `import.meta.url`
+FE-19's job-detail test proves the "long LLM token cannot overflow the card" rule structurally —
+jsdom has no layout, so it parses the `p, li, h1, h2, span { overflow-wrap: break-word; }` reset out
+of `client/public/app.css` and asserts the tag of every element holding the token. The obvious
+`readFileSync(new URL("../../../public/app.css", import.meta.url))` fails with `TypeError: The URL
+must be of scheme file`: Vite rewrites `import.meta.url` to an `http://` module URL in the test
+module graph. Use `join(import.meta.dirname, "..", "..", "..", "public", "app.css")` instead, which
+is what `lib/labels.test.ts` already does for its repo-root walk. Two other gotchas found in the
+same file: `screen.getByText("Intake")` is ambiguous on ANY ported screen because `AppChrome`'s
+landing tab is labelled "Intake" — scope such assertions with `within(container.querySelector(...))`;
+and to assert where an in-app navigation landed, render a catch-all `<Route path="*">` whose element
+prints `useLocation().pathname` into the DOM and assert on that, rather than writing a module-level
+variable from a component render.

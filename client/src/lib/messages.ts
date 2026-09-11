@@ -36,6 +36,13 @@ const LIFECYCLE_FAILED = "Could not update the job. Please try again.";
  */
 const SCORE_FAILED = "Could not request scoring.";
 
+/**
+ * `applyCreateResult`'s message for a failed `POST /api/applications`. "Start" rather than
+ * "apply": the request prepares a draft for review and submits nothing, so copy that implied an
+ * application had been sent would be a lie about a trusted-submit boundary.
+ */
+const APPLICATION_FAILED = "Could not start the application. Please try again.";
+
 /** `applyIntakeResult`'s message for a failed pause or resume of inbound email processing. */
 const INTAKE_FAILED = "Could not update intake. Please try again.";
 
@@ -64,4 +71,9 @@ export function scoreErrorMessage(error: unknown): string {
  */
 export function intakeErrorMessage(error: unknown): string {
   return isUnauthorized(error) ? SESSION_EXPIRED : INTAKE_FAILED;
+}
+
+/** A failed `POST /api/applications`: no draft was started and nothing was submitted. */
+export function applicationErrorMessage(error: unknown): string {
+  return isUnauthorized(error) ? SESSION_EXPIRED : APPLICATION_FAILED;
 }

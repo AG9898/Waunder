@@ -129,6 +129,15 @@ figures where possible.
   (`.intake-status--on|paused`), a held-alert count when any are waiting, and a single
   pause/resume button that shows `Updating…` disabled while in flight. It never changes intake on
   render; the outcome is reported in a quiet `.intake-message` pill, failures in `.intake-error`.
+- The job detail is a header (title, company, origin sentence, compensation, score pill) above a
+  `.job-workspace` that holds the assessment column and a `.job-workspace-actions` aside. Below
+  800px the aside is `display: contents`, so its panels interleave with the assessment by CSS
+  `order` — route out (0), assessment (1), pipeline status (2), drafts & outreach (3), intake (4);
+  above it the aside becomes a sticky surface-coloured sidebar. The optional actions (prepare a
+  draft, contacts and outreach) sit inside a collapsed `<details class="job-optional-actions">`
+  so the primary path — open the posting on the employer's site, then record it — stays first.
+  Assessment blocks are omitted entirely when the scorer had nothing for them; only the summary
+  falls back to a sentence, because an unscored posting is the common case rather than an error.
 - On the Jobs feed each row card is followed by a `.job-list-actions` manage bar: the selection
   checkbox (`.job-select-label`, "Select") is grouped on the left with the lifecycle
   backlog/remove/restore buttons on the right, rather than floating the bare checkbox above the

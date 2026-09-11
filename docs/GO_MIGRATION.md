@@ -936,6 +936,55 @@ Five things this pass settled:
   previous outcome by construction. The one copy change is a 401 branch on the failure message,
   which Go had for every other write but not this one.
 
+## The job detail — done (`FE-19`)
+
+`client/src/components/job-detail/` is `/jobs/:id`: `job-detail.tsx` (the read, the header, the
+back link, the workspace aside, the apply action, the intake controls) and `requirements.tsx` (the
+assessment column — summary, the three requirement lists, alignment, strategy). `src/lib/job-detail.ts`
+holds the pure helpers: `parseJobId`, `backLink`, `routeLabel`, `externalApplicationURL`, and
+`applyButtonLabel`. The cover letter and the tracker quick action are `FE-20`, and both have a
+named seam here (`JobAssessment`'s `children` slot, and the `.manual-application` section).
+
+Five things this pass settled:
+
+- **`externalApplicationURL` is a safety filter, and it is what makes the "Open application" link
+  safe to render.** `route.application_url` is resolved by Rails from an email Waunder did not
+  write, so the Go build ran it — and the posting URL as fallback — through `url.Parse` and
+  accepted only `http`/`https` with a non-empty host. The TypeScript port keeps the same table
+  (`javascript:alert(1)` and `/relative` both rejected, the posting URL used when the route has no
+  link), because rendering a `javascript:` URL as an `href` is a script-injection vector and a
+  relative one would navigate the PWA to a route that does not exist instead of leaving for the
+  employer. `rel="noopener noreferrer"` is kept for the same class of reason.
+- **A non-numeric path now reaches this screen, and the answer is to ask Rails anyway.** go-app
+  matched `^/jobs/\d+$`, so `/jobs/abc` was never routed here; React Router's `:id` accepts it.
+  `parseJobId` returns `0` for anything that is not a positive safe integer, which reproduces what
+  the Go build did when `jobIDFromPath` failed — `JobID` stayed at its zero value and the screen
+  asked for job 0, which Rails answers 404 and the load error paints. The alternative, fabricating
+  the raw string into the path, would throw inside `segment()` and be retried as a transport
+  failure.
+- **The aside's order lives in `app.css`, so the markup has to stay element-for-element.**
+  `.job-workspace-actions` is `display: contents` below the 800px container query, so its children
+  become direct flex children of `.job-workspace` and are positioned by `order` (`.manual-application`
+  0, `.job-assessment` 1, `.job-pipeline-status` 2, `.job-optional-actions` 3, `.job-lifecycle` 4);
+  above it, the aside becomes a real sticky sidebar. Wrapping, unwrapping, or reordering anything in
+  the aside changes the phone layout with no failing render, which is why the test asserts the
+  aside's children by class and in order.
+- **Every block of scorer prose must render into `p`, `li`, `h1`, `h2`, or `span`.** That five-tag
+  list is the entire wrap protection `app.css` gives LLM-generated text
+  (`overflow-wrap: break-word`, AGENTS.md 2026-06-18), and this screen renders six such blocks. A
+  `<div>` holding the text directly sits outside the reset and overflows the card at phone width, so
+  the alignment and strategy blocks keep Go's shape — a wrapper `<div>` with the prose in a `<p>`.
+  jsdom has no layout, so the test reads the reset's selector list out of `public/app.css` and
+  asserts the tag of every element that holds a long unbroken token, which is the structural
+  precondition rather than a picture of it.
+- **Apply navigates; lifecycle stays and waits.** Both are explicit clicks and neither retries. The
+  create-application mutation invalidates `applications.root()` and `jobs.root()` without awaiting
+  them and then navigates to `/applications/:id` — the screen is unmounting, so marking those stale
+  is all that is useful. The lifecycle mutation awaits its three invalidations (`jobs`, `digest`,
+  `ingestion_batches`, the same set the feed uses) because the owner stays on the transitioned
+  posting and the buttons must not re-enable over a bin the server has already changed. Go patched
+  `d.job.LifecycleState` locally instead, which left the feed and the landing showing the old bin.
+
 ---
 
 ## Service worker handoff

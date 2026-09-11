@@ -28,7 +28,8 @@
  * ## Placeholders
  *
  * Every element below is a placeholder until its screen task lands (`FE-16` … `FE-26`; the
- * task id is on each route — `/`, `/login`, and `/jobs` are ported, so they carry none). A
+ * task id is on each route — `/`, `/login`, `/jobs`, and `/jobs/:id` are ported, so they carry
+ * none). A
  * placeholder carries the **real root class** the Go screen renders, because that class is what
  * `public/app.css` styles the page container with and what the parity gate compares.
  * Keeping it here means the route test asserts the same thing before and after each port:
@@ -44,6 +45,7 @@ import { Link } from "react-router";
 import type { RouteObject } from "react-router";
 
 import { IngestionBatchesScreen } from "./components/ingestion-batches/ingestion-batches";
+import { JobDetailScreen } from "./components/job-detail/job-detail";
 import { JobList } from "./components/jobs/job-list";
 import { LoginScreen } from "./components/login";
 
@@ -83,7 +85,7 @@ export const routes: RouteObject[] = [
   // Before /jobs/:id, mirroring main.go. React Router's ranking makes this redundant
   // rather than wrong — see the module comment.
   { path: "/jobs/new", element: placeholder("manual-entry", "Import a job", "FE-23") },
-  { path: "/jobs/:id", element: placeholder("job-detail", "Job detail", "FE-19") },
+  { path: "/jobs/:id", element: <JobDetailScreen /> },
   { path: "/jobs/:id/contacts", element: placeholder("contacts-view", "Contacts", "FE-21") },
   { path: "/applications", element: placeholder("applications", "Applications", "FE-22") },
   { path: "/applications/:id", element: placeholder("draft-review", "Draft review", "FE-26") },
