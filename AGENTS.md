@@ -1338,3 +1338,14 @@ discarded it (`if _, err := ctx.Notifications().Subscribe(vapid); err != nil`), 
 shown "notifications are on" while no digest could ever be delivered; the React port posts it to
 `/api/push_subscription` like `push-toggle.tsx` does. The component was unrouted in the Go build
 (`main.go` maps `/` to `DigestView`; only the dead `Home` rendered it), so it is mounted by FE-25.
+
+### 2026-09-11 — The jobs feed carries no location, and a ported screen breaks the route test
+`Api::JobPostsController#serialize_summary` emits no `location` key, so a feed row cannot render one
+(FE-15's acceptance criterion named it anyway — `job-list.test.tsx` now asserts its absence in both
+directions). Two React-side gotchas: the first real screen forced `client/src/routes.test.tsx` to
+render through a `QueryClientProvider` plus the shared MSW handlers, because a ported screen fetches
+on mount (placeholders did not); and `eslint-plugin-react-refresh` warns when a component module also
+exports a constant or plain function, so pure helpers belong in `client/src/lib/` — that is why
+`feedParams`/`pageIndicatorLabel` are in `lib/job-feed.ts`. Finally, an error-state test that returns
+a 5xx waits out `shouldRetryQuery`'s two retries and their backoff (over a second, past
+`waitFor`'s default); use a 4xx, which Rails-considered answers never retry.

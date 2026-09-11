@@ -2368,7 +2368,7 @@
       "id": "FE-15",
       "title": "Port the jobs feed list rows and pagination",
       "description": "Port the list half of JobList from web/components/jobs.go: fetch GET /api/job_posts through TanStack Query and render rows with the title, company, location, colour-banded score pill, source pill with its brand logo or emoji marker, and lifecycle status pill. Server-side pagination honours the page envelope. Filters, bins, and bulk actions are separate tasks. Keep every existing class name so the parity gate holds.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FE",
       "depends_on": [

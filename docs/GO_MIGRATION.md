@@ -749,6 +749,49 @@ only the dead `Home` component rendered `InstallGuide`. So this task changes no 
 guide is mounted by the profile screen (`FE-25`), next to the push toggle it explains, and
 `src/lib/platform.ts` is available to any screen that needs to know it is running installed.
 
+## The jobs feed — list, rows, pagination — done (`FE-15`)
+
+`client/src/components/jobs/job-list.tsx` is the screen; `job-row.tsx` is one row card;
+`src/lib/job-feed.ts` holds the pure params/label helpers; `src/components/load-state.tsx` is the
+shared loading/error chrome. Filters, sort, and the `waunder.jobFilters` persistence are `FE-16`;
+bins, the manage bar, bulk actions, and score-on-demand are `FE-17`. Both extend this component —
+the `.job-feed-controls` column they fill is already rendered, because `.job-feed-workspace` is a
+two-column grid on desktop and an empty controls column is what that grid expects.
+
+Five things this pass settled:
+
+- **The feed row renders no location, and the task's criterion naming one was wrong.**
+  `Api::JobPostsController#serialize_summary` emits no `location` key, `JobSummarySchema` declares
+  no such field, `renderJobRow` rendered no such element, and `app.css` styles no `.job-location`
+  inside `.job-list-link`. A location line would therefore be new design with no data behind it
+  and would fail the `FE-28` parity gate; the posting's location reaches the owner through the
+  triage reasons and the detail screen. `job-list.test.tsx` asserts its absence in both directions
+  (no element, and no such key on the fixture) so this cannot be "fixed" back in by mistake.
+- **Paging costs no refetch, which the Go build could not do.** `page` is part of
+  `queryKeys.jobs.list`, so each page is its own cache entry and stepping back within the 30-second
+  `staleTime` is served from memory. `jobs.go` set `loadLoading` and refetched on every Prev/Next.
+  Rows are still replaced by the loading state while a *new* page is in flight, matching Go — no
+  `placeholderData`, because a stale page under a fresh page indicator reads as a failed click.
+- **The route test needed the app's providers once, with the first real screen.** `FE-07`'s note
+  that swapping a placeholder for a real screen is "a one-line change in `routes.tsx` and no change
+  in the test" held for the route table itself, but a ported screen fetches on mount, so
+  `routes.test.tsx` now renders through a `QueryClientProvider` and the shared MSW handlers. That
+  is a one-time cost paid here; `FE-18` … `FE-26` change nothing in it.
+- **`renderLoad`/`renderLoadError` are a shared module, not per-screen copies.** Seven Go screens
+  rendered them. `load-state.tsx` keeps `.loading`, `.load-error`, `.sign-in-link` and both message
+  strings unchanged. The sign-in link stays even though `src/lib/auth.ts` redirects on any 401 — it
+  is the fallback for the frame before the redirect lands. `loadIdle` has no counterpart: it
+  rendered the same "Loading…" as `loadLoading`, which `isPending` already covers.
+- **Pure helpers live in `lib/`, not beside the component.** `eslint-plugin-react-refresh` warns on
+  a module that exports both components and non-components, and the chain's bar is zero warnings
+  with no disable comments (`FE-07`). So `FEED_DEFAULTS`, `feedParams`, and `pageIndicatorLabel`
+  are in `src/lib/job-feed.ts`, and `load-state.tsx` keeps its message mapper module-private. The
+  shared pill components (`ScorePill`, `LifecycleStatusPill`, `SourcePill`) are exported from
+  `job-row.tsx` for the ingestion batches (`FE-18`) and the job detail (`FE-19`), which rendered
+  the same `sourceIcon` / `lifecycleStatusPill` helpers in Go.
+
+---
+
 ## Service worker handoff
 
 **This is the highest-risk item in the migration.** Without explicit handling, the installed PWA

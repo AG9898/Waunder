@@ -1,8 +1,17 @@
+import { QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { RouterProvider, createMemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
+import { createQueryClient } from "./api/query-client";
 import { routes } from "./routes";
+import { apiHandlers } from "./test/handlers";
+import { installMockApi } from "./test/msw";
+
+// A ported screen fetches on mount, so the route table can only be exercised with the two
+// providers `main.tsx` wraps it in and with Rails mocked. Placeholder screens need neither,
+// which is why this arrived with the first real screen (`FE-15`) rather than with `FE-07`.
+installMockApi(...apiHandlers());
 
 /**
  * Every path, and the page-container class the Go screen renders at its root — read off
@@ -25,7 +34,11 @@ const SCREENS: ReadonlyArray<{ path: string; rootClass: string; go: string }> = 
 
 function renderAt(path: string) {
   const router = createMemoryRouter(routes, { initialEntries: [path] });
-  const { container } = render(<RouterProvider router={router} />);
+  const { container } = render(
+    <QueryClientProvider client={createQueryClient()}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
   return { router, container };
 }
 
