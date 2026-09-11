@@ -754,8 +754,8 @@ guide is mounted by the profile screen (`FE-25`), next to the push toggle it exp
 `client/src/components/jobs/job-list.tsx` is the screen; `job-row.tsx` is one row card;
 `src/lib/job-feed.ts` holds the pure params/label helpers; `src/components/load-state.tsx` is the
 shared loading/error chrome. Filters, sort, and the `waunder.jobFilters` persistence followed in
-`FE-16` (below); bins, the manage bar, bulk actions, and score-on-demand are `FE-17`. Both extend
-this component — the `.job-feed-controls` column they fill is already rendered, because
+`FE-16`, and bins, the manage bar, bulk actions, and score-on-demand in `FE-17` (both below). Both
+extended this component — the `.job-feed-controls` column they fill was already rendered, because
 `.job-feed-workspace` is a two-column grid on desktop and an empty controls column is what that
 grid expects.
 
@@ -810,7 +810,7 @@ Five things this pass settled:
   `date_from`, `date_to`, `page_num` are `jobFilterState`'s json tags, and `encodeSelection` /
   `decodeSelection` are the only place the in-memory camelCase and the stored snake_case meet.
   The test transcribes those tags from `jobs.go` rather than from the code under test.
-- **Every stored field round-trips, including two this task renders no control for.** `bin` is
+- **Every stored field round-trips, including two this task rendered no control for.** `bin` is
   `FE-17`'s tab and `page_num` is pagination's, but both are decoded, carried in the selection,
   sent, and re-encoded. Truncating the struct to the fields one task happens to own is how a
   selection saved by the Go build would come back subtly different — and `bin` in particular
@@ -833,6 +833,58 @@ Five things this pass settled:
   sort and deliberately left the view and the bin alone, because those are tabs. A Reset that also
   returned the owner to the scored, active feed would be a navigation wearing a filter control's
   label. Both halves are asserted — what it clears, and what it must not touch.
+
+## The jobs feed — bins, selection, bulk actions, score-on-demand — done (`FE-17`)
+
+`client/src/components/jobs/job-bins.tsx` is the Active / Backlog / Removed tab strip;
+`job-actions.tsx` is the per-row manage bar and the bulk bar; `src/lib/job-actions.ts` holds the
+pure bin table, button labels, and selection transitions; `src/lib/messages.ts` is the
+owner-facing failure copy the whole app now shares. `job-list.tsx` gained the two mutations and
+`job-row.tsx` an `actions` slot. This completes the jobs feed.
+
+Five things this pass settled:
+
+- **A write invalidates the query; it never patches the rows.** Go's `applyLifecycleResult`
+  spliced the transitioned rows out of its local slice and `applyScoreResult` swapped one row in
+  place. Both are wrong here for a reason that has nothing to do with TanStack owning the cache: a
+  lifecycle transition changes **which postings belong on the page being shown**. Backlogging the
+  3rd of 30 rows on page 2 of the Active bin does not leave 29 rows — it pulls a row forward from
+  page 3 and shifts every later page and `page.total`. A local splice renders a page that no
+  longer exists on the server. So a successful write invalidates `jobs.root()`, `digest()`, and
+  `ingestionBatches.root()` (the latter two render the same postings with the same lifecycle
+  pill) and awaits the refetch, which also keeps the controls disabled through the whole
+  transition rather than re-enabling them over stale rows. The test asserts it from the *outside*:
+  after a backlog, the feed is re-read and both rows are still on screen, because the fake Rails
+  still answers with both — something a local splice could not produce.
+- **Lifecycle is one mutation, scoring is many.** Go had a single `lifecycleBusy` / `lifecycleErr`
+  pair and per-id `scoreStates` / `scoreErrs` maps, and that asymmetry is right rather than
+  incidental. Every lifecycle control — the bulk bar and all thirty rows — `PATCH`es the same rows,
+  so overlapping writes are a race the owner cannot reason about; `useMutation`'s `isPending` /
+  `error` are exactly the single flag and single message that needs. Scoring is the opposite:
+  several postings can legitimately be queued at once, so the in-flight ids and the failures stay
+  per row — one shared score error could not say which posting failed.
+- **The bulk count is the *visible* selection, which corrects a real Go bug.** `selectedCount()`
+  counted every id ever checked while `selectedIDs()` returned only ids still among the loaded
+  rows, so switching bins could leave "3 selected" on screen with an enabled Remove button whose
+  handler returned immediately on an empty id list — an enabled control that does nothing.
+  Counting what a click would actually send makes the disabled state honest. Nothing prunes the
+  set itself, as nothing did in Go; `visibleSelection` is what keeps a stale id from moving a row
+  the owner is not looking at.
+- **The endpoint split is only observable from the request.** `setJobLifecycle` routes one id to
+  `PATCH /api/job_posts/:id/lifecycle` and several to the collection `PATCH
+  /api/job_posts/lifecycle`, which is what keeps a bulk transition in one Rails transaction. The
+  Go test could only assert that `SetJobLifecycle` had been called, which cannot tell a bulk PATCH
+  from N member PATCHes; with MSW the test asserts the method, path, and body that actually went
+  out. Note the split is by **id count, not by which control was clicked** — a bulk action with
+  exactly one row checked correctly uses the member endpoint.
+- **Failure copy moved to `src/lib/messages.ts`, and reads and writes map differently.** Go shared
+  one package-level `sessionExpiredMessage` across every screen; `load-state.tsx` had a private
+  copy of it, and the sentence is what that panel compares against to decide whether to offer the
+  Sign in link — so a second copy drifts into a silently missing link. The three mappers are
+  deliberately separate: "Could not load data. Please try again." after pressing Remove would
+  describe the screen rather than the action, leaving the owner unable to tell whether the row
+  moved. Only a 401 is an auth failure; a 403 is an authorization decision about an owner who
+  still has a session.
 
 ---
 

@@ -15,13 +15,18 @@
  * would fail the parity gate.
  *
  * The manage bar the Go row rendered after the card (`.job-list-actions`: the selection
- * checkbox, the lifecycle buttons, and the score-on-demand control) belongs to `FE-17`.
+ * checkbox, the lifecycle buttons, and the score-on-demand control) is `job-actions.tsx`,
+ * passed in as `actions`. It is a prop rather than something this row builds, because the
+ * row is a pure function of one `JobSummary` while the manage bar needs the feed's selection,
+ * its in-flight writes, and the bin being shown — and because the ingestion landing renders
+ * rows with no manage bar at all.
  *
  * `SourcePill` and `LifecycleStatusPill` were shared helpers in the Go file too
  * (`sourceIcon`, `lifecycleStatusPill`), rendered identically by the ingestion batches
  * (`FE-18`) and the job detail (`FE-19`); they are exported here for those screens rather
  * than transcribed a second time.
  */
+import type { ReactNode } from "react";
 import { Link } from "react-router";
 
 import type { JobSummary } from "../../api/schemas";
@@ -34,7 +39,7 @@ import {
   sourceLabel,
 } from "../../lib/labels";
 
-export function JobRow({ job }: { job: JobSummary }) {
+export function JobRow({ job, actions }: { job: JobSummary; actions?: ReactNode }) {
   return (
     <li className="job-list-item">
       <Link className="job-list-link" to={`/jobs/${job.id}`}>
@@ -43,6 +48,7 @@ export function JobRow({ job }: { job: JobSummary }) {
         <SourcePill source={job.source} />
         <JobPills job={job} />
       </Link>
+      {actions}
     </li>
   );
 }

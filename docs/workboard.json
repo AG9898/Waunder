@@ -2436,7 +2436,7 @@
       "id": "FE-17",
       "title": "Port jobs feed lifecycle bins, selection, bulk actions, and score-on-demand",
       "description": "Port the remaining JobList behaviour: the active/backlog/removed bin tabs, the per-row selection checkbox inside the manage bar grouped with the lifecycle buttons, bulk and single lifecycle writes, and on-demand scoring. Mutations invalidate the feed query rather than patching rows locally, because a lifecycle change can move a row out of the current bin.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FE",
       "depends_on": [

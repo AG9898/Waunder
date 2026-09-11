@@ -1363,3 +1363,27 @@ React renders `value=""` on an `<option>`, so the fix is to assert the rendered 
 present-and-empty rather than to add a mapping layer. Simulate a site-data-blocking browser with
 `vi.spyOn(globalThis, "localStorage", "get").mockImplementation(() => { throw ... })`, which throws
 from the property getter exactly as the real one does.
+
+### 2026-09-11 — MSW handler order decides whether a bulk PATCH is ever seen
+`http.patch("/api/job_posts/:id/lifecycle")` matches the **collection** path with `id="lifecycle"`,
+so registering it before `http.patch("/api/job_posts/lifecycle")` silently swallows every bulk
+write and the test still passes — it just proves the wrong endpoint. Register the collection route
+first (`client/src/test/handlers.ts` already does; `job-actions.test.tsx` repeats it). Two other
+things FE-17 settled: `setJobLifecycle` splits on **id count, not on which control was clicked**, so
+a bulk action with exactly one row checked correctly uses the member endpoint — a test for "bulk uses
+the collection PATCH" needs at least two selected rows. And to observe an in-flight write
+deterministically, make the MSW resolver `await` a promise a test resolves (an `afterEach` release
+guard), rather than leaving the request hanging: an unresolved handler outlives the component that
+made it.
+
+### 2026-09-11 — Go's bulk selection count was a lie; count the visible selection
+`JobList.selectedCount()` counted every id ever checked while `selectedIDs()` returned only ids still
+among the loaded rows, so switching bins or pages could leave "3 selected" on screen with an **enabled**
+Remove button whose handler returned immediately on an empty list. The React port counts
+`visibleSelection(jobs, selected).length` instead, so the disabled state describes what a click would
+actually send; nothing prunes the selection set itself, matching Go. More generally in `client/`: a
+successful mutation invalidates the query prefixes in `api/keys.ts` and never patches cached rows —
+a lifecycle transition changes *which* postings belong on a paged, filtered, server-sorted page, so
+Go's local splice (`applyLifecycleResult`) would render a page that no longer exists on the server.
+`await` the invalidation inside `onSuccess` so `isPending` covers the refetch and controls stay
+disabled through the whole transition.

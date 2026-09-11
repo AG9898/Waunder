@@ -77,6 +77,19 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 > 401 reaches the login redirect immediately), and **a mutation is never retried**, because
 > replaying `POST /api/applications/:id/submit` would re-dispatch a trusted submit.
 >
+> **Writes invalidate; they never patch what the server said.** Each Go screen spliced its own
+> local slice after a successful write — `applyLifecycleResult` removed the transitioned rows,
+> `applyScoreResult` swapped one row in place. The shadow client instead invalidates the query
+> prefixes in `keys.ts` and re-asks Rails. This is a correctness rule, not a caching preference:
+> a lifecycle transition changes *which* postings belong on the page being shown, because
+> backlogging one row of a paged, filtered, server-sorted feed pulls a row forward from a later
+> page and shifts `page.total`. A local splice therefore renders a page that no longer exists on
+> the server. The same write also invalidates the digest and the ingestion batches, which render
+> the same postings with the same lifecycle pill. Rails is unchanged, and the endpoint split it
+> already offered is preserved: a single row goes through `PATCH /api/job_posts/:id/lifecycle`
+> and several go through the collection `PATCH /api/job_posts/lifecycle`, so a bulk transition
+> stays one Rails transaction rather than N requests.
+>
 > Client-side routing carries over unchanged. `client/src/routes.tsx` declares the same nine paths
 > `main.go` registers, with go-app's three `RouteWithRegexp` patterns as ordinary React Router
 > params (`/jobs/:id`, `/jobs/:id/contacts`, `/applications/:id`) and a catch-all not-found screen

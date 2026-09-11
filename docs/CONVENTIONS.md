@@ -196,6 +196,14 @@ A standalone npm project (no monorepo workspace), exactly like `workers/`. Node 
 - **Every query key comes from `queryKeys` in `src/api/keys.ts`.** A key spelled out inline at a
   call site is how a mutation silently stops refreshing a screen. Keys are hierarchical so a
   mutation invalidates by prefix — as narrowly as one job, not the whole cache.
+- **A successful mutation invalidates a query prefix; it never patches cached rows.** A write can
+  change *which* records belong on the screen — backlogging one row of a paged, filtered,
+  server-sorted feed pulls a row forward from a later page and shifts `page.total` — so a local
+  splice renders a page that no longer exists on the server. Invalidate every prefix that renders
+  the same records (the jobs feed write also invalidates the digest and the ingestion batches) and
+  `await` the refetch inside `onSuccess`, which keeps the controls disabled through the whole
+  transition instead of re-enabling them over stale rows. Local state after a write is limited to
+  what is not server data: the row selection and the failure message.
 - **A mutation is never retried.** `client/src/api/query-client.ts` sets `mutations.retry = false`
   for all writes, not an allowlist: replaying `POST /api/applications/:id/submit` would re-dispatch
   a trusted submit the owner approved once. Reads retry only on a transport failure or a Rails
@@ -216,6 +224,12 @@ A standalone npm project (no monorepo workspace), exactly like `workers/`. Node 
   the containing block for the `position: fixed` bottom navigation, and they own the
   `padding-bottom: var(--screen-bottom)` that reserves the bar plus the iPhone safe area. The login
   and not-found screens render no chrome.
+- **Owner-facing failure copy lives in `src/lib/messages.ts`, and a read and a write map
+  differently.** One module owns the strings because `load-state.tsx` keys its Sign in link off the
+  expired-session sentence itself, so a second copy drifts into a silently missing link. A failed
+  write says what the action could not do ("Could not update the job.") rather than what the screen
+  could not load, because the owner otherwise cannot tell whether their change took effect. Only a
+  401 is an auth failure; a 403 is an authorization decision about an owner who still has a session.
 - **Browser storage is a total, injectable seam.** Every read and write of `localStorage` goes
   through a helper in `src/lib/` that takes an optional `Storage` (so tests drive a stub instead of
   patching a global) and never throws: the global can be absent, can throw on *access* where a
