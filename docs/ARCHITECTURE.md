@@ -103,6 +103,16 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 > drives `client/src/components/update-banner.tsx`, which leaves activation/reload as an explicit
 > owner action. This is shadow-client behavior only until the frontend cutover.
 >
+> The shadow client's service worker (`client/src/sw.ts`, built with the plugin's `injectManifest`
+> strategy) also fixes a live push defect without any Rails change. Rails sends
+> `{title, body, data: {url, count}}`, which the go-app worker discarded — it read a
+> `notification.path` Rails never sends and overwrote `data` — so the digest notification's click
+> target has been dead. The new handlers read `data.url`, resolve it against the app origin and
+> refuse anything that is not same-origin, show the notification with the app icon and badge, and
+> on click focus an open window and message it to route in place rather than reloading it (opening
+> a new window only when none is open). `POST`/`DELETE /api/push_subscription` and the VAPID key
+> endpoint are untouched.
+>
 > `FE-27` supplies the un-deployed Caddy container for that shadow client:
 > `client/Caddyfile` serves the built SPA with `zstd`/`gzip` compression and proxies the existing
 > API and Resend paths to `API_INTERNAL_URL`. Its container smoke test verifies that Caddy preserves

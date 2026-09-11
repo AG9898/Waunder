@@ -405,8 +405,11 @@ already in place.
 
 #### PWA manifest, precache, and update prompt (`FE-10`)
 
-`vite-plugin-pwa` owns the shadow client's `/manifest.webmanifest`, generated service worker, and
-the content-hashed precache manifest. `client/vite.config.ts` pins the manifest identity to the
+`vite-plugin-pwa` owns the shadow client's `/manifest.webmanifest`, service worker build, and
+the content-hashed precache manifest. (`FE-11` moved the worker itself from the plugin's
+`generateSW` strategy to `injectManifest` over a hand-written `client/src/sw.ts`, because the push
+handlers below cannot be expressed in generated config; everything in this section is unchanged by
+that, and `sw.ts` restates the generated defaults it replaced.) `client/vite.config.ts` pins the manifest identity to the
 current go-app output: name/short name `Waunder`, start URL and scope `/`, standalone display,
 both colors `#2d2c2c`, and the four default/large/SVG/maskable records all pointing to `/icon.svg`.
 It deliberately supplies **no `id`**, so platforms continue to derive identity from the unchanged
@@ -757,6 +760,34 @@ like it works. The shape mismatch is a static fact on both sides.
 
 **The new service worker reads `data.url`, sets the app icon and badge, and Rails still does not
 change.** Owned by `FE-11`.
+
+`client/src/sw.ts` is that worker: `vite-plugin-pwa` builds it with `injectManifest`, replacing
+`self.__WB_MANIFEST` with the same revisioned precache manifest `FE-10` configured. Because the
+plugin no longer generates the worker, `sw.ts` restates the four defaults it would have written —
+`precacheAndRoute`, `cleanupOutdatedCaches`, the `index.html` navigation fallback, and the
+`SKIP_WAITING` message handler. That last one is load-bearing: with `registerType: "prompt"`,
+`updateServiceWorker()` only posts `{type: "SKIP_WAITING"}`, so without a worker acting on it the
+update banner's Reload button would do nothing.
+
+The behavior lives in `client/src/lib/sw-nav.ts`, which takes the worker scope as an argument so
+the handlers are driven in tests with a fake scope and fake events (`client/src/sw.test.ts`):
+
+- **`push`** reads `{title, body, data: {url, count}}` exactly as Rails sends it and shows the
+  notification with `icon` and `badge` set to `/icon.svg` (the manifest's icon). A push with a
+  malformed or absent body still shows a notification that opens the app rather than being
+  dropped.
+- **`data.url` is resolved against this origin and clamped to it.** Rails sends a path, which only
+  means anything relative to the app; anything that does not resolve same-origin — another host, a
+  `javascript:` URL, a protocol-relative `//host/path` — falls back to `/`. A push body is the one
+  input the worker takes from outside the app, and it must never hand an arbitrary URL to
+  `openWindow`. The stored target is re-resolved on click, so a notification left over from the
+  go-app worker cannot escape either.
+- **`notificationclick`** focuses an already-open app window — preferring one already on the target
+  URL — and posts it `{type: "waunder:navigate", url}` instead of calling `client.navigate(url)`,
+  which would be a full document load that discards the React tree and the whole TanStack cache.
+  `installSwNavigation` in `main.tsx` is the other half: it routes the focused window through the
+  router object, the same way the 401 boundary does. With no app window open (or with focus
+  refused) it falls back to `clients.openWindow`.
 
 ---
 

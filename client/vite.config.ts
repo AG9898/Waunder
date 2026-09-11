@@ -42,8 +42,15 @@ export default defineConfig({
       registerType: "prompt",
       manifestFilename: "manifest.webmanifest",
       manifest: pwaManifest,
+      // The worker is written by hand (src/sw.ts) because Rails' Web Push payload needs push and
+      // notificationclick handlers a generated worker cannot express — see docs/GO_MIGRATION.md.
+      // It restates the generated defaults it replaces: precache, outdated-cache cleanup, the
+      // index.html navigation fallback, and the SKIP_WAITING message the update banner sends.
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
       // Public files retain stable URLs, so they must be revisioned in the precache manifest.
-      workbox: { globPatterns: ["**/*.{js,css,html,svg,woff2}"] },
+      injectManifest: { globPatterns: ["**/*.{js,css,html,svg,woff2}"] },
     }),
   ],
   server: {

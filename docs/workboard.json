@@ -2235,7 +2235,7 @@
       "id": "FE-11",
       "title": "Write the service worker push and notification-click handlers",
       "description": "Implement the custom service worker's push handling against Rails' actual payload. Rails sends {title, body, data:{url, count}}; go-app's generated worker read notification.path and overwrote data, so data.url was discarded and the click target has been dead. Read data.url, set the app icon and badge, and navigate on click. Rails must not be modified to accommodate the client.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FE",
       "depends_on": [

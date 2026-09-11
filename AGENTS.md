@@ -1288,3 +1288,14 @@ one modern-looking SVG icon entry changes the installed PWA's manifest contract 
 Playwright WebKit from `workers/node_modules`. On a fresh Debian/Ubuntu host, install WebKit's system
 libraries with `cd workers && sudo npx playwright install-deps webkit` before the check; a passing
 desktop WebKit run is useful evidence but cannot replace the post-cutover owner iOS home-screen check.
+
+### 2026-09-11 — A custom service worker must restate what vite-plugin-pwa generated
+FE-11 switched `client/` from the plugin's `generateSW` strategy to `injectManifest` over
+`client/src/sw.ts`, because push/notificationclick handlers cannot be expressed in generated
+config. `generateSW`'s defaults are not inherited: `precacheAndRoute`, `cleanupOutdatedCaches`, the
+`navigateFallback: "index.html"` route, and — easiest to miss — the `{type: "SKIP_WAITING"}`
+message handler must all be written by hand, or `registerType: "prompt"` silently breaks (FE-10's
+banner posts that message and nothing acts on it). Keep worker logic in a plain module that takes
+the scope as an argument (`src/lib/sw-nav.ts`) and declare only the slice of
+`ServiceWorkerGlobalScope` it uses: adding `/// <reference lib="webworker" />` would pull the
+WebWorker lib into the same TypeScript program as the DOM lib the app needs.
