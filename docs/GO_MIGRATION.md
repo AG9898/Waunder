@@ -720,6 +720,26 @@ the new build after the push.
 every real returning browser shows the old build. The handoff must be verified with
 `launchPersistentContext` and no such option.
 
+### Handoff integration result (`FE-29`, 2026-09-11)
+
+`node client/scripts/handoff-check.cjs` passed locally against the built Caddy image, Rails in the
+test environment, the legacy Go server, and both Playwright Chromium and WebKit. It performs two
+isolated checks:
+
+- It replays a freshly Svix-signed `email.received` body through Caddy twice: first into a capture
+  server to compare the raw bytes and every `svix-*` header, then into Rails with the test webhook
+  secret. Rails accepts the signature and persists an `InboundEmail`; the script asserts the stored
+  raw payload is byte-for-byte the replayed JSON. It temporarily pauses test intake and deletes its
+  fixture row afterward, so no parsing or scoring is triggered.
+- It opens the Go app in a `launchPersistentContext`, waits for the legacy `/app-worker.js` and its
+  cache, swaps the same origin to the Caddy image, then requests a worker update. Chromium and
+  Playwright WebKit both observed the replacement worker unregistering and all legacy caches being
+  removed before the Vite asset bundle loaded.
+
+Playwright WebKit is a closer proxy to iOS than Chromium, but no desktop automation proves iOS
+WebKit or the Chrome-added home-screen container. The manual on-device check in
+[`PRODUCTION_SETUP.md`](PRODUCTION_SETUP.md#pwa-cutover-recovery) remains the production gate.
+
 ---
 
 ## Web Push payload — fix a real bug

@@ -153,6 +153,17 @@ DevTools and a version-dependent storage model. If a later launch does not recov
 re-add the home-screen icon; this loses its session, push subscription, and local layout/filter
 preferences, so the owner must sign in and enable push again.
 
+**Post-cutover gate:** on the owner's actual iPhone, open the existing home-screen icon after the
+deployment and confirm it reaches the current app rather than the old Go shell. Close and reopen it
+once if the retirement worker clears the old cache without forcing the already-loaded page to
+reload. This on-device check is the real gate: desktop Chromium and Playwright WebKit validate the
+handoff logic but cannot prove iOS WebKit or the Chrome-added web-app container.
+
+If the icon remains pinned to the old shell, delete it and add the site to the home screen again.
+That fallback clears the `waunder_session` cookie, the Web Push subscription, and the
+`waunder.layout` and `waunder.jobFilters` local-storage values. Sign in again, re-enable push from
+Profile, and restore the preferred layout and jobs filters.
+
 ---
 
 ## Smoke Checks

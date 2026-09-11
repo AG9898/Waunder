@@ -32,5 +32,13 @@ export default tseslint.config(
     files: ["vite.config.ts", "vitest.setup.ts", "eslint.config.js"],
     languageOptions: { globals: globals.node },
   },
+  {
+    files: ["scripts/**/*.cjs"],
+    languageOptions: {
+      sourceType: "commonjs",
+      globals: { ...globals.node, navigator: "readonly", caches: "readonly", document: "readonly" },
+    },
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
   prettier,
 );

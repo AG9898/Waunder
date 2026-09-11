@@ -2842,7 +2842,7 @@
       "id": "FE-29",
       "title": "Verify the Resend webhook path and the service worker handoff",
       "description": "Exercise the two production data paths the cutover cannot be allowed to break. First, prove a real or replayed Resend email.received survives Svix signature verification through Caddy into Rails, with the raw body and svix-* headers intact, and creates an InboundEmail. Svix verifies against the raw request body, so any proxy-layer body rewriting silently breaks ingestion. Second, prove the /app-worker.js kill switch actually retires the go-app worker: load the Go app first in a launchPersistentContext browser, then point it at the new build and confirm the old worker unregisters and its caches are cleared. Record both procedures and their results. No production Railway change.",
-      "status": "todo",
+      "status": "done",
       "priority": "critical",
       "group_id": "FE",
       "depends_on": [

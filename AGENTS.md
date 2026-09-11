@@ -1282,3 +1282,9 @@ go-app emits four manifest icons from its default, large, SVG, and maskable hand
 when every field points to the same SVG: maskable 512 PNG-labelled, SVG any, large 512 PNG-labelled,
 and default 192 PNG-labelled. Preserve those records plus the absent `id` in the Vite manifest;
 one modern-looking SVG icon entry changes the installed PWA's manifest contract during cutover.
+
+### 2026-09-11 — Handoff verification needs Playwright WebKit system dependencies
+`client/scripts/handoff-check.cjs` runs the legacy-worker retirement flow through both Chromium and
+Playwright WebKit from `workers/node_modules`. On a fresh Debian/Ubuntu host, install WebKit's system
+libraries with `cd workers && sudo npx playwright install-deps webkit` before the check; a passing
+desktop WebKit run is useful evidence but cannot replace the post-cutover owner iOS home-screen check.
