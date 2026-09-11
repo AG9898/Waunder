@@ -109,16 +109,31 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 > rendered from the literal values Rails sent rather than converted to the browser's timezone, so
 > a batch's date header cannot disagree with the day `IngestionBatchBuilder` grouped on.
 >
-> The shadow client's job detail (`client/src/components/job-detail/`) is one
-> `GET /api/job_posts/:id` with three explicit writes and no Rails change. Opening a posting is a
-> read: nothing on the screen creates an application, generates materials, or reaches the submit
-> path on mount. `Prepare application draft` posts `POST /api/applications` and navigates to
-> `/applications/:id` for review — it approves nothing, and approve-and-submit stays the separate
-> action on that screen; the intake controls reuse the feed's lifecycle `PATCH`; and the tracker
-> quick action (`FE-20`) writes only `PATCH /api/job_posts/:id/application_status`. The outbound
-> `Open application` link is filtered through `externalApplicationURL`, which accepts only an
-> `http(s)` URL with a host — so a `javascript:` or relative `application_url` Rails resolved from
-> an email renders no link at all — and falls back to `posting_url` when the route carries none.
+> The shadow client's job detail (`client/src/components/job-detail/`) is
+> `GET /api/job_posts/:id` plus a `GET /api/job_posts/:id/cover_letter_draft`, with five explicit
+> writes and no Rails change. Opening a posting is a read: nothing on the screen creates an
+> application, generates materials, or reaches the submit path on mount. `Prepare application
+> draft` posts `POST /api/applications` and navigates to `/applications/:id` for review — it
+> approves nothing, and approve-and-submit stays the separate action on that screen; the intake
+> controls reuse the feed's lifecycle `PATCH`. The outbound `Open application` link is filtered
+> through `externalApplicationURL`, which accepts only an `http(s)` URL with a host — so a
+> `javascript:` or relative `application_url` Rails resolved from an email renders no link at all —
+> and falls back to `posting_url` when the route carries none.
+>
+> The manual tracker and the cover letter (`FE-20`) are the other two writes. `Mark as applied`
+> and the status/stage selects share one mutation against `PATCH
+> /api/job_posts/:id/application_status` and reach nothing else — no draft creation, no submit —
+> because the owner is recording an application they made by hand; `pipeline_note` and
+> `next_follow_up_on` stay absent from every payload so Rails keeps the values it holds, a status
+> change sends a blank stage so `Application#assign_pipeline_status` applies that status's default,
+> and the stage change reads the status from the refetched tracker rather than from a value
+> captured in an earlier render. `Mark as applied` is offered only from `interested`, `drafting`,
+> `needs_review`, or an untracked posting, so one tap cannot walk an interviewing posting
+> backwards. The cover letter reads its own endpoint and generates through `POST
+> /api/job_posts/:id/cover_letter_draft` on an explicit click only — the one control on the screen
+> that spends OpenRouter budget — and keeps Rails' three answers apart: 201 with the letter, 503
+> `llm_unavailable` (no key configured), and 502 `generation_failed`. Generating is disabled until
+> the saved letter is on screen, because the `POST` replaces it.
 >
 > The auth model is unchanged and stays entirely server-side, but the client's half of it is now in
 > one place. Because the session cookie is httponly, being signed out can only be derived from

@@ -79,6 +79,21 @@ export function isUnauthorized(error: unknown): boolean {
   return asAPIError(error)?.status === 401;
 }
 
+/**
+ * Reports whether `error` is an `APIError` carrying a 503, ported from `isServiceUnavailable`
+ * in `web/components/contacts.go`.
+ *
+ * 503 is not a generic server hiccup in this API: it is the status Rails answers when an LLM
+ * generator ran but had nothing to run *with* — `CoverLetterDraftsController#create` and
+ * `OutreachDraftsController#create` both map their generator's `skipped` result (no
+ * `OPENROUTER_API_KEY`) to `llm_unavailable` + 503, while a generator that actually failed is
+ * 502. Screens keep the two apart because "try again later" and "try again" are different
+ * instructions, and the first one is the truth when no key is configured.
+ */
+export function isServiceUnavailable(error: unknown): boolean {
+  return asAPIError(error)?.status === 503;
+}
+
 /** The Rails envelope `error.code` for `error`, or `""` when it is not an `APIError`. */
 export function apiErrorCode(error: unknown): string {
   return asAPIError(error)?.code ?? "";

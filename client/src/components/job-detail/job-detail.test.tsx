@@ -37,7 +37,7 @@ import {
   parseJobId,
   routeLabel,
 } from "../../lib/job-detail";
-import { fixtures } from "../../test/handlers";
+import { apiHandlers, fixtures } from "../../test/handlers";
 import { HttpResponse, errorResponse, http, installMockApi } from "../../test/msw";
 import { JobDetailScreen } from "./job-detail";
 
@@ -95,6 +95,9 @@ const server = installMockApi(
     answer = { ...answer, lifecycle_state: state };
     return HttpResponse.json({ job_post: { ...fixtures.scoredJob, lifecycle_state: state } });
   }),
+  // The screen also reads the cover letter (`FE-20`) and writes the tracker; both fall through
+  // to the shared handlers, which the more specific ones above shadow (MSW takes the first match).
+  ...apiHandlers(),
 );
 
 beforeEach(() => {
@@ -127,6 +130,13 @@ function renderDetail(path = "/jobs/101") {
       </MemoryRouter>
     </QueryClientProvider>,
   );
+}
+
+/** The first element matching `selector`, or a failure naming what was missing. */
+function requireElement(container: HTMLElement, selector: string): HTMLElement {
+  const found = container.querySelector<HTMLElement>(selector);
+  if (found === null) throw new Error(`no ${selector} rendered`);
+  return found;
 }
 
 /** Stands in for every other screen, rendering the path a navigation reached. */
@@ -234,10 +244,14 @@ describe("job detail rendering", () => {
     });
     const { container } = await loadedDetail();
 
+    for (const text of ["Staff Engineer", "Acme", "$180k – $210k", "direct_ats"]) {
+      expect(screen.getByText(text, { exact: false })).toBeTruthy();
+    }
+    // Scoped to the assessment column, which is where scorer output belongs — and necessary
+    // now that the tracker selects (`FE-20`) are on the page: a substring match for "Go" also
+    // finds the "Offer negotiation" stage option.
+    const assessment = within(requireElement(container, ".job-assessment"));
     for (const text of [
-      "Staff Engineer",
-      "Acme",
-      "$180k – $210k",
       "Great role for a platform generalist.",
       "Go",
       "Distributed systems",
@@ -245,9 +259,8 @@ describe("job detail rendering", () => {
       "On-call rotation heavy",
       "Strong alignment on backend depth.",
       "Lead with the payments platform project.",
-      "direct_ats",
     ]) {
-      expect(screen.getByText(text, { exact: false })).toBeTruthy();
+      expect(assessment.getByText(text, { exact: false })).toBeTruthy();
     }
     expect(screen.getByText("Match: 88%")).toBeTruthy();
     expect(container.querySelector(".job-score--high")).not.toBeNull();
@@ -329,6 +342,7 @@ describe("job detail rendering", () => {
     expect(aside?.getAttribute("aria-label")).toBe("Application workspace");
     expect(Array.from(aside?.children ?? []).map((child) => child.className)).toEqual([
       "manual-application",
+      "job-pipeline-status",
       "job-optional-actions",
       "job-lifecycle",
     ]);

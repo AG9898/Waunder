@@ -942,8 +942,9 @@ Five things this pass settled:
 back link, the workspace aside, the apply action, the intake controls) and `requirements.tsx` (the
 assessment column — summary, the three requirement lists, alignment, strategy). `src/lib/job-detail.ts`
 holds the pure helpers: `parseJobId`, `backLink`, `routeLabel`, `externalApplicationURL`, and
-`applyButtonLabel`. The cover letter and the tracker quick action are `FE-20`, and both have a
-named seam here (`JobAssessment`'s `children` slot, and the `.manual-application` section).
+`applyButtonLabel`. The cover letter and the tracker quick action arrived with `FE-20`
+(below), through the seams left here: `JobAssessment`'s `children` slot and the
+`.manual-application` section.
 
 Five things this pass settled:
 
@@ -984,6 +985,60 @@ Five things this pass settled:
   `ingestion_batches`, the same set the feed uses) because the owner stays on the transitioned
   posting and the buttons must not re-enable over a bin the server has already changed. Go patched
   `d.job.LifecycleState` locally instead, which left the feed and the landing showing the old bin.
+
+---
+
+## The cover letter and the manual tracker — done (`FE-20`)
+
+The two panels `FE-19` left seams for. `cover-letter.tsx` fills the assessment column's slot;
+`tracker-action.tsx` supplies the tracker line and `Mark as applied` inside `.manual-application`
+plus the sibling `.job-pipeline-status` block. `src/lib/pipeline.ts` holds what both the job detail
+and the tracker table (`FE-22`) need — the two option tables, the sentinel mapping,
+`pipelineStatusLabel`, `canMarkApplied` — and `useTrackerWrite`, the shared mutation.
+`copy-button.tsx` ports `web/components/copy_button.go`, which `FE-21` and `FE-26` also use.
+
+Five things this pass settled:
+
+- **The tracker writes to the tracker and to nothing else.** `PATCH
+  /api/job_posts/:id/application_status` is the owner saying what *they* did on the employer's
+  site; Rails creates the Application row on first use and enqueues no job. `tracker-action.test.tsx`
+  therefore watches `/api/applications` and `/api/applications/:id/submit` stay at zero requests
+  across a mark-applied and a status change — the safety property is about requests, which is why
+  the test drives the whole screen rather than the two components.
+- **Two payload details are Rails semantics, not client convenience.** `pipeline_note` and
+  `next_follow_up_on` carried `,omitempty` in Go and stay *absent* here (`update_pipeline_status`
+  assigns each only when non-nil, so `""` would erase a note the owner wrote elsewhere). And a
+  status change deliberately sends a **blank** stage: `Application#assign_pipeline_status` reads
+  that as `DEFAULT_PIPELINE_STAGE_BY_STATUS[status]`, which is how moving to Applied from the
+  select lands in the same `applied` + `waiting` the quick action writes.
+- **The `none` stage sentinel is kept, unlike the feed's `allOption`.** go-app dropped an empty
+  `value` attribute, so `optionNodes` rendered `"none"` and mapped it back on read. `FE-16` dropped
+  the feed's equivalent because *that* sentinel leaked into the request and produced `source=All`;
+  this one cannot, because `stageFromSelectValue` is the only path from a change to an update and
+  it normalizes first. Keeping it also keeps the DOM identical to the build in production today.
+  Rails must never receive the literal string — `pipeline_stage` is validated against
+  `/\A[a-z0-9_]+\z/`, so `"none"` would be accepted and stored as a real stage named "none".
+- **The stale-status bug from AGENTS.md 2026-09-08 is designed out rather than avoided.** Go's
+  `jobStageSetter(status)` captured the status when the handler was built, and go-app compares
+  handler function pointers, so a closure — and its stale status — could survive a render. Here the
+  tracker arrives as a prop from the screen's `useQuery`, one `useTrackerWrite` is shared by both
+  blocks (Go's single `statusSaving` flag), and its invalidations are **awaited**, so the controls
+  do not re-enable until the refetched tracker has landed. The test pins the sequence: change the
+  status, wait for the controls to re-enable, change the stage, and assert the second request
+  carried the *new* status.
+- **The cover letter reads its own endpoint, and generating is the one budget-spending click.**
+  `GET /api/job_posts/:id` embeds `cover_letter_draft` and Go rendered that copy; here the letter
+  is its own cache entry under `jobs.coverLetter(id)`, because generating replaces it and a second
+  copy in the detail payload would keep rendering the old text until the whole posting refetched.
+  The `POST` runs `CoverLetterGenerator` against OpenRouter, so it happens on an explicit click
+  only, and Rails' three answers stay apart (201, 503 `llm_unavailable` when no key is configured,
+  502 `generation_failed`) — collapsing them would tell an owner with no key to keep retrying.
+  Generate is disabled while the read is pending or failed, since the `POST` replaces a letter the
+  panel cannot currently show.
+
+`CopyButton` gains the test Go never had: jsdom exposes no `navigator.clipboard`, so the
+unsupported-browser path ("Select the text and copy it manually.") is exercised for free, and a
+stubbed `navigator` covers the resolved and rejected `writeText` cases.
 
 ---
 

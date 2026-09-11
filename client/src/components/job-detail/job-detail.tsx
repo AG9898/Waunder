@@ -4,19 +4,22 @@
  * as a header, an assessment column (`requirements.tsx`), and a workspace aside holding the
  * route out to the employer, the optional draft actions, and the intake controls.
  *
- * Two panels of the Go aside arrive with `FE-20` and have explicit seams here: the tracker
- * quick action (`Mark as applied` and the pipeline status selects) inside `.manual-application`
- * and `.job-pipeline-status`, and the cover letter inside `JobAssessment`'s children slot.
+ * The two remaining panels arrived with `FE-20`: the tracker quick action (`tracker-action.tsx`,
+ * split between `.manual-application` and the sibling `.job-pipeline-status` block) and the
+ * cover letter (`cover-letter.tsx`, in `JobAssessment`'s children slot). One `useTrackerWrite`
+ * is shared by both tracker blocks, so a single in-flight write disables all of them — the
+ * single `statusSaving` flag Go had.
  *
  * ## Nothing on this screen applies to a job
  *
- * Opening a posting is a read. The three writes it offers — prepare a draft, move the posting
- * between intake bins, and (with `FE-20`) record that the owner applied by hand — are all
- * explicit clicks, and none of them submits anything: `POST /api/applications` creates a draft
- * Application and generates materials for review, and the approve-and-submit step lives on
- * `/applications/:id` behind its own button. That is CLAUDE.md's "never auto-submit without
- * explicit per-application approval" as it applies here, and `job-detail.test.tsx` pins it by
- * asserting zero create-application and zero lifecycle requests after a full render.
+ * Opening a posting is a read. The five writes it offers — prepare a draft, move the posting
+ * between intake bins, record that the owner applied by hand, edit the tracker, and generate a
+ * cover letter — are all explicit clicks, and none of them submits anything: `POST
+ * /api/applications` creates a draft Application and generates materials for review, and the
+ * approve-and-submit step lives on `/applications/:id` behind its own button. That is CLAUDE.md's
+ * "never auto-submit without explicit per-application approval" as it applies here, and
+ * `job-detail.test.tsx`, `tracker-action.test.tsx`, and `cover-letter.test.tsx` pin it by
+ * asserting zero create-application, lifecycle, tracker, and cover-letter writes after a render.
  *
  * ## The aside's order is CSS, not markup
  *
@@ -52,10 +55,13 @@ import {
 import type { FeedBin } from "../../lib/job-filters";
 import { matchScoreBand, matchScoreLabel, sourceLabel } from "../../lib/labels";
 import { applicationErrorMessage, lifecycleErrorMessage } from "../../lib/messages";
+import { type TrackerWrite, useTrackerWrite } from "../../lib/pipeline";
 import { AppChrome } from "../app-chrome";
 import { SourceMarker } from "../jobs/job-row";
 import { LoadError, Loading } from "../load-state";
+import { CoverLetterPanel } from "./cover-letter";
 import { JobAssessment } from "./requirements";
+import { MarkAppliedControl, PipelineStatusPanel, TrackerStatusLine } from "./tracker-action";
 
 export function JobDetailScreen() {
   const jobId = parseJobId(useParams().id);
@@ -83,6 +89,9 @@ export function JobDetailScreen() {
 
 /** The loaded posting: header, workspace aside, assessment column. */
 function JobBody({ job }: { job: JobDetail }) {
+  // One write for both tracker blocks: they are separate nodes only because `app.css` orders
+  // them separately, and a second mutation would let two edits race on one Application.
+  const write = useTrackerWrite(job.id);
   return (
     <div className="job-detail-body">
       <h1 className="job-title">{job.title}</h1>
@@ -94,7 +103,8 @@ function JobBody({ job }: { job: JobDetail }) {
       </p>
       <div className="job-workspace">
         <aside className="job-workspace-actions" aria-label="Application workspace">
-          <ManualApplication job={job} />
+          <ManualApplication job={job} write={write} />
+          <PipelineStatusPanel application={job.application} write={write} />
           <details className="job-optional-actions">
             <summary>Drafts &amp; outreach</summary>
             <ApplyAction jobId={job.id} />
@@ -104,7 +114,9 @@ function JobBody({ job }: { job: JobDetail }) {
           </details>
           <LifecycleControls jobId={job.id} state={job.lifecycle_state} />
         </aside>
-        <JobAssessment job={job} />
+        <JobAssessment job={job}>
+          <CoverLetterPanel jobId={job.id} />
+        </JobAssessment>
       </div>
     </div>
   );
@@ -132,24 +144,30 @@ function SourceLine({ source }: { source: string }) {
 
 /**
  * The manual route out: how Rails resolved the application route, the link that opens it in a
- * new tab, and what to do next. `FE-20` adds the tracker line and the `Mark as applied`
- * button to this section.
+ * new tab, where the posting currently stands, and the one-tap way to record that the owner
+ * applied. This is the whole loop the app is built around — Waunder finds the posting, the
+ * owner applies on the employer's site, and the tracker line closes it.
  *
  * The link is the resolved `application_url`, falling back to the posting URL — so a posting
  * whose route never resolved still opens the original listing instead of dead-ending. Both go
  * through `externalApplicationURL`, which is the safety filter, not a formatter: a
  * `javascript:` URL or a relative path yields no link and the note changes to say so.
+ *
+ * The children are flat rather than grouped because `app.css` styles them as siblings of
+ * `.manual-application`, in Go's order: route, status line, note, button, error.
  */
-function ManualApplication({ job }: { job: JobDetail }) {
+function ManualApplication({ job, write }: { job: JobDetail; write: TrackerWrite }) {
   const applicationUrl = externalApplicationURL(job.route.application_url, job.posting_url);
   return (
     <section className="manual-application">
       <RouteBlock route={job.route} applicationUrl={applicationUrl} />
+      <TrackerStatusLine application={job.application} className="manual-tracker-current" />
       <p className="manual-application-note">
         {applicationUrl === ""
           ? "No application link is available. Use the original alert to find the posting."
           : "Apply on the employer or job-board site in a new tab. When finished, record it here."}
       </p>
+      <MarkAppliedControl application={job.application} write={write} />
     </section>
   );
 }

@@ -18,7 +18,7 @@
  * after pressing Remove would be wrong in the way that matters: it describes the screen
  * rather than the action that failed, and the owner cannot tell whether the row moved.
  */
-import { isUnauthorized } from "../api/errors";
+import { isServiceUnavailable, isUnauthorized } from "../api/errors";
 
 /** The expired-session sentence. `load-state.tsx` keys its Sign in link off this exact string. */
 export const SESSION_EXPIRED = "Your session expired. Please sign in again.";
@@ -76,4 +76,36 @@ export function intakeErrorMessage(error: unknown): string {
 /** A failed `POST /api/applications`: no draft was started and nothing was submitted. */
 export function applicationErrorMessage(error: unknown): string {
   return isUnauthorized(error) ? SESSION_EXPIRED : APPLICATION_FAILED;
+}
+
+/** `applyJobStatusResult`'s message for a failed manual tracker edit (`FE-20`). */
+const TRACKER_FAILED = "Could not update application status.";
+
+/**
+ * `applyCoverLetterResult`'s 503 branch. "Later" rather than "again" on purpose: Rails answers
+ * 503 when no `OPENROUTER_API_KEY` is configured, so a second click now changes nothing.
+ */
+const COVER_LETTER_UNAVAILABLE = "Cover-letter generation is unavailable. Please try again later.";
+
+/** `applyCoverLetterResult`'s message for any other generation failure (Rails answers 502). */
+const COVER_LETTER_FAILED = "Could not generate the cover letter. Please try again.";
+
+/**
+ * A failed tracker write: the posting's pipeline status is still whatever Rails held before
+ * the click. Deliberately has no "please try again" — Go's copy had none, and the owner can
+ * see from the unchanged status line that nothing moved.
+ */
+export function trackerErrorMessage(error: unknown): string {
+  return isUnauthorized(error) ? SESSION_EXPIRED : TRACKER_FAILED;
+}
+
+/**
+ * A failed cover-letter generation, with the three-way split `applyCoverLetterResult` made:
+ * an expired session, a generator that is not configured (503), and one that ran and failed
+ * (502 or anything else). Nothing was written either way — the previous letter, if there was
+ * one, is untouched.
+ */
+export function coverLetterErrorMessage(error: unknown): string {
+  if (isUnauthorized(error)) return SESSION_EXPIRED;
+  return isServiceUnavailable(error) ? COVER_LETTER_UNAVAILABLE : COVER_LETTER_FAILED;
 }

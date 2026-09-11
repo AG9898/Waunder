@@ -1424,3 +1424,32 @@ landing tab is labelled "Intake" — scope such assertions with `within(containe
 and to assert where an in-app navigation landed, render a catch-all `<Route path="*">` whose element
 prints `useLocation().pathname` into the DOM and assert on that, rather than writing a module-level
 variable from a component render.
+
+### 2026-09-11 — A pending state shorter than 50ms is invisible to `waitFor`
+FE-20's "the generate button disables itself while a request is in flight" test failed against an
+MSW handler that answered instantly: `waitFor` polls every 50ms, so the whole pending render came
+and went between two checks, and asserting synchronously right after `fireEvent.click` fails too —
+TanStack's `notifyManager` flushes observer updates on a microtask, so `isPending` is not yet true
+when the handler returns. Give the handler an `await delay(200)` (from `msw`) when the in-flight
+state itself is what is under test. The same microtask gap means an `if (mutation.isPending) return`
+guard cannot stop two `fireEvent.click`s fired in one synchronous block — but a real browser cannot
+produce those either, because a click is a discrete event whose state update is flushed before the
+next one is delivered, so the `disabled` attribute is the actual protection and is what to assert.
+Second sequencing trap: a mutation whose `onSuccess` **awaits** its invalidations stays `isPending`
+through the refetch, so a test doing two edits in a row must wait for the control to be *enabled*
+again, not just for the refetched value to appear — the value lands one render before the flag
+clears.
+
+### 2026-09-11 — Adding a screen panel breaks sibling tests in two predictable ways
+Wiring FE-20's two panels into the FE-19 job detail broke two of that screen's existing tests, both
+worth expecting on every remaining FE task. (1) `getByText(x, { exact: false })` is a
+case-insensitive **substring** match, so the new "Offer negotiation" stage option collided with a
+`<li>Go</li>` assertion ("ne**go**tiation") — scope scorer-output assertions to
+`within(container.querySelector(".job-assessment"))` rather than the whole screen. (2) The
+`.job-workspace-actions` children-by-class-and-order assertion is a deliberate tripwire for the
+`app.css` `order` rules and must be extended (here with `job-pipeline-status` at index 1) whenever a
+panel lands in the aside. Also: a test file that renders a whole ported screen should pass
+`...apiHandlers()` **after** its own specific handlers in `installMockApi(...)` — MSW takes the
+first match, so the specific ones still win, and a newly added fetch inside the screen (the cover
+letter read here) then falls through instead of failing the file with "intercepted a request
+without a matching request handler".

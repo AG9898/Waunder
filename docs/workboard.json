@@ -2533,7 +2533,7 @@
       "id": "FE-20",
       "title": "Port the cover letter draft and the manual tracker quick action",
       "description": "Port the two job-detail side panels. The cover letter reads and generates via /api/job_posts/:id/cover_letter_draft with a copy-to-clipboard control. The tracker quick action writes applied and waiting through PATCH /api/job_posts/:id/application_status only; it must never call draft creation or submit. Omit untouched notes and follow-up dates from the request so they are preserved, use the none sentinel for an empty stage, and read the current tracker state at click time rather than from a value captured in an earlier render.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FE",
       "depends_on": [
