@@ -439,6 +439,27 @@ Be honest about the current state — most of the suite is still to be written.
   off, on, denied) are asserted as distinct renderings, and the VAPID key is asserted to come from
   `GET /api/push/vapid_public_key` — never a build-time value.
 
+- **client/** — `src/lib/platform.test.ts` and `src/components/install-guide.test.tsx` (`FE-14`):
+  platform detection and the guidance it drives. `platform.test.ts` is a straight transcription of
+  `web/components/pwa_test.go`'s three case tables, and it is the one Go test file worth
+  transcribing rather than rewriting, because its rows encode facts that cannot be re-derived: an
+  iPad has reported the **desktop Safari user agent** since iPadOS 13, so `maxTouchPoints > 1` is
+  the only thing separating it from a Mac (a single touch point is asserted to stay a Mac — a
+  touch-capable peripheral reports one); `Mac OS X 10_15_7` must not be read as version 10.15; and
+  Apple shipped Web Push at **16.4**, not 16.0. One case is new and guards an ordering the Go code
+  had right without saying why: an uninstalled iOS 17 device reports *no Push API at all*, because
+  Safari hides it until the app is on the home screen, so the gate must check version and install
+  state before capability or the owner is told their browser cannot do something that one "Add to
+  Home Screen" fixes. The browser readers are covered too — jsdom has no `matchMedia`,
+  `PushManager`, or `navigator.standalone`, which is the same answer a prerender gives, and a
+  `navigator` whose getters throw (a fingerprint-blocking browser) must not take the guide down.
+  `install-guide.test.tsx` injects those signals as a plain record, which is what turns each of the
+  four gates into an ordinary render assertion — the Go component read the browser inside `OnMount`
+  and had no test at all. It carries the same counter rule as the push toggle (**zero VAPID
+  fetches, zero subscribes, zero persists after a plain render of every gate**) and asserts the
+  correction this port makes: `install_guide.go` subscribed the browser and then discarded the
+  subscription, so the test pins `POST /api/push_subscription` actually receiving it.
+
 ### Planned (from the plan's Testing Plan)
 
 **Intake management (INTAKE / RESOLVED-20):**
@@ -545,6 +566,8 @@ Keep this table up to date — add a row when adding a new test file.
 | `client/src/lib/auth.test.tsx` | client (Vitest) | the 401 auth boundary and sign-out, driven through the app's own `installUnauthorizedRedirect` over a memory router built from the real route table: a 401 from a read and from a write each redirect to a rendered `/login` with `REPLACE`, a 403 does not, the 401 is not retried first, no navigation when already on `/login`, unsubscribing stops it, and `DELETE /api/session` clears the query cache and returns to login — including a 401 counting as already signed out, and a 500 reporting a failure in place |
 | `client/src/lib/push.test.ts` | client (Vitest) | browser push flow against a **mocked PushManager** (no permission prompt, no real push): the Go `initialPushState` table, unsupported/denied/failed staying distinct states, the three `pushErrorMessage` strings, `readSubscription` reading both encryption keys off `toJSON()` and rejecting a subscription Rails could never encrypt to, permission requested before `pushManager.subscribe` (and a denied or dismissed prompt subscribing nothing), an unsupported browser neither prompting nor failing a read, unsubscribe cancelling the active subscription and propagating a browser failure, and the production environment reporting unsupported wherever there is no Push API |
 | `client/src/components/push-toggle.test.tsx` | client (Vitest) | push toggle parity over MSW plus a mocked `PushSubscriber`: **zero subscribe, zero persist, and zero VAPID fetches after a plain render** in both supported and unsupported browsers, the unsupported/off/on/denied states rendering distinctly, the VAPID key read from `GET /api/push/vapid_public_key` and passed to the browser, `POST /api/push_subscription` carrying the browser subscription, the in-flight disabled `Working…` control, an empty server key and an unsupported browser both landing on unsupported without touching the other side, no persist when the browser subscribe fails, 401 and 500 messages, and unsubscribe cancelling in the browser before `DELETE /api/push_subscription` (and leaving Rails alone when it cannot) |
+| `client/src/lib/platform.test.ts` | client (Vitest) | platform detection with no browser at all: the `pwa_test.go` user-agent case table (iPhone/iPad, an underscore patch version, **iPadOS masquerading as desktop Safari** via `maxTouchPoints > 1`, and `Mac OS X 10_15_7` never read as a version), the iOS 16.4 Web Push boundary, the push-gate table with the ordering case that offers an uninstalled iOS 17 device the install step rather than "unsupported", `navigator.standalone` and the `display-mode` media query each sufficing alone, and the browser readers degrading to every signal off when `matchMedia`/`PushManager`/`Notification` are missing or throw |
+| `client/src/components/install-guide.test.tsx` | client (Vitest) | install guide parity over MSW plus a mocked `PushSubscriber` and injected platform signals (no permission prompt, no real push): the four gates rendering their own copy and `.install-guide`/`.enable-notifications`/`.install-status` markup, the granted state winning over platform guidance, **zero VAPID fetches, zero subscribes, and zero persists after a plain render of every gate**, and the enable flow fetching the key, subscribing, and actually storing the subscription with `POST /api/push_subscription` — plus the declined/no-server-key/failed-store messages and the in-flight disabled button that stops a double post |
 | `client/src/test/handlers.ts` | client (Vitest, harness) | shared fake Rails: `apiHandlers()` covers every endpoint (echoing the requested page, the URL id, and the posted intake value) and `fixtures` exports schema-typed canned payloads, including an unscored row whose `match_score` stays `null` |
 | `api/spec/requests/api/push_subscriptions_spec.rb` | API (Rails) | `GET /api/push/vapid_public_key` public VAPID key read; `POST`/`DELETE /api/push_subscription` authenticated subscribe/unsubscribe, idempotent endpoint update, and 401 auth gating |
 | `api/spec/requests/api/worker_tasks_spec.rb` | API (Rails) | `GET /api/worker_tasks` worker-shaped task pull with bearer-only auth; `POST /api/worker_tasks/:id/report` status updates, audit screenshots/log refs, and human-session rejection |

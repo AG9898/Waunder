@@ -708,6 +708,47 @@ See [`ENV_VARS.md`](ENV_VARS.md).
 
 ---
 
+## Platform detection and the install guide — done (`FE-14`)
+
+`web/components/pwa.go` is the one Go file in this chain whose **test** is more valuable than its
+code, and it is transcribed rather than rewritten (`client/src/lib/platform.test.ts`). Its case
+table encodes three facts that are not derivable from reading the code:
+
+- An iPad has reported the **desktop Safari user agent** since iPadOS 13. Nothing in the string
+  distinguishes it from a Mac, so `navigator.maxTouchPoints > 1` is the whole detection — and `> 1`
+  rather than `> 0`, because a Mac with a touch-capable peripheral reports one point.
+- That same desktop user agent carries **no OS version token**, so an iPad detected this way has
+  version `0.0`. `Mac OS X 10_15_7` must not be read as version 10.15.
+- Apple shipped Web Push for home-screen web apps at **iOS/iPadOS 16.4**, not 16.0.
+
+The gate ordering is the part worth stating out loud, because it looks wrong until you know why:
+on iOS the **Push API is absent until the app is installed to the home screen**. An uninstalled
+iOS 17 device therefore reports no push support at all, and reading the capability first would
+tell the owner their browser cannot do something that one "Add to Home Screen" fixes. So
+`evaluatePushGate` checks OS version and installed state before capability, and only the
+non-Apple branch falls through to a plain feature check. Since the owner's real client is exactly
+this — a home-screen web app — that ordering is the difference between a working install prompt
+and a dead end.
+
+Standalone detection needs both signals and neither is redundant: `navigator.standalone` is
+non-standard and iOS-only, while `display-mode: standalone` is the standard query that covers an
+installed Chrome/Edge PWA. Every browser read is guarded and total, because the module is also
+loaded under jsdom (no `matchMedia`, no `PushManager`) and in a browser configured to block
+fingerprinting surfaces, where touching `navigator` can throw.
+
+**One real bug is fixed in the port.** `install_guide.go`'s comment claimed the subscription was
+"forwarded to Rails for storage", but the code discarded it
+(`if _, err := ctx.Notifications().Subscribe(vapid); err != nil`). A browser subscription Rails
+never hears about is invisible: the owner sees "notifications are on" and no digest ever arrives,
+with nothing reporting a failure anywhere. `install-guide.tsx` runs the same path
+`push-toggle.tsx` does — subscribe, then `POST /api/push_subscription` — and reads the VAPID key
+from `GET /api/push/vapid_public_key` per `FE-13` above.
+
+The guide's component was **unrouted in the Go build**: `main.go` maps `/` to `DigestView`, and
+only the dead `Home` component rendered `InstallGuide`. So this task changes no live screen; the
+guide is mounted by the profile screen (`FE-25`), next to the push toggle it explains, and
+`src/lib/platform.ts` is available to any screen that needs to know it is running installed.
+
 ## Service worker handoff
 
 **This is the highest-risk item in the migration.** Without explicit handling, the installed PWA

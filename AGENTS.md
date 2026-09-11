@@ -1323,3 +1323,18 @@ not as properties of the subscription object, and `applicationServerKey` accepts
 DOMString Rails serves — no `Uint8Array` conversion. Read `currentEndpoint` off `subscription.endpoint`
 rather than through full key validation, or a browser that will not re-expose its keys flips a
 working toggle to a failure the owner cannot act on.
+
+### 2026-09-11 — iOS hides the Push API until install, so the gate checks version before capability
+FE-14 ported `web/components/pwa.go` to `client/src/lib/platform.ts`. The non-obvious rule:
+`evaluatePushGate` must check iOS version and home-screen-installed state **before** reading
+whether the Push API exists, because Safari does not expose it to an uninstalled web app at all —
+a capability-first check tells the owner their iOS 17 browser cannot do push when one "Add to Home
+Screen" fixes it. Two detection traps from the transcribed Go case table: an iPad reports the
+**desktop Safari user agent** (so `navigator.maxTouchPoints > 1` is the only signal, and `> 1` not
+`> 0`, since a Mac with a touch peripheral reports one), and that user agent carries no OS token,
+so `Mac OS X 10_15_7` must not parse as version 10.15 — the regex requires a digit immediately
+after `OS `. Also found: `install_guide.go` claimed it forwarded the push subscription to Rails but
+discarded it (`if _, err := ctx.Notifications().Subscribe(vapid); err != nil`), which would have
+shown "notifications are on" while no digest could ever be delivered; the React port posts it to
+`/api/push_subscription` like `push-toggle.tsx` does. The component was unrouted in the Go build
+(`main.go` maps `/` to `DigestView`; only the dead `Home` rendered it), so it is mounted by FE-25.

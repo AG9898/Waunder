@@ -2336,7 +2336,7 @@
       "id": "FE-14",
       "title": "Port platform detection and the install guide",
       "description": "Port web/components/pwa.go and install_guide.go. The detection logic is pure and its existing test cases are valuable, so bring the case table across: iOS and iPadOS user agents including a Macintosh UA reporting more than one touch point, the major/minor version parse, standalone detection via navigator.standalone or display-mode, and Push API availability.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FE",
       "depends_on": [

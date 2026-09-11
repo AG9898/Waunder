@@ -141,6 +141,15 @@ For iOS Web Push, install the site first: Safari share button -> Add to Home Scr
 from the home-screen icon, then enable notifications from the profile/push area. Normal Safari tabs
 cannot receive iOS PWA push notifications.
 
+Two exact requirements sit behind that instruction, and both fail silently if they are not met:
+the device must be on **iOS/iPadOS 16.4 or later**, and the app must be opened from the home-screen
+icon. Before it is installed, iOS does not expose the Push API at all — so a Safari tab reports the
+browser as push-incapable even on iOS 17, and tapping an enable control there produces no prompt
+and no error. After the React cutover the app detects this itself (`client/src/lib/platform.ts`)
+and shows which of the three blockers applies — too old, not installed, or genuinely unsupported —
+instead of offering a control that cannot work. Until then, check the iOS version and the
+home-screen icon by hand before reporting push as broken.
+
 ## PWA Cutover Recovery
 
 After the React frontend cutover, keep `/app-worker.js` deployed permanently. It is the retirement
