@@ -99,6 +99,16 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 > manifest `start_url`, the push notification's click target, and the owner's existing history all
 > depend on them.
 >
+> The shadow client's landing screen (`client/src/components/ingestion-batches/`) reproduces the
+> Go `DigestView` without any Rails change: `GET /api/ingestion_batches` grouped by date and
+> newest-first, each batch a native `<details>` block whose postings link to `/jobs/:id` carrying
+> `?from=digest&batch=<id>` so the batch re-expands on the way back, Prev/Next reading the server
+> page envelope, and the intake pause/resume panel over `GET`/`PATCH /api/intake`. Two behaviors
+> are load-bearing: the panel never writes intake on render (an intake write on mount would resume
+> a pipeline the owner paused and spend LLM budget on the held backlog), and both date and time are
+> rendered from the literal values Rails sent rather than converted to the browser's timezone, so
+> a batch's date header cannot disagree with the day `IngestionBatchBuilder` grouped on.
+>
 > The auth model is unchanged and stays entirely server-side, but the client's half of it is now in
 > one place. Because the session cookie is httponly, being signed out can only be derived from
 > responses, so `client/src/lib/auth.ts` subscribes to both TanStack caches and sends the owner to

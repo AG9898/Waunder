@@ -1387,3 +1387,26 @@ a lifecycle transition changes *which* postings belong on a paged, filtered, ser
 Go's local splice (`applyLifecycleResult`) would render a page that no longer exists on the server.
 `await` the invalidation inside `onSuccess` so `isPending` covers the refetch and controls stay
 disabled through the whole transition.
+
+### 2026-09-11 — Go's time formatters keep the written offset; JS `toLocale*` does not
+FE-18's two date helpers are the only place in the port where an idiomatic JS one-liner is wrong.
+Go parses a batch date with `time.Parse("2006-01-02", …)` (UTC midnight) and formats it straight
+back, so `2026-09-08` always read `Tue, Sep 8`; `new Date(iso).toLocaleDateString()` renders
+`Mon, Sep 7` anywhere west of UTC, which would make the landing's date header disagree with the day
+`IngestionBatchBuilder` grouped on. Subtler: `time.Parse(time.RFC3339, …)` keeps the **offset
+written in the string** rather than converting to local, so `…T15:04:05Z` and `…T15:04:05-07:00`
+both render `3:04 PM` — a `toLocaleTimeString` port would differ per device *and* per test machine.
+Port both by reading the literal components (regex + `Date.UTC` round-trip to reproduce Go's
+out-of-range rejection) with fixed English `Mon`/`Jan` tables, since Go's reference layout is not
+locale-aware either. Generate the expectations by running the Go original, not by restating the TS.
+
+### 2026-09-11 — React leaves `<details open>` alone, which is what makes the batch list testable
+The ingestion landing's collapsible batch is a native `<details>`/`<summary>`, so every posting is
+in the DOM while collapsed and a test asserts on rows without clicking — necessary, because jsdom
+implements no `<details>` activation behaviour, so a hand-rolled disclosure would put the rows out
+of reach entirely. `open` is not a React-controlled property (unlike `<input>`/`<select>`), so
+setting it once from `?batch=…` and never changing the prop lets a manual expand or collapse stick;
+`open={false}` is safe here where go-app's `.Open(false)` was not (it emitted `open="false"`, which
+a browser treats as open). Also: an in-flight button label like `Updating…` is unobservable against
+MSW, which answers in the same tick — gate the handler on a promise the test resolves, rather than
+deleting the assertion.

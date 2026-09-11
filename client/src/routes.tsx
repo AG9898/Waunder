@@ -28,8 +28,8 @@
  * ## Placeholders
  *
  * Every element below is a placeholder until its screen task lands (`FE-16` … `FE-26`; the
- * task id is on each route — `/login` and `/jobs` are ported, so they carry none). A placeholder carries
- * the **real root class** the Go screen renders, because that class is what
+ * task id is on each route — `/`, `/login`, and `/jobs` are ported, so they carry none). A
+ * placeholder carries the **real root class** the Go screen renders, because that class is what
  * `public/app.css` styles the page container with and what the parity gate compares.
  * Keeping it here means the route test asserts the same thing before and after each port:
  * swapping a placeholder for the real screen is a one-line change in this file and no
@@ -43,6 +43,7 @@
 import { Link } from "react-router";
 import type { RouteObject } from "react-router";
 
+import { IngestionBatchesScreen } from "./components/ingestion-batches/ingestion-batches";
 import { JobList } from "./components/jobs/job-list";
 import { LoginScreen } from "./components/login";
 
@@ -76,7 +77,7 @@ function notFoundScreen() {
 }
 
 export const routes: RouteObject[] = [
-  { path: "/", element: placeholder("digest", "Recent ingestions", "FE-18") },
+  { path: "/", element: <IngestionBatchesScreen /> },
   { path: "/login", element: <LoginScreen /> },
   { path: "/jobs", element: <JobList /> },
   // Before /jobs/:id, mirroring main.go. React Router's ranking makes this redundant

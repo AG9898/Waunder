@@ -36,6 +36,9 @@ const LIFECYCLE_FAILED = "Could not update the job. Please try again.";
  */
 const SCORE_FAILED = "Could not request scoring.";
 
+/** `applyIntakeResult`'s message for a failed pause or resume of inbound email processing. */
+const INTAKE_FAILED = "Could not update intake. Please try again.";
+
 /** A failed read: the screen could not be filled. */
 export function loadErrorMessage(error: unknown): string {
   return isUnauthorized(error) ? SESSION_EXPIRED : LOAD_FAILED;
@@ -49,4 +52,16 @@ export function lifecycleErrorMessage(error: unknown): string {
 /** A failed score-on-demand request: no scoring was queued for that posting. */
 export function scoreErrorMessage(error: unknown): string {
   return isUnauthorized(error) ? SESSION_EXPIRED : SCORE_FAILED;
+}
+
+/**
+ * A failed intake pause/resume: inbound processing is still in whatever state it was in.
+ *
+ * `applyIntakeResult` in `jobs.go` had no 401 branch — it reported this sentence for every
+ * failure. The branch is added here for the same reason every other write mapper has one:
+ * a dead session is not "try again", and the owner clicking Resume twice against an expired
+ * cookie learns nothing from a sentence that invites a third click.
+ */
+export function intakeErrorMessage(error: unknown): string {
+  return isUnauthorized(error) ? SESSION_EXPIRED : INTAKE_FAILED;
 }

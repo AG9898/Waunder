@@ -886,6 +886,56 @@ Five things this pass settled:
   moved. Only a 401 is an auth failure; a 403 is an authorization decision about an owner who
   still has a session.
 
+## The ingestion landing — done (`FE-18`)
+
+`client/src/components/ingestion-batches/` is the `/` screen: `ingestion-batches.tsx` (the two
+reads, the date-grouped batch list, Prev/Next), `batch.tsx` (one collapsible batch and its
+postings), and `intake-control.tsx` (the pause/resume panel). `src/lib/ingestion-batches.ts` holds
+the formatters and the toggle's success copy. The `digest` tab id and every `.digest*` class name
+are unchanged, even though the screen has not been a daily digest since 2026-06-23 — it is
+ingestion history, and `GET /api/digest` still backs the once-a-day push notification only.
+
+Five things this pass settled:
+
+- **Both date formatters had to stop consulting the local clock, and that is a port fix, not a
+  preference.** Go parsed a batch's `date` with `time.Parse("2006-01-02", …)` and formatted it
+  straight back, so `2026-09-08` always read `Tue, Sep 8`; `new Date(iso).toLocaleDateString()`
+  would render `Mon, Sep 7` for every owner west of UTC and the header would disagree with the day
+  Rails grouped on. The time chip is the subtler one: Go's `time.Parse(time.RFC3339, …)` keeps the
+  **offset written in the string** rather than converting, so `…T15:04:05Z` and `…T15:04:05-07:00`
+  both rendered `3:04 PM` (verified by running the Go original — the expectations in the test are
+  its output, not a mirror of the TypeScript). `toLocaleTimeString` would convert and the chip
+  would differ per device and per test machine. The weekday and month names are fixed English
+  abbreviations for the same reason: Go's `Mon`/`Jan` layout is not locale-aware.
+- **The native `<details>` is what makes the screen testable, and React does not fight it.**
+  Every posting is in the DOM whether or not its batch is expanded, so a test asserts on rows
+  without clicking anything — which matters because jsdom does not implement `<details>`
+  activation behaviour, so a hand-rolled disclosure would put the rows out of reach. `open` is set
+  only for the batch named by `?batch=…` and then left alone: `<details>` is not one of React's
+  controlled elements, so a manual expand sticks. Go had a sharper version of the same constraint
+  — go-app rendered `.Open(false)` as `open="false"`, which a browser treats as **open**, so the
+  attribute had to be omitted rather than set false.
+- **`useSearchParams` replaces three lifecycle hooks with one read.** Go re-read `?batch=` in
+  `OnMount`, `OnPreRender`, *and* `OnNav`, the last because a client-side navigation back to an
+  already-mounted screen ran neither of the first two — and its own test could not exercise any of
+  them, so it rendered `renderBatches()` directly. Here the param is reactive, the whole screen
+  renders under a `MemoryRouter`, and paging deliberately does not clear the target: a batch that
+  is not on this page simply matches nothing.
+- **Either read failing fails the screen, as `load()` did.** The intake panel is what explains an
+  empty batch list, so a page showing "No ingestions yet." while silently failing to report that
+  intake is paused is the one combination that actively misleads. A failure also wins over data
+  already on screen, so a refetch that starts erroring cannot leave a stale page looking live.
+  They are still two queries, because their cache lifetimes differ — the toggle writes
+  `queryKeys.intake()` directly from its response, and each page of batches is its own entry.
+- **Nothing toggles intake on render, and the mutation owns the panel's whole state.** Go pinned
+  the safety rule with `setIntakeCalls != 0` after a render and the test here does the same: an
+  intake write on mount would resume a pipeline the owner deliberately paused and spend OpenRouter
+  budget on the held backlog every time the landing loaded. Go then carried `intakeBusy`,
+  `intakeErr`, and `intakeMessage` as three fields kept consistent by hand in `applyIntakeResult`;
+  they are `isPending`, `error`, and `data` on one mutation here, so a new click clears the
+  previous outcome by construction. The one copy change is a 401 branch on the failure message,
+  which Go had for every other write but not this one.
+
 ---
 
 ## Service worker handoff

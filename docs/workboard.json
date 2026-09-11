@@ -2468,7 +2468,7 @@
       "id": "FE-18",
       "title": "Port the landing screen: ingestion batches",
       "description": "Port DigestView from web/components/jobs.go: GET /api/ingestion_batches rendered as collapsible batches newest-first, each holding its postings. Use a native details/summary so the postings are always present in the DOM and need no click handler to test. Keep the existing .digest* class names.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FE",
       "depends_on": [
