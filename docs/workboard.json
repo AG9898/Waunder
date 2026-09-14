@@ -2635,7 +2635,7 @@
       "id": "FE-23",
       "title": "Port the manual entry form",
       "description": "Port web/components/manual_entry.go: post to /api/job_posts wrapped as {job_post:{...}} and decode the top-level {job_post, import} envelope, rendering the new, tracked, and submitted import outcomes distinctly. The client does only a URL-or-text-present hint and trims fields. All real validation, HTTPS-URL checking, normalization, identity matching, route resolution, and scoring stay in Rails.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FE",
       "depends_on": [

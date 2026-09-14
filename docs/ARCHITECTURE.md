@@ -157,6 +157,17 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 > draft or submit endpoint, and then invalidates and refetches the feed, because a status change can
 > move the row out of the active tab and changes every tab's total.
 >
+> The shadow client's manual import (`client/src/components/manual-entry/`) makes the same two
+> writes as the Go form, with no Rails change. `POST /api/job_posts` receives all five fields
+> trimmed and wrapped as `{job_post: {...}}`, and the screen renders the top-level `import` outcome
+> Rails returns — new, already tracked, or already submitted — each with its own sentence and a link
+> to the posting Rails named, so a match leads to the existing record. The client's only check is
+> the URL-or-text hint. The form sets `noValidate`, so the browser's own `type="url"` validation
+> cannot block a value before Rails judges it, and a 422 renders Rails' `invalid_input` sentence as
+> sent. Leaving the URL field (or pressing Look up details) calls `POST /api/job_posts/lookup`, which
+> persists nothing, and its answer fills only fields the owner has not typed into. Nothing is posted
+> on render.
+>
 > The auth model is unchanged and stays entirely server-side, but the client's half of it is now in
 > one place. Because the session cookie is httponly, being signed out can only be derived from
 > responses, so `client/src/lib/auth.ts` subscribes to both TanStack caches and sends the owner to

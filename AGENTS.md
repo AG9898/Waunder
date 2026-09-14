@@ -1477,3 +1477,15 @@ refuses lowercase `t`/`z`, accepts a `,` fraction and offsets up to `+24:00` wit
 trim, never `trim()` or `Date.UTC` (which maps years 0–99 onto the 1900s). `formatBatchTime` in
 `client/src/lib/ingestion-batches.ts` accepts `[Tt]`/`[Zz]` where Go refuses them: harmless while Rails
 sends uppercase, but not byte-for-byte Go. Go is installed at `/usr/local/go/bin/go`, not on `PATH`.
+
+### 2026-09-13 — A `type="url"` field makes a `<form>` validate URLs unless it is `noValidate`
+FE-23 found the Go manual-entry form was doing client-side URL validation without meaning to: a
+`<form>` containing a `type="url"` input runs the browser's constraint validation before `submit`
+fires, so a scheme-less `careers.acme.com/apply` never reached Rails, and Rails' "URL must be an HTTP
+or HTTPS URL" could not be shown. jsdom 30 enforces the same check (a submit-button click dispatches
+no `submit`), so set `noValidate` on any form whose validation belongs to Rails, keep `type="url"`
+for the phone keyboard, and test it by sending a scheme-less value. Two related traps: render a Rails
+validation sentence through `apiErrorMessage(error)`, never `APIError.message`, which falls back to
+`api request failed: status N: <body>` and is never empty; and assert URL trimming on a pure helper,
+because `fireEvent.change` cannot observe it — a `type="url"` input strips surrounding whitespace
+from its own value.

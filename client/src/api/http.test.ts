@@ -11,7 +11,14 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { APIError, ResponseFormatError, apiErrorCode, asAPIError, isUnauthorized } from "./errors";
+import {
+  APIError,
+  ResponseFormatError,
+  apiErrorCode,
+  apiErrorMessage,
+  asAPIError,
+  isUnauthorized,
+} from "./errors";
 import { apiGet, apiSend } from "./http";
 import { IntakeEnvelopeSchema, JobPageSchema } from "./schemas";
 import {
@@ -114,7 +121,22 @@ describe("a 4xx with the Rails error envelope", () => {
     expect((error as APIError).code).toBe("unsafe_payload");
     expect((error as APIError).message).toBe("Autofill payload contains sensitive fields");
     expect(apiErrorCode(error)).toBe("unsafe_payload");
+    expect(apiErrorMessage(error)).toBe("Autofill payload contains sensitive fields");
     expect(isUnauthorized(error)).toBe(false);
+  });
+
+  it("reports an empty envelope message as empty, even though message falls back", async () => {
+    // Go's APIErrorMessage returned the envelope's own text or "". `message` is never empty, so a
+    // screen rendering Rails' validation sentence from it would show the raw JSON body instead.
+    server.use(errorResponse("post", "/api/job_posts", 422, "invalid_input", ""));
+
+    const error = await captureError(() => apiSend("POST", "/api/job_posts", IntakeEnvelopeSchema));
+
+    expect(apiErrorCode(error)).toBe("invalid_input");
+    expect(apiErrorMessage(error)).toBe("");
+    expect((error as APIError).message).toBe(
+      'api request failed: status 422: {"error":{"code":"invalid_input","message":""}}',
+    );
   });
 });
 
@@ -151,6 +173,7 @@ describe("a 401", () => {
     expect(isUnauthorized(new Error("offline"))).toBe(false);
     expect(isUnauthorized(undefined)).toBe(false);
     expect(apiErrorCode(new Error("offline"))).toBe("");
+    expect(apiErrorMessage(new Error("offline"))).toBe("");
   });
 });
 
@@ -163,6 +186,7 @@ describe("a 500 without an envelope", () => {
     expect(error).toBeInstanceOf(APIError);
     expect((error as APIError).status).toBe(500);
     expect((error as APIError).code).toBe("");
+    expect(apiErrorMessage(error)).toBe("");
     expect((error as APIError).message).toBe(
       "api request failed: status 500: <html>Application error</html>",
     );

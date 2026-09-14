@@ -18,7 +18,13 @@
  * after pressing Remove would be wrong in the way that matters: it describes the screen
  * rather than the action that failed, and the owner cannot tell whether the row moved.
  */
-import { asAPIError, isServiceUnavailable, isUnauthorized } from "../api/errors";
+import {
+  apiErrorCode,
+  apiErrorMessage,
+  asAPIError,
+  isServiceUnavailable,
+  isUnauthorized,
+} from "../api/errors";
 
 /** The expired-session sentence. `load-state.tsx` keys its Sign in link off this exact string. */
 export const SESSION_EXPIRED = "Your session expired. Please sign in again.";
@@ -140,7 +146,47 @@ export function outreachErrorMessage(error: unknown): string {
  */
 export function contactSaveErrorMessage(error: unknown): string {
   if (isUnauthorized(error)) return SESSION_EXPIRED;
-  const apiError = asAPIError(error);
-  if (apiError?.code === "invalid_input" && apiError.message !== "") return apiError.message;
+  const railsSentence = apiErrorMessage(error);
+  if (apiErrorCode(error) === "invalid_input" && railsSentence !== "") return railsSentence;
   return CONTACT_SAVE_FAILED;
+}
+
+/**
+ * `createErrorStatus`'s 422 sentence in `manual_entry.go`, kept for a 422 that arrives without a
+ * validation sentence of Rails' own.
+ */
+const IMPORT_INVALID = "Could not add that job. Provide a valid URL or paste the posting text.";
+
+/** `createErrorStatus`'s message for any other failed import. */
+const IMPORT_FAILED = "Could not add the job. Please try again.";
+
+/**
+ * `lookupErrorNote`'s sentence for a posting that could not be read. Exported because it has two
+ * sources that read the same: a lookup request that failed, and a lookup Rails answered 200 with
+ * `status` `unsupported` or `unavailable` — which is not an error, so it never reaches a mapper.
+ */
+export const POSTING_UNREADABLE =
+  "Could not read that posting. Add the title and company yourself.";
+
+/**
+ * A failed `POST /api/job_posts`. A 422 `invalid_input` renders Rails' own sentence as sent
+ * ("URL must be an HTTP or HTTPS URL", or several rules joined with ", ") instead of Go's
+ * paraphrase: Rails says *which* field it rejected, and the paraphrase could only guess. Nothing
+ * was imported in any branch.
+ */
+export function importErrorMessage(error: unknown): string {
+  if (isUnauthorized(error)) return SESSION_EXPIRED;
+  if (asAPIError(error)?.status !== 422) return IMPORT_FAILED;
+  const railsSentence = apiErrorMessage(error);
+  return apiErrorCode(error) === "invalid_input" && railsSentence !== ""
+    ? railsSentence
+    : IMPORT_INVALID;
+}
+
+/**
+ * A failed `POST /api/job_posts/lookup`. Non-blocking by design — the fields stay editable and
+ * the import still works — so the only case worth telling apart is the one the owner must act on.
+ */
+export function lookupErrorMessage(error: unknown): string {
+  return isUnauthorized(error) ? SESSION_EXPIRED : POSTING_UNREADABLE;
 }

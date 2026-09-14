@@ -28,7 +28,7 @@
  * ## Placeholders
  *
  * Every element below is a placeholder until its screen task lands (`FE-16` … `FE-26`; the
- * task id is on each route — `/`, `/login`, `/jobs`, `/jobs/:id`, `/jobs/:id/contacts`, and `/applications` are
+ * task id is on each route — `/`, `/login`, `/jobs`, `/jobs/new`, `/jobs/:id`, `/jobs/:id/contacts`, and `/applications` are
  * ported, so they carry none). A
  * placeholder carries the **real root class** the Go screen renders, because that class is what
  * `public/app.css` styles the page container with and what the parity gate compares.
@@ -49,6 +49,7 @@ import { IngestionBatchesScreen } from "./components/ingestion-batches/ingestion
 import { JobDetailScreen } from "./components/job-detail/job-detail";
 import { JobList } from "./components/jobs/job-list";
 import { LoginScreen } from "./components/login";
+import { ManualEntryScreen } from "./components/manual-entry/manual-entry";
 import { TrackerScreen } from "./components/tracker/tracker";
 
 /**
@@ -86,7 +87,7 @@ export const routes: RouteObject[] = [
   { path: "/jobs", element: <JobList /> },
   // Before /jobs/:id, mirroring main.go. React Router's ranking makes this redundant
   // rather than wrong — see the module comment.
-  { path: "/jobs/new", element: placeholder("manual-entry", "Import a job", "FE-23") },
+  { path: "/jobs/new", element: <ManualEntryScreen /> },
   { path: "/jobs/:id", element: <JobDetailScreen /> },
   { path: "/jobs/:id/contacts", element: <ContactsScreen /> },
   { path: "/applications", element: <TrackerScreen /> },

@@ -40,6 +40,12 @@ export class APIError extends Error {
   /** `error.code` from the Rails envelope; `""` when the body is not that shape. */
   readonly code: string;
 
+  /**
+   * `error.message` from the Rails envelope; `""` when Rails sent none. Unlike `message`, this never
+   * falls back to the `api request failed: …` text, so a screen can tell Rails' own sentence apart.
+   */
+  readonly envelopeMessage: string;
+
   /** Raw response body, truncated to the same 2048 bytes Go read. */
   readonly body: string;
 
@@ -49,6 +55,7 @@ export class APIError extends Error {
     super(envelope.message || fallbackMessage(status, truncated));
     this.status = status;
     this.code = envelope.code;
+    this.envelopeMessage = envelope.message;
     this.body = truncated;
   }
 }
@@ -97,6 +104,15 @@ export function isServiceUnavailable(error: unknown): boolean {
 /** The Rails envelope `error.code` for `error`, or `""` when it is not an `APIError`. */
 export function apiErrorCode(error: unknown): string {
   return asAPIError(error)?.code ?? "";
+}
+
+/**
+ * The Rails envelope `error.message` for `error`, or `""` — Go's `APIErrorMessage`. Screens that
+ * render Rails' validation sentence must read this rather than `APIError.message`, which is never
+ * empty: it falls back to `api request failed: status N: <body>`, raw JSON included.
+ */
+export function apiErrorMessage(error: unknown): string {
+  return asAPIError(error)?.envelopeMessage ?? "";
 }
 
 /**

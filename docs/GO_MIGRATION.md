@@ -201,6 +201,8 @@ Four properties are enforced here rather than left to convention:
   to the exact `api request failed: status N[: body]` string Go produced. `isUnauthorized(err)`
   matches **401 only** — a 403 is an authorization decision about an authenticated owner and must
   not sign them out — and walks the `cause` chain, replacing Go's `errors.As` unwrap loop.
+  `apiErrorMessage` (added in `FE-23`) returns the envelope's own message or `""`, like Go's
+  `APIErrorMessage`; `message` is never empty, so a screen showing Rails' sentence reads that instead.
 
 `ResponseFormatError` has no Go counterpart on purpose. Go had no way to say "the server answered,
 but with something I cannot use", so it did not distinguish that from success. Separating it from
@@ -630,7 +632,7 @@ No Go toolchain, no `go.mod`, no `Makefile`, no `app.wasm`.
 | `web/components/jobs.go` — `DigestView` | ~450 | `src/components/ingestion-batches/` |
 | `web/components/applications.go` | 653 | `src/components/tracker/` |
 | `web/components/draft.go` | 576 | `src/components/draft-review/` |
-| `web/components/manual_entry.go` | 477 | `src/components/manual-entry/` |
+| `web/components/manual_entry.go` | 477 | `src/components/manual-entry/` + `src/lib/manual-entry.ts` |
 | `web/components/contacts.go` | 325 | `src/components/contacts/` + `src/lib/contacts.ts` |
 | `web/components/push.go` + `push_browser.go` | 427 | `src/components/push-toggle.tsx` + `src/lib/push.ts` (244 lines of code; the `FuncOf`/`Release`/promise-to-channel `await` adapter disappears) |
 | `web/components/profile.go` | 266 | `src/components/profile/` |
@@ -1144,6 +1146,62 @@ Five things this pass settled:
   — which is why the day range is counted by hand rather than through `Date.UTC`, whose years 0–99
   land in the 1900s. One deliberate difference from Go: a stage with no label renders no `.tracker-stage`
   pill, where Go painted an empty one.
+
+---
+
+## Manual import — done (`FE-23`)
+
+`client/src/components/manual-entry/` is `/jobs/new`: `manual-entry.tsx` (the form, the posting
+lookup, and the import write) and `import-result.tsx` (Rails' outcome and its link).
+`src/lib/manual-entry.ts` holds the pure half — the form state and `editField`, the trim-only
+`manualJobInput` and the `importInputPresent` hint, `lookupTarget`, `applyLookupResult` /
+`applyLookupFailure`, `joinFields`, both button labels, and the outcome copy (`importOutcome`,
+`importMessage`, `importLinkLabel`, `importResultHref`, `importResultClass`). `src/lib/messages.ts`
+gains `importErrorMessage`, `lookupErrorMessage`, and `POSTING_UNREADABLE`; `src/api/errors.ts`
+gains `apiErrorMessage`.
+
+Five things this pass settled:
+
+- **The Go form validated URLs after all, and `noValidate` is the fix.** Both URL fields are
+  `type="url"`, and a `<form>` holding one runs the browser's constraint validation before `submit`
+  fires. A scheme-less `careers.acme.com/apply` is a `typeMismatch`, so the Go build's browser
+  refused to send it and showed its own tooltip — Rails' "URL must be an HTTP or HTTPS URL" could
+  never reach the owner. The React form sets `noValidate` and keeps `type="url"`, which gives a
+  phone its URL keyboard and which no `app.css` rule keys off. jsdom enforces the same validation,
+  so `manual-entry.test.tsx` sends a scheme-less URL and a `javascript:` application URL through
+  to the fake Rails exactly as typed; removing the attribute fails that test, which was checked by
+  mutation rather than assumed.
+- **Rails' 422 sentence is rendered instead of Go's paraphrase, which needed `apiErrorMessage`
+  back.** `createErrorStatus` answered every 422 with "Could not add that job. Provide a valid URL or
+  paste the posting text.", which cannot say *which* field was rejected, while
+  `ManualJobPostImporter` joins every failed rule into its `invalid_input` message. The port renders
+  that message as sent and keeps Go's sentence only for a 422 without one. Doing so exposed a gap in
+  `FE-04`: `APIError.message` is never empty — it falls back to `api request failed: status 422:
+  <body>` — so a `message !== ""` check renders raw JSON for an envelope whose message is blank. Go
+  had `APIErrorMessage` for exactly this. `apiErrorMessage` (backed by `APIError.envelopeMessage`)
+  restores it, and `contactSaveErrorMessage` (`FE-21`), which made the same check, now uses it too.
+- **The outcome is the top-level `import` key, rendered and never inferred.** The test answers with
+  a decoy `import` inside `job_post` beside the real sibling and asserts the sibling wins, and with
+  no `import` key at all to show that reads as a new import, where Go's `switch` fell through. New,
+  already tracked, already submitted, and possible match (supported, though Rails does not send it
+  yet) keep Go's single `.manual-entry-result` box and differ by sentence, link label, and a
+  `manual-entry-result--<outcome>` modifier that `app.css` does not style yet. The link goes to the
+  posting Rails named, so a match leads to the existing record rather than a duplicate.
+- **The lookup commits on blur, and folds its answer in functionally.** Go started the lookup on the
+  native `change` event — blur or Enter. React's `onChange` is the per-keystroke `input` event, so
+  the commit is `onBlur`, and Enter in the form imports, as Enter in a form does. The answer is
+  applied with `setForm((current) => applyLookupResult(current, …))` against the form as it stands
+  when the response lands, so a title typed while the request is in flight is kept; a closure over
+  the pre-request form would overwrite it, and the test holds a lookup open to pin that race. Both
+  writes are mutations, so neither retries and a 401 from either reaches the `lib/auth.ts` redirect
+  — the lookup included, although it persists and invalidates nothing.
+- **An import marks the feed and the landing stale without waiting.** A success invalidates
+  `jobs.root()` and `ingestionBatches.root()` (the `keys.ts` row) and does not await them: nothing on
+  this screen renders either, so they only need to be stale when the owner follows the result link
+  or goes back. The fields are kept after a success, as Go kept them, and pressing Import again with
+  nothing to import replaces the shown result with the hint, because Go's state machine had one slot
+  for the outcome. URL trimming is asserted on `manualJobInput` rather than through the DOM, because a
+  `type="url"` input strips surrounding whitespace from its own value before any handler sees it.
 
 ---
 
