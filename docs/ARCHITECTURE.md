@@ -434,11 +434,16 @@ the original browser `Host` header.
    from Resend's receiving API (`ResendInboundClient` → `GET /emails/receiving/{email_id}`, using
    `RESEND_API_KEY`), then: parse alert (deterministic known-sender parsers, forward-aware via the
    in-body `From:` header) → if no postings, LLM fallback extraction (`InboundEmailLlmExtractor`)
-   → normalize each into a `JobPost` (shared `JobPostMaterializer`, deduped by stable URL identity
+   → apply the versioned `JobPostTitleScreen` through `InboundPostingTitleFilter`. The screen keeps
+   software-development, AI/ML/LLM/agentic, platform/DevOps/SRE/cloud, and data-engineering titles;
+   off-scope candidates are represented only by aggregate counts/reasons in the inbound email's
+   `parse_result` and create no domain rows. Accepted candidates normalize into a `JobPost` (shared
+   `JobPostMaterializer`, deduped by stable URL identity
    and registering idempotent `source`/`posting` aliases) → resolve application route (which also
-   registers its stable `application` alias) → run `JobPostTriage` title/location gating. Eligible inbound posts
+   registers its stable `application` alias) → run `JobPostTriage` using the same title policy plus
+   location gating. Manual imports bypass title screening. Eligible inbound posts
    are automatically enqueued for `ScoreJobPostJob` until `JOB_TRIAGE_AUTO_SCORE_DAILY_LIMIT`
-   is reached; rejected posts are marked `scoring_status: "filtered"`, and over-budget eligible
+   is reached; location-rejected materialized posts are marked `scoring_status: "filtered"`, and over-budget eligible
    posts are marked `scoring_status: "deferred"` for later manual scoring from the PWA. To keep the
    Active feed drainable under heavy intake (INTAKE-02), triage also sets `lifecycle_state`:
    triage-rejected posts are auto-parked in `backlog` (kept, not surfaced in the Active feed), and

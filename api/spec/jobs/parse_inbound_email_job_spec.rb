@@ -48,7 +48,7 @@ RSpec.describe ParseInboundEmailJob, type: :job do
     expect(JobPost.last.triage_reasons).to include("location_vancouver_priority")
   end
 
-  it "filters known-sender postings that miss target title/location rules without scoring" do
+  it "screens out known-sender postings that miss target title rules before materialization" do
     email = inbound_email(data: {
       "from" => "jobs@linkedin.com",
       "subject" => "Job alert",
@@ -57,14 +57,14 @@ RSpec.describe ParseInboundEmailJob, type: :job do
         "https://www.linkedin.com/jobs/view/3812345678/\n"
     })
 
-    expect { described_class.perform_now(email) }.to change(JobPost, :count).by(1)
+    expect { described_class.perform_now(email) }.not_to change(JobPost, :count)
     expect(ActiveJob::Base.queue_adapter.enqueued_jobs).to be_empty
-
-    post = JobPost.last
-    expect(post.scoring_status).to eq("filtered")
-    expect(post.triage_status).to eq("rejected")
-    expect(post.lifecycle_state).to eq("backlog")
-    expect(post.triage_reasons).to include("title_missing_target_role", "title_matches_exclusion")
+    expect(email.reload.raw_payload.dig("parse_result", "title_screen")).to include(
+      "policy" => JobPostTitleScreen::POLICY_VERSION,
+      "candidates" => 1,
+      "accepted" => 0,
+      "rejected" => 1
+    )
   end
 
   it "auto-backlogs eligible inbound postings beyond the daily active limit" do
@@ -159,15 +159,15 @@ RSpec.describe ParseInboundEmailJob, type: :job do
       # no text/html — as actually delivered by the Resend webhook
     })
     fetched = {
-      "text" => "Staff Engineer\nGlobex · Remote\nhttps://www.linkedin.com/jobs/view/9999999999/\n"
+      "text" => "Staff Software Engineer\nGlobex · Remote\nhttps://www.linkedin.com/jobs/view/9999999999/\n"
     }
     fake_client = instance_double(ResendInboundClient, fetch: fetched)
     allow(ResendInboundClient).to receive(:new).and_return(fake_client)
 
     expect { described_class.perform_now(email) }.to change(JobPost, :count).by(1)
     expect(fake_client).to have_received(:fetch).with("rcv_abc123")
-    expect(email.reload.raw_payload.dig("data", "text")).to include("Staff Engineer")
-    expect(JobPost.last.title).to eq("Staff Engineer")
+    expect(email.reload.raw_payload.dig("data", "text")).to include("Staff Software Engineer")
+    expect(JobPost.last.title).to eq("Staff Software Engineer")
   end
 
   it "matches a forwarded LinkedIn alert via the in-body From header" do

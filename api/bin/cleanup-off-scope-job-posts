@@ -1,0 +1,20 @@
+#!/usr/bin/env ruby
+
+require "json"
+require "optparse"
+
+options = { dry_run: true }
+
+OptionParser.new do |parser|
+  parser.banner = "Usage: bin/cleanup-off-scope-job-posts [--dry-run | --apply] [--sample-limit N]"
+  parser.on("--dry-run", "Report changes without writing (default)") { options[:dry_run] = true }
+  parser.on("--apply", "Soft-remove eligible off-scope records") { options[:dry_run] = false }
+  parser.on("--sample-limit N", Integer, "Maximum rejected records to print") do |value|
+    options[:sample_limit] = value.clamp(0, 100)
+  end
+end.parse!
+
+require_relative "../config/environment"
+
+report = OffScopeJobPostCleanup.new(**options).call
+puts JSON.pretty_generate(report.to_h)
