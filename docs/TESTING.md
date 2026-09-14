@@ -124,7 +124,10 @@ Be honest about the current state — most of the suite is still to be written.
   soft-removal, manual-import exclusion, and application-history preservation for historical
   title-policy cleanup.
 - **api/** — `spec/bin/cleanup_off_scope_job_posts_spec.rb`: subprocess smoke coverage proving the
-  cleanup executable boots through Bundler and emits a parseable, non-writing dry-run report.
+  cleanup executable boots through Bundler and emits a parseable, non-writing dry-run report. It
+  runs the executable outside the parent's Bundler environment with gems visible only through
+  `BUNDLE_PATH`, as in the Docker image, so requiring a pinned default gem such as `json` before
+  `config/environment` fails the spec.
 - **api/** — `spec/jobs/parse_inbound_email_job_spec.rb`: job spec wiring the inbound parse job
   to the parser service for both the known-sender and LLM-fallback paths.
 - **api/** — `spec/services/application_route_resolver_spec.rb`: deterministic route-type
