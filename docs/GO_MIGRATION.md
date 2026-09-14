@@ -1576,6 +1576,17 @@ What actually differed from the plan:
 
 ---
 
+## Tailwind alongside app.css — done (`UI-01`, 2026-09-14)
+
+- `@tailwindcss/vite` plus `src/styles/tailwind.css` (theme + utilities layers only, no Preflight),
+  imported from `src/main.tsx`. `app.css` is still linked from `index.html` and unchanged.
+- The FE-28 parity gate no longer exists (deleted at cutover), so parity was checked on the build
+  output: the emitted Tailwind stylesheet contains only the probe's five utilities and theme
+  variables equal to the `:root` values. No existing class name gains a rule, so no screen changes.
+- `src/components/tailwind-probe.tsx` is unrouted; remove it when a real screen adopts utilities.
+
+---
+
 ## Notes for agents working the chain (historical)
 
 - Until `FE-30`, `web/` is production. Do not edit it, and do not delete it.

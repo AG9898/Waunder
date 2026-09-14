@@ -7,6 +7,7 @@ import { createQueryClient } from "./api/query-client";
 import { installUnauthorizedRedirect } from "./lib/auth";
 import { installSwNavigation } from "./lib/sw-nav";
 import { routes } from "./routes";
+import "./styles/tailwind.css";
 
 const container = document.getElementById("root");
 if (!container) {

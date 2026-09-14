@@ -2926,7 +2926,7 @@
       "id": "UI-01",
       "title": "Add Tailwind v4 alongside app.css without Preflight",
       "description": "Begin the styling phase. Import only tailwindcss/theme and tailwindcss/utilities, never the full tailwindcss entry, because its Preflight fights app.css's own resets and base element styles. Derive @theme from the existing :root token block: --color-bg, --radius-pill, --text-xs and the rest are already in Tailwind v4's token naming shape, so the design system transfers rather than being re-derived. app.css stays loaded and authoritative; no shipped screen changes appearance in this task.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "UI",
       "depends_on": [

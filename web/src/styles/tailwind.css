@@ -1,0 +1,67 @@
+/* Tailwind v4, styling phase (UI-01). Only the theme and utilities layers are imported: the full
+   "tailwindcss" entry also loads Preflight, whose resets fight public/app.css's own base styles.
+   Both land in cascade layers, so the unlayered app.css (linked from index.html) stays
+   authoritative for every existing screen; utilities only add what app.css does not set.
+
+   @theme mirrors app.css's :root token block value for value. The default Tailwind palettes,
+   radii, type scale, shadows, and fonts are cleared so a utility can only express a Waunder token.
+   Keep this block in sync with app.css when a token changes (docs/STYLE_GUIDE.md). */
+@import "tailwindcss/theme" layer(theme);
+@import "tailwindcss/utilities" layer(utilities) source(none);
+
+/* Automatic source detection is off: it turns ordinary words anywhere in src/ into utilities
+   (.table, .hidden, .fixed, .container) that could match class names app.css screens already use.
+   Opt files in explicitly as they adopt utilities. */
+@source "../components/tailwind-probe.tsx";
+
+@theme {
+  --color-*: initial;
+  --radius-*: initial;
+  --text-*: initial;
+  --shadow-*: initial;
+  --font-*: initial;
+
+  --color-bg: #f4efe8;
+  --color-surface: #fbf8f3;
+  --color-surface-sunken: #ece5da;
+  --color-ink: #2d2c2c;
+  --color-ink-soft: #5d584f;
+  --color-ink-faint: #8c8579;
+  --color-border: #e4dccd;
+  --color-border-strong: #d4c9b6;
+  --color-accent: #5e7d6a;
+  --color-accent-strong: #4c6a58;
+  --color-accent-soft: #e7ede7;
+  --color-accent-ink: #3a5446;
+  --color-danger: #a8533f;
+  --color-danger-soft: #f4e3dc;
+  --color-danger-ink: #843d2c;
+  --color-success: #4c6a58;
+  --color-success-soft: #e3ece4;
+  --color-success-ink: #36513f;
+  --color-warning: #b07d35;
+  --color-warning-soft: #f5ecd9;
+  --color-warning-ink: #8a601f;
+
+  --font-sans:
+    "Hanken Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-md: 1.0625rem;
+  --text-lg: 1.375rem;
+  --text-xl: 1.75rem;
+
+  /* app.css spaces on a 4px step (--space-1..8 = 4..40px), which is Tailwind's 0.25rem unit. */
+  --spacing: 4px;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 1px 2px rgba(45, 44, 44, 0.04), 0 1px 3px rgba(45, 44, 44, 0.05);
+  --shadow-md: 0 2px 6px rgba(45, 44, 44, 0.05), 0 10px 28px rgba(45, 44, 44, 0.06);
+}

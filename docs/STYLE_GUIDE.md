@@ -20,6 +20,16 @@ source of truth; the stylesheet is `web/public/app.css`, linked from `web/index.
 > live under `web/public/`, which Vite serves at the site root: `/app.css`, `/fonts/…`, `/icons/…`,
 > `/icon.svg`.
 >
+> **Tailwind v4 (`UI-01`).** `web/src/styles/tailwind.css` imports only `tailwindcss/theme` and
+> `tailwindcss/utilities` — never the full entry, whose Preflight fights `app.css`'s resets. Both
+> sit in cascade layers, so the unlayered `app.css` stays authoritative. `@theme` restates the
+> `:root` tokens value for value (Tailwind's default colors, radii, type scale, shadows, and fonts
+> are cleared; `--spacing` is 4px to match `--space-*`), so `bg-accent-soft`, `rounded-pill`, and
+> `text-xs` mean exactly the `app.css` tokens. Change a token in both files at once;
+> `tailwind-probe.test.tsx` fails on drift. Automatic source detection is off: opt a file in with an
+> `@source` line when it adopts utilities, because scanning all of `src/` emits utilities such as
+> `.table` and `.hidden` from ordinary words.
+>
 > The class *suffixes* this file specifies — `.job-score--high|mid|low|pending`,
 > `.job-status--active|backlog|removed`, `.tracker-row--<group>` — plus the brand-logo paths
 > are produced by `web/src/lib/labels.ts`. Renaming a band or a state there

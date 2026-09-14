@@ -103,6 +103,10 @@ A standalone npm project (no monorepo workspace), exactly like `workers/`. Node 
 - ESLint is configured **syntactically** (`typescript-eslint`'s `recommended`, not the
   type-checked variant) because `npm run typecheck` already owns type errors. `eslint-config-prettier`
   is applied last so formatting is Prettier's job alone.
+- **Tailwind utilities are opt-in per file.** `src/styles/tailwind.css` loads theme + utilities
+  only (no Preflight) with `source(none)`. Add an `@source` line for a file before using utilities
+  in it, and use only token utilities (`bg-accent-soft`, `rounded-pill`), never arbitrary values
+  that bypass `app.css` tokens. See `docs/STYLE_GUIDE.md`.
 - Rails stays the source of truth for validation, normalization, scoring, route resolution, and
   submit safety. The client does trim-only hints, exactly as the Go client did — porting is not an
   occasion to move logic forward.

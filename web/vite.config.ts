@@ -1,3 +1,4 @@
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 import { VitePWA } from "vite-plugin-pwa";
@@ -38,6 +39,8 @@ export const pwaManifest = {
 export default defineConfig({
   plugins: [
     react(),
+    // Theme + utilities only, no Preflight: see src/styles/tailwind.css (UI-01).
+    tailwindcss(),
     VitePWA({
       registerType: "prompt",
       manifestFilename: "manifest.webmanifest",

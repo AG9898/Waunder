@@ -185,6 +185,9 @@ Be honest about the current state — most of the suite is still to be written.
   through Testing Library into jsdom and asserts it with a jest-dom matcher, so a green run proves
   Vite + React + TypeScript, the jsdom environment, `vitest.setup.ts`, and the matcher type
   augmentation are all wired. Screen tests arrive with the ported components (`FE-08` onward).
+- **web/** — `src/components/tailwind-probe.test.tsx` (`UI-01`): asserts `tailwind.css` imports only
+  the theme and utilities layers (no Preflight), that every `@theme` token equals its `app.css`
+  `:root` value, that `app.css` is still linked, and renders the unrouted Tailwind probe.
 
 - **web/** — `src/api/schemas.test.ts` (`FE-03`): the API boundary contract. Fixtures are copied
   from what the Rails serializers actually emit, **including the keys they leave out** — the
