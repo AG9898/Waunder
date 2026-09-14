@@ -1,7 +1,7 @@
 # STYLE_GUIDE.md — Waunder Frontend Style System
 
 > Canonical source for Waunder's PWA visual direction.
-> Component behavior and data ownership still live in Rails/go-app docs; this file governs
+> Component behavior and data ownership still live in Rails and `web/src/` docs; this file governs
 > visual treatment, CSS integration, and design constraints.
 
 Waunder's frontend should feel like a quiet personal operations tool: warm, utilitarian,
@@ -11,29 +11,22 @@ not use hero sections, decorative gradients, or card-heavy layouts.
 The current design handoff lives at
 [`reference/design_handoff_waunder_css/`](../reference/design_handoff_waunder_css/).
 Its static HTML files and screenshots are reference material only. Do not copy the wrapper
-HTML into the app. The go-app components in `web/components/` remain the markup and behavior
-source of truth; the stylesheet is integrated through go-app's `app.Handler`.
+HTML into the app. The React components in `web/src/components/` are the markup and behavior
+source of truth; the stylesheet is `web/public/app.css`, linked from `web/index.html`.
 
-> **Migrating:** the frontend is moving to Vite + React + TypeScript. `app.css` and every
-> class name in it are carried over **verbatim** by the port, so this visual system survives
-> unchanged; only the component language changes. Styling upgrades (Tailwind, component
-> libraries) are a separate later phase. See [`GO_MIGRATION.md`](GO_MIGRATION.md).
->
-> The stylesheet, the Hanken Grotesk WOFF2, the app icon, and the brand logos now also live
-> as byte-identical copies under `client/public/`, linked from `client/index.html`. Vite
-> serves that directory at the site root, so every asset URL loses go-app's `/web/` prefix:
-> `/web/app.css` → `/app.css`, `/web/fonts/…` → `/fonts/…`, `/web/icons/…` → `/icons/…`,
-> `/web/icon.svg` → `/icon.svg`. Until the cutover, `web/web/` is still what production
-> serves and both copies must stay in sync; edit neither for styling reasons.
+> `app.css` and every class name were carried over **verbatim** from the retired Go/go-app build
+> ([`GO_MIGRATION.md`](GO_MIGRATION.md)); styling upgrades (Tailwind, component libraries) are the
+> separate `UI-*` phase. The stylesheet, the Hanken Grotesk WOFF2, the app icon, and the brand logos
+> live under `web/public/`, which Vite serves at the site root: `/app.css`, `/fonts/…`, `/icons/…`,
+> `/icon.svg`.
 >
 > The class *suffixes* this file specifies — `.job-score--high|mid|low|pending`,
 > `.job-status--active|backlog|removed`, `.tracker-row--<group>` — plus the brand-logo paths
-> are produced by `client/src/lib/labels.ts` in the ported app (`web/components/client.go` in
-> production), with identical thresholds and strings. Renaming a band or a state there
+> are produced by `web/src/lib/labels.ts`. Renaming a band or a state there
 > silently unstyles a pill, so treat those return values as part of this style contract.
 >
 > The tracker's responsive table carries its markup contract into
-> `client/src/components/tracker/` unchanged: one `<table class="tracker-table">`, a `data-label` on
+> `web/src/components/tracker/` unchanged: one `<table class="tracker-table">`, a `data-label` on
 > every `.tracker-cell` that matches its column header (the only label a phone shows),
 > `.tracker-cell-job` as every row's leading cell (it paints the group tint in table mode), and
 > `tracker-row tracker-row--<group>` from `trackerRowClass`. `tracker.test.tsx` parses `app.css` to
@@ -93,7 +86,7 @@ detail; the base `.job-score` pill defines only shape and layout.
 
 The target typeface is Hanken Grotesk with system sans fallbacks. Because Waunder is an
 installable PWA with an offline-tolerant app shell, prefer self-hosted WOFF2 assets under
-`web/web/` or a documented system-font fallback over a live Google Fonts dependency.
+`web/public/` or a documented system-font fallback over a live Google Fonts dependency.
 
 Use the reference scale:
 
@@ -153,7 +146,7 @@ figures where possible.
   backlog/remove/restore buttons on the right, rather than floating the bare checkbox above the
   card. This keeps the per-row controls together and reads cleanly when the card stacks on mobile.
 - The origin pill leads with the source's official brand logo (LinkedIn/Glassdoor/Indeed),
-  self-hosted as SVGs under `web/web/icons/` (vendored from Simple Icons with the brand color
+  self-hosted as SVGs under `web/public/icons/` (vendored from Simple Icons with the brand color
   baked into the fill — no live CDN dependency, matching the self-hosted-font policy). Sources
   without a brand logo (manual entry, generic email alert) use an emoji marker instead. The
   logo/emoji sits inline before the source label via `flex` + `gap` on the pill.
@@ -236,13 +229,12 @@ columns, a compact title, hairline sections, and one primary action where possib
 
 ## Integration Rules
 
-- Ship styling from `web/web/app.css` and load it through `app.Handler{Styles: []string{"/web/app.css"}}`.
-- Keep go-app components as the source of truth for markup and state. Static files under
+- Ship styling from `web/public/app.css`, linked from `web/index.html` (not imported from `src/`,
+  so it keeps a constant URL). It is excluded from Prettier; do not reformat it.
+- Keep React components as the source of truth for markup and state. Static files under
   `reference/` are review references only.
-- Do not introduce React, Tailwind, MUI, hand-written manifests, or a hand-written service
-  worker for this styling pass.
-- Keep PWA manifest, icon, theme/background colors, and service worker generation in
-  `web/main.go` through go-app.
+- Keep the PWA manifest in `web/vite.config.ts` (`vite-plugin-pwa`) and the service worker in
+  `web/src/sw.ts`; `/app-worker.js` is the permanent legacy-worker kill switch.
 - Any markup adjustments should be narrow compatibility fixes for existing states/classes,
   not product redesigns.
 - Preserve existing safety tests and behavior: submits, profile saves, manual job creation,

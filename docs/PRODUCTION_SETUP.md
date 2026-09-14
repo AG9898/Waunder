@@ -4,9 +4,9 @@ Operational reference for the live Railway/Resend setup. Keep this file limited 
 non-secret values and setup facts that agents need to orient quickly; secrets stay in
 Railway variables and local ignored `.env` files.
 
-The `web` service's frontend is being migrated from Go/go-app to Vite + React + TypeScript.
-The service, domain, proxy paths, and Resend webhook URL are all unchanged by that work; see
-[`GO_MIGRATION.md`](GO_MIGRATION.md).
+The `web` service runs the Vite + React + TypeScript PWA behind Caddy (cut over from Go/go-app on
+2026-09-14). The service, domain, proxy paths, and Resend webhook URL were unchanged by that
+migration; see [`GO_MIGRATION.md`](GO_MIGRATION.md).
 
 ---
 
@@ -29,7 +29,7 @@ Production runs in one Railway project with these services:
 
 | Service | Role |
 |---|---|
-| `web` | Public Go/go-app PWA server and proxy |
+| `web` | Public Caddy server: static React PWA plus `/api` and Resend webhook proxy |
 | `api` | Private single-Puma Rails API, bounded async jobs, LLM orchestration, webhook handling |
 | `worker` | Private Playwright worker for approved submit tasks |
 | `Postgres` | Managed PostgreSQL backing Rails data, jobs, cache, and cable |
@@ -45,9 +45,12 @@ each app service points `RAILWAY_DOCKERFILE_PATH` at a root-context Dockerfile:
 | `web` | `deploy/railway-web.Dockerfile` |
 | `worker` | `deploy/railway-worker.Dockerfile` |
 
-`deploy/railway-web.Dockerfile` now contains the locally verified Node-build-to-Caddy shadow
-configuration (`FE-27`). No Railway service configuration or deployment is changed until frontend
-cutover; the current production web container remains the Go/go-app server.
+`deploy/railway-web.Dockerfile` builds `web/` with Node 22 (`npm ci && npm run build`) and runs the
+`dist/` output in `caddy:2.10-alpine` with `web/Caddyfile`: automatic HTTPS off (Railway terminates
+TLS), `zstd`/`gzip` compression, SPA fallback to `index.html`, and `/api/*` plus
+`/webhooks/resend/inbound` reverse-proxied to `API_INTERNAL_URL` with the original `Host` header
+preserved. `bash web/scripts/container-smoke.sh` builds and checks that image locally. The `web`
+service needs only `API_INTERNAL_URL` and `PORT`.
 
 Required production env is documented in [`ENV_VARS.md`](ENV_VARS.md). Key placement:
 
@@ -58,7 +61,7 @@ Required production env is documented in [`ENV_VARS.md`](ENV_VARS.md). Key place
 | `RESEND_WEBHOOK_SECRET` | `api` |
 | `RESEND_API_KEY` | `api` |
 | `RESEND_INBOUND_DOMAIN` | `api` |
-| `VAPID_PUBLIC_KEY` | `api` and `web` |
+| `VAPID_PUBLIC_KEY` | `api` |
 | `VAPID_PRIVATE_KEY` | `api` |
 | `APP_SHARED_SECRET`, `SESSION_SECRET` | `api` |
 | `WORKER_SERVICE_TOKEN` | `api` and `worker` |
@@ -145,14 +148,13 @@ Two exact requirements sit behind that instruction, and both fail silently if th
 the device must be on **iOS/iPadOS 16.4 or later**, and the app must be opened from the home-screen
 icon. Before it is installed, iOS does not expose the Push API at all — so a Safari tab reports the
 browser as push-incapable even on iOS 17, and tapping an enable control there produces no prompt
-and no error. After the React cutover the app detects this itself (`client/src/lib/platform.ts`)
+and no error. The app detects this itself (`web/src/lib/platform.ts`)
 and shows which of the three blockers applies — too old, not installed, or genuinely unsupported —
-instead of offering a control that cannot work. Until then, check the iOS version and the
-home-screen icon by hand before reporting push as broken.
+instead of offering a control that cannot work.
 
 ## PWA Cutover Recovery
 
-After the React frontend cutover, keep `/app-worker.js` deployed permanently. It is the retirement
+Since the React frontend cutover, keep `/app-worker.js` deployed permanently. It is the retirement
 worker for installed go-app clients: it clears CacheStorage, unregisters the legacy cache-first
 worker, claims open windows, and best-effort reloads them. Removing that exact path can leave a
 device permanently pinned to the old app shell.

@@ -8,7 +8,7 @@
 ## Overview
 
 Waunder is a single-user, mobile-first personal job-application assistant deployed as a
-three-service monorepo on Railway. A Go + go-app WebAssembly PWA (`web`) serves the
+three-service monorepo on Railway. A Vite + React + TypeScript PWA served by Caddy (`web`) provides the
 installable app shell and proxies `/api/*` plus the Resend inbound webhook path to a
 Ruby on Rails API (`api`), which is the single source of truth for all data, LLM
 orchestration, notification dispatch, and worker dispatch. A Node + Playwright
@@ -24,13 +24,13 @@ Three Railway services in one project, plus Railway managed PostgreSQL. Services
 communicate over Railway's private network (no public internet hop). Redis or a resident durable
 queue is introduced only if the bounded low-cost Active Job runtime is outgrown.
 
-- **web** (Railway — Go 1.26 + go-app v10 WebAssembly PWA + small native Go HTTP server;
-  Go module `github.com/ag9898/waunder/web`): serves the compiled `app.wasm`, go-app's
-  generated `wasm_exec.js`, the auto-generated PWA manifest and service worker, and the
-  app shell. Reverse-proxies `/api/*` and `/webhooks/resend/inbound` to the Rails `api`
-  service over the private network. Built from an explicit two-target Dockerfile
-  (`GOOS=js GOARCH=wasm go build -o web/app.wasm .` for the frontend, then a native
-  server binary). Listens on `$PORT` (default `8000`).
+- **web** (Railway — Vite + React 19 + TypeScript PWA built with Node 22, served by Caddy 2.10):
+  serves the static bundle, the `vite-plugin-pwa` manifest, the custom service worker (`/sw.js`),
+  and the permanent legacy-worker kill switch (`/app-worker.js`), with `zstd`/`gzip` compression
+  and SPA fallback. Reverse-proxies `/api/*` and `/webhooks/resend/inbound` to the Rails `api`
+  service over the private network, preserving the browser's `Host` header. Built by the
+  root-context `deploy/railway-web.Dockerfile` (Node build stage → Caddy runtime). Listens on
+  `$PORT` (container default `8080`).
 - **api** (Railway — Rails 8.1.3 API-only, Ruby 3.2.3, Puma): owns all data, LLM
   orchestration via OpenRouter, notification dispatch, Resend inbound webhook handling,
   background jobs, and worker dispatch. Jobs run on one in-Puma async thread; cache uses
@@ -54,254 +54,208 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 
 ## Component Responsibilities
 
-### web (Go + go-app PWA server)
+### web (React PWA + Caddy)
 
-> **Migrating:** the `web/` frontend is being replaced with a Vite + React + TypeScript
-> PWA (Go removed entirely). This section describes the current Go/go-app implementation and
-> stays accurate until the cutover task rewrites it. Plan of record:
-> [`GO_MIGRATION.md`](GO_MIGRATION.md).
->
-> The shadow client's copy of this contract lives in `client/src/api/schemas.ts`: one zod schema
-> and inferred type per payload, including the response envelopes. **Rails is unchanged** — every
-> endpoint, query param, and JSON shape below is the same. The one behavioral difference is that
-> the new client *validates* at the boundary instead of decoding into a struct: a missing key or
-> `null` still resolves to the Go zero value (Rails' serializers legitimately vary per endpoint),
-> a pointer field still resolves to `null` rather than a zero (`match_score: null` is "not scored",
-> never `0`), and a **wrong type now fails loudly** instead of arriving somewhere downstream as an
-> empty string.
->
-> `client/src/api/endpoints.ts` then carries one function per `RailsClient` method with the same
-> method, path, and request body, `keys.ts` gives every read a hierarchical TanStack Query key so a
-> mutation invalidates by prefix, and `query-client.ts` sets the two policies that are safety
-> properties rather than tuning: a read is retried only on a transport failure or a Rails 5xx (so a
-> 401 reaches the login redirect immediately), and **a mutation is never retried**, because
-> replaying `POST /api/applications/:id/submit` would re-dispatch a trusted submit.
->
-> **Writes invalidate; they never patch what the server said.** Each Go screen spliced its own
-> local slice after a successful write — `applyLifecycleResult` removed the transitioned rows,
-> `applyScoreResult` swapped one row in place. The shadow client instead invalidates the query
-> prefixes in `keys.ts` and re-asks Rails. This is a correctness rule, not a caching preference:
-> a lifecycle transition changes *which* postings belong on the page being shown, because
-> backlogging one row of a paged, filtered, server-sorted feed pulls a row forward from a later
-> page and shifts `page.total`. A local splice therefore renders a page that no longer exists on
-> the server. The same write also invalidates the digest and the ingestion batches, which render
-> the same postings with the same lifecycle pill. Rails is unchanged, and the endpoint split it
-> already offered is preserved: a single row goes through `PATCH /api/job_posts/:id/lifecycle`
-> and several go through the collection `PATCH /api/job_posts/lifecycle`, so a bulk transition
-> stays one Rails transaction rather than N requests.
->
-> Client-side routing carries over unchanged. `client/src/routes.tsx` declares the same nine paths
-> `main.go` registers, with go-app's three `RouteWithRegexp` patterns as ordinary React Router
-> params (`/jobs/:id`, `/jobs/:id/contacts`, `/applications/:id`) and a catch-all not-found screen
-> that go-app had no equivalent for — an SPA behind Caddy answers every path with the app shell, so
-> an unmatched path would otherwise render blank. `client/src/main.tsx` is the app root that mounts
-> the router and the TanStack Query client. The paths themselves are a preserved contract: the
-> manifest `start_url`, the push notification's click target, and the owner's existing history all
-> depend on them.
->
-> The shadow client's landing screen (`client/src/components/ingestion-batches/`) reproduces the
-> Go `DigestView` without any Rails change: `GET /api/ingestion_batches` grouped by date and
-> newest-first, each batch a native `<details>` block whose postings link to `/jobs/:id` carrying
-> `?from=digest&batch=<id>` so the batch re-expands on the way back, Prev/Next reading the server
-> page envelope, and the intake pause/resume panel over `GET`/`PATCH /api/intake`. Two behaviors
-> are load-bearing: the panel never writes intake on render (an intake write on mount would resume
-> a pipeline the owner paused and spend LLM budget on the held backlog), and both date and time are
-> rendered from the literal values Rails sent rather than converted to the browser's timezone, so
-> a batch's date header cannot disagree with the day `IngestionBatchBuilder` grouped on.
->
-> The shadow client's job detail (`client/src/components/job-detail/`) is
-> `GET /api/job_posts/:id` plus a `GET /api/job_posts/:id/cover_letter_draft`, with five explicit
-> writes and no Rails change. Opening a posting is a read: nothing on the screen creates an
-> application, generates materials, or reaches the submit path on mount. `Prepare application
-> draft` posts `POST /api/applications` and navigates to `/applications/:id` for review — it
-> approves nothing, and approve-and-submit stays the separate action on that screen; the intake
-> controls reuse the feed's lifecycle `PATCH`. The outbound `Open application` link is filtered
-> through `externalApplicationURL`, which accepts only an `http(s)` URL with a host — so a
-> `javascript:` or relative `application_url` Rails resolved from an email renders no link at all —
-> and falls back to `posting_url` when the route carries none.
->
-> The manual tracker and the cover letter (`FE-20`) are the other two writes. `Mark as applied`
-> and the status/stage selects share one mutation against `PATCH
-> /api/job_posts/:id/application_status` and reach nothing else — no draft creation, no submit —
-> because the owner is recording an application they made by hand; `pipeline_note` and
-> `next_follow_up_on` stay absent from every payload so Rails keeps the values it holds, a status
-> change sends a blank stage so `Application#assign_pipeline_status` applies that status's default,
-> and the stage change reads the status from the refetched tracker rather than from a value
-> captured in an earlier render. `Mark as applied` is offered only from `interested`, `drafting`,
-> `needs_review`, or an untracked posting, so one tap cannot walk an interviewing posting
-> backwards. The cover letter reads its own endpoint and generates through `POST
-> /api/job_posts/:id/cover_letter_draft` on an explicit click only — the one control on the screen
-> that spends OpenRouter budget — and keeps Rails' three answers apart: 201 with the letter, 503
-> `llm_unavailable` (no key configured), and 502 `generation_failed`. Generating is disabled until
-> the saved letter is on screen, because the `POST` replaces it.
->
-> The shadow client's contacts screen (`client/src/components/contacts/`) lists
-> `GET /api/job_posts/:id/contact_candidates` and adds the one write the Go screen never offered:
-> saving a contact through `POST /api/job_posts/:id/contact_candidates`, which Rails has always
-> served. Outreach stays prefilled for manual sending only — each candidate's draft is generated
-> through `POST /api/contact_candidates/:id/outreach_drafts` on an explicit click, shown read-only
-> with a copy control, and never sent. The screen has no form, no submit-typed control, and no
-> messaging link, and its test asserts that nothing leaves the screen beyond the list read, the
-> drafts, and the saves. Rails' 503 `llm_unavailable` and 502 `generation_failed` render as distinct
-> messages, and a saved contact appears by re-reading the list rather than being inserted locally.
->
-> The shadow client's application tracker (`client/src/components/tracker/`) is the same
-> `GET /api/job_posts` read the Go `ApplicationsView` makes, with `status=all` and `state=open` sent
-> explicitly on every request — the feed's scored-only default would otherwise hide the
-> triage-deferred postings the owner may still have applied to — plus the chosen group
-> (`application`), bin, sort, and page. The group tab totals and the header's "Applied to" / "Jobs
-> tracked" figures come from Rails' `application_counts`, never from counting rows. One `<table>`
-> renders as self-labelling cards below the 800px container query and as a real table inside it, so
-> it follows the selected layout rather than the viewport. A row's status select writes `PATCH
-> /api/job_posts/:id/application_status` with a blank stage and no note or follow-up date, reaches no
-> draft or submit endpoint, and then invalidates and refetches the feed, because a status change can
-> move the row out of the active tab and changes every tab's total.
->
-> The shadow client's manual import (`client/src/components/manual-entry/`) makes the same two
-> writes as the Go form, with no Rails change. `POST /api/job_posts` receives all five fields
-> trimmed and wrapped as `{job_post: {...}}`, and the screen renders the top-level `import` outcome
-> Rails returns — new, already tracked, or already submitted — each with its own sentence and a link
-> to the posting Rails named, so a match leads to the existing record. The client's only check is
-> the URL-or-text hint. The form sets `noValidate`, so the browser's own `type="url"` validation
-> cannot block a value before Rails judges it, and a 422 renders Rails' `invalid_input` sentence as
-> sent. Leaving the URL field (or pressing Look up details) calls `POST /api/job_posts/lookup`, which
-> persists nothing; typing into the field sends nothing. An `ok` answer fills only fields the owner
-> has not typed into — the title and company land in the Title and Company fields directly under
-> the lookup control, whose note names what was filled. `unsupported`, `unavailable`, and a failed
-> lookup request leave a warning and the fields as they were, and no lookup state (in flight or
-> failed) disables or delays the import, because Rails' `EnrichJobPostJob` reads a URL-only import in
-> the background anyway. Nothing is posted on render.
->
-> The shadow client's profile screen (`client/src/components/profile/`) reads `GET /api/profile` and
-> writes `PATCH /api/profile` with exactly the seven editable text/URL fields — never `email`,
-> `phone`, or `street_address`, which Rails' `profile_params` would accept — so the encrypted contact
-> details stay presence flags in both directions. The save's answer is the refreshed profile and is
-> written straight into the query cache; the form is seeded once and reseeded only from that answer,
-> so a focus refetch, or a failed one, never discards typing. A 422 renders Rails' own validation
-> sentence. The screen embeds the push toggle, mounts the install guide only for the iOS gates where
-> the owner must act outside the app (add to Home Screen, update iOS), and renders the sign-out
-> control. Nothing writes on render.
->
-> The shadow client's draft review (`client/src/components/draft-review/`) reads
-> `GET /api/applications/:id` and renders `draft_ready`, the autofill warnings, the worker's failure
-> reason and last report, and the worker-shaped preview. Only the answer values are editable, and
-> `PATCH /api/applications/:id/draft` carries `answers` alone, so the ATS, apply URL, and resume
-> reference stay Rails-owned. `POST /api/applications/:id/submit` is sent only from the explicit
-> approve-and-submit click, which stays disabled until the draft is ready, every answer is filled,
-> and Rails reports no warnings. Unsaved edits are saved first, and the submit is sent only if
-> Rails' saved draft still passes that check. Rails' dispatcher remains the final gate, and its
-> refusal codes render as sentences. Nothing is submitted or saved on render, and a non-`http(s)`
-> apply URL renders as text rather than a link.
->
-> The auth model is unchanged and stays entirely server-side, but the client's half of it is now in
-> one place. Because the session cookie is httponly, being signed out can only be derived from
-> responses, so `client/src/lib/auth.ts` subscribes to both TanStack caches and sends the owner to
-> `/login` on a 401 from any read or write — replacing the per-call-site `IsUnauthorized` checks
-> and "session expired" panels the Go screens each rendered by hand. A 403 does not sign anyone
-> out. The login screen (`client/src/components/login.tsx`) posts the passphrase to
-> `POST /api/session` outside the query cache and holds it in no state, and a new sign-out
-> (`DELETE /api/session`, which Rails always served but no Go screen ever called) clears the cached
-> reads and returns to the login screen.
->
-> The shadow client keeps a small amount of **device-local UI state** in `localStorage`, and none
-> of it is a source of truth: the layout preference (`waunder.layout`, `client/src/lib/layout.ts`)
-> and the jobs feed's filter selection (`waunder.jobFilters`, `client/src/lib/job-filters.ts` —
-> scored/unscored view, lifecycle bin, sort, score band, source, location, ingestion-date range,
-> and page). Both keys and both stored shapes are preserved from the Go build so a selection made
-> on the owner's devices survives the cutover in either direction. The selection only decides what
-> the client **asks for**: `Api::JobPostsController#index` still performs every filter, sort, and
-> page, and an unset filter is omitted from the query rather than sent as an empty value, so the
-> server can never receive a literal `""` or an "all" sentinel to match against. Every read is
-> total — absent, blocked, or corrupt storage resolves to the default selection.
->
-> The shadow client's `vite-plugin-pwa` configuration preserves the current installed app identity:
-> `/manifest.webmanifest` retains `Waunder`, `/`, standalone display, `#2d2c2c` colors, four
-> `/icon.svg` icon records, and no `id` (so identity still derives from `start_url`). Workbox
-> precaches content-hashed modules and revisioned constant public assets; its `needRefresh` signal
-> drives `client/src/components/update-banner.tsx`, which leaves activation/reload as an explicit
-> owner action. This is shadow-client behavior only until the frontend cutover.
->
-> The shadow client's service worker (`client/src/sw.ts`, built with the plugin's `injectManifest`
-> strategy) also fixes a live push defect without any Rails change. Rails sends
-> `{title, body, data: {url, count}}`, which the go-app worker discarded — it read a
-> `notification.path` Rails never sends and overwrote `data` — so the digest notification's click
-> target has been dead. The new handlers read `data.url`, resolve it against the app origin and
-> refuse anything that is not same-origin, show the notification with the app icon and badge, and
-> on click focus an open window and message it to route in place rather than reloading it (opening
-> a new window only when none is open). `POST`/`DELETE /api/push_subscription` and the VAPID key
-> endpoint are untouched.
->
-> `FE-27` supplies the un-deployed Caddy container for that shadow client:
-> `client/Caddyfile` serves the built SPA with `zstd`/`gzip` compression and proxies the existing
-> API and Resend paths to `API_INTERNAL_URL`. Its container smoke test verifies that Caddy preserves
-> the original browser `Host` header; the live Go service remains unchanged until cutover.
-- Serves the installable PWA: app shell, `app.wasm`, generated `wasm_exec.js`, web manifest,
-  and service worker. The manifest (`display: standalone`) and the offline app-shell service
-  worker are auto-generated by go-app from the `app.Handler` config in `main.go`; the only
-  supplied chrome is name/title, description, lang, start URL, theme/background colors, and the
-  app icon (`web/web/icon.svg`, used for default/large/SVG/maskable).
-- **PWA update path.** The generated service worker is **cache-first with no revalidation**, keyed
-  on `app.Handler.Version` — unset here, so go-app derives it from process start time and every
-  deploy gets a new version. A running page therefore keeps its old WebAssembly until it is
-  reloaded, which is especially sticky for an installed PWA resumed from memory rather than
-  reloaded. `components.AppChrome` implements go-app's `AppUpdater`: `OnAppUpdate` (plus a pending
-  check on mount, since an update can land before the chrome mounts) raises a "new version is
-  ready" banner whose Reload button calls `ctx.Reload()`. Reload stays an explicit user action,
-  never automatic, so an in-progress form edit is never discarded. The chrome also calls go-app's
-  `goappTryUpdate()` bootstrap hook on mount, so an in-app navigation re-checks for a new build
-  even when the browser never performs a full page load. Without this, a shipped change is
-  downloaded and then silently never applied.
-- Renders the iOS install + notification-permission guide (`components.InstallGuide`): it detects
-  iOS (incl. iPadOS desktop-UA), the iOS version (Web Push needs 16.4+), and home-screen-installed
-  state, then gates the push-permission request so it is only offered when permission can actually
-  be granted. The public `VAPID_PUBLIC_KEY` is forwarded into the PWA env (public by design) so the
-  client can subscribe via go-app's notification service; the resulting subscription is posted to
-  Rails through the same-origin `/api` proxy. The detection/gating logic is pure Go in
-  `components/pwa.go` and unit-tested.
-- Reverse-proxies `/api/*` and `/webhooks/resend/inbound` to the Rails `api` service via
-  `API_INTERNAL_URL`. When that var is unset, the proxy is disabled and the PWA serves
-  standalone (local dev convenience).
-- Renders the client screens (go-app routes in `main.go`): the ingestion-history landing (`/`,
-  `components.DigestView` — recently-ingested postings grouped into batches, one alert/digest
-  email per batch, by date and newest first; each batch is a collapsible block whose postings
-  link to their detail; fed by `GET /api/ingestion_batches` with Prev/Next 30-per-page
-  pagination reading the server page envelope; INTAKE-09), the job feed (`/jobs`,
-  `components.JobList` — scored/unscored status tabs, lifecycle bin tabs (Active default /
-  Backlog / Removed), filter controls (score band, source, location, ingestion-date range), an
-  oldest/highest-score sort toggle, and Prev/Next 30-per-page pagination reading the server page
-  envelope; explicit score requests on unscored rows; INTAKE-07; plus per-row and multi-select
-  bulk intake actions — Backlog/Remove in the Active bin and Restore in the Backlog/Removed bins —
-  calling `PATCH /api/job_posts/:id/lifecycle` and bulk `PATCH /api/job_posts/lifecycle` via
-   `RailsClient.SetJobLifecycle`; INTAKE-08), the manual job import form (`/jobs/new`,
-   `components.ManualEntry` — a listing URL and/or pasted posting text, optional external
-   application URL, and optional title/company hints, posting to `POST /api/job_posts`; it renders
-   Rails' typed new/tracked/submitted result with a `/jobs/:id` link to the returned record), a single
-  job's scored detail (`/jobs/:id`, `components.JobDetailView` — summary, match score,
-  relevant/missing requirements, red flags, alignment/strategy notes, the resolved
-  application route, an owner-controlled Cover letter card (generate/copy/regenerate one
-  manual-use letter, never an Application or submit task), and an intake block exposing Backlog/Remove (or Restore) via
-  `SetJobLifecycle`; INTAKE-08), the applications tracker (`/applications`,
-  `components.ApplicationsView` — tracked applications with status/stage controls, plus an
-  "All jobs" table view (lazily fetched on first open) that lists every JobPost via the paginated
-  `Jobs()` feed, surfaces the same lifecycle bin filter (Active default / Backlog / Removed) so
-  removed/backlog are excluded by default, and paginates 30-per-page with Prev/Next reading the
-  server page envelope; INTAKE-09), the
-  application draft review (`/applications/:id`,
-  `components.DraftReview` — resume emphasis, cover letter, structured answers, and a read-only
-  worker autofill preview, plus an explicit approve+submit control), the contacts/outreach screen
-  (`/jobs/:id/contacts`, `components.ContactsView` — saved contact candidates for a job plus
-  per-candidate, copy/manual-send-only outreach drafting), the profile/resume screen
-  (`/profile`, `components.ProfileView` — editable non-sensitive text/URL fields, encrypted
-  contact details shown as presence flags only, read-only resume ingest metadata, and an embedded
-  `components.PushToggle`), and the passphrase login
-  (`/login`, `components.Login`, which posts to
-  `POST /api/session`). All screens fetch through the same-origin `/api` proxy so the signed,
+The frontend replaced the Go/go-app build on 2026-09-14; the migration record (what was preserved
+and why) is [`GO_MIGRATION.md`](GO_MIGRATION.md). References below to "Go" behavior describe the
+retired build the port reproduced.
+
+The web client's copy of this contract lives in `web/src/api/schemas.ts`: one zod schema
+and inferred type per payload, including the response envelopes. **Rails is unchanged** — every
+endpoint, query param, and JSON shape below is the same. The one behavioral difference is that
+the new client *validates* at the boundary instead of decoding into a struct: a missing key or
+`null` still resolves to the Go zero value (Rails' serializers legitimately vary per endpoint),
+a pointer field still resolves to `null` rather than a zero (`match_score: null` is "not scored",
+never `0`), and a **wrong type now fails loudly** instead of arriving somewhere downstream as an
+empty string.
+
+`web/src/api/endpoints.ts` then carries one function per `RailsClient` method with the same
+method, path, and request body, `keys.ts` gives every read a hierarchical TanStack Query key so a
+mutation invalidates by prefix, and `query-client.ts` sets the two policies that are safety
+properties rather than tuning: a read is retried only on a transport failure or a Rails 5xx (so a
+401 reaches the login redirect immediately), and **a mutation is never retried**, because
+replaying `POST /api/applications/:id/submit` would re-dispatch a trusted submit.
+
+**Writes invalidate; they never patch what the server said.** Each Go screen spliced its own
+local slice after a successful write — `applyLifecycleResult` removed the transitioned rows,
+`applyScoreResult` swapped one row in place. The web client instead invalidates the query
+prefixes in `keys.ts` and re-asks Rails. This is a correctness rule, not a caching preference:
+a lifecycle transition changes *which* postings belong on the page being shown, because
+backlogging one row of a paged, filtered, server-sorted feed pulls a row forward from a later
+page and shifts `page.total`. A local splice therefore renders a page that no longer exists on
+the server. The same write also invalidates the digest and the ingestion batches, which render
+the same postings with the same lifecycle pill. Rails is unchanged, and the endpoint split it
+already offered is preserved: a single row goes through `PATCH /api/job_posts/:id/lifecycle`
+and several go through the collection `PATCH /api/job_posts/lifecycle`, so a bulk transition
+stays one Rails transaction rather than N requests.
+
+Client-side routing carries over unchanged. `web/src/routes.tsx` declares the same nine paths
+`main.go` registers, with go-app's three `RouteWithRegexp` patterns as ordinary React Router
+params (`/jobs/:id`, `/jobs/:id/contacts`, `/applications/:id`) and a catch-all not-found screen
+that go-app had no equivalent for — an SPA behind Caddy answers every path with the app shell, so
+an unmatched path would otherwise render blank. `web/src/main.tsx` is the app root that mounts
+the router and the TanStack Query client. The paths themselves are a preserved contract: the
+manifest `start_url`, the push notification's click target, and the owner's existing history all
+depend on them.
+
+The web client's landing screen (`web/src/components/ingestion-batches/`) reproduces the
+Go `DigestView` without any Rails change: `GET /api/ingestion_batches` grouped by date and
+newest-first, each batch a native `<details>` block whose postings link to `/jobs/:id` carrying
+`?from=digest&batch=<id>` so the batch re-expands on the way back, Prev/Next reading the server
+page envelope, and the intake pause/resume panel over `GET`/`PATCH /api/intake`. Two behaviors
+are load-bearing: the panel never writes intake on render (an intake write on mount would resume
+a pipeline the owner paused and spend LLM budget on the held backlog), and both date and time are
+rendered from the literal values Rails sent rather than converted to the browser's timezone, so
+a batch's date header cannot disagree with the day `IngestionBatchBuilder` grouped on.
+
+The web client's job detail (`web/src/components/job-detail/`) is
+`GET /api/job_posts/:id` plus a `GET /api/job_posts/:id/cover_letter_draft`, with five explicit
+writes and no Rails change. Opening a posting is a read: nothing on the screen creates an
+application, generates materials, or reaches the submit path on mount. `Prepare application
+draft` posts `POST /api/applications` and navigates to `/applications/:id` for review — it
+approves nothing, and approve-and-submit stays the separate action on that screen; the intake
+controls reuse the feed's lifecycle `PATCH`. The outbound `Open application` link is filtered
+through `externalApplicationURL`, which accepts only an `http(s)` URL with a host — so a
+`javascript:` or relative `application_url` Rails resolved from an email renders no link at all —
+and falls back to `posting_url` when the route carries none.
+
+The manual tracker and the cover letter (`FE-20`) are the other two writes. `Mark as applied`
+and the status/stage selects share one mutation against `PATCH
+/api/job_posts/:id/application_status` and reach nothing else — no draft creation, no submit —
+because the owner is recording an application they made by hand; `pipeline_note` and
+`next_follow_up_on` stay absent from every payload so Rails keeps the values it holds, a status
+change sends a blank stage so `Application#assign_pipeline_status` applies that status's default,
+and the stage change reads the status from the refetched tracker rather than from a value
+captured in an earlier render. `Mark as applied` is offered only from `interested`, `drafting`,
+`needs_review`, or an untracked posting, so one tap cannot walk an interviewing posting
+backwards. The cover letter reads its own endpoint and generates through `POST
+/api/job_posts/:id/cover_letter_draft` on an explicit click only — the one control on the screen
+that spends OpenRouter budget — and keeps Rails' three answers apart: 201 with the letter, 503
+`llm_unavailable` (no key configured), and 502 `generation_failed`. Generating is disabled until
+the saved letter is on screen, because the `POST` replaces it.
+
+The web client's contacts screen (`web/src/components/contacts/`) lists
+`GET /api/job_posts/:id/contact_candidates` and adds the one write the Go screen never offered:
+saving a contact through `POST /api/job_posts/:id/contact_candidates`, which Rails has always
+served. Outreach stays prefilled for manual sending only — each candidate's draft is generated
+through `POST /api/contact_candidates/:id/outreach_drafts` on an explicit click, shown read-only
+with a copy control, and never sent. The screen has no form, no submit-typed control, and no
+messaging link, and its test asserts that nothing leaves the screen beyond the list read, the
+drafts, and the saves. Rails' 503 `llm_unavailable` and 502 `generation_failed` render as distinct
+messages, and a saved contact appears by re-reading the list rather than being inserted locally.
+
+The web client's application tracker (`web/src/components/tracker/`) is the same
+`GET /api/job_posts` read the Go `ApplicationsView` makes, with `status=all` and `state=open` sent
+explicitly on every request — the feed's scored-only default would otherwise hide the
+triage-deferred postings the owner may still have applied to — plus the chosen group
+(`application`), bin, sort, and page. The group tab totals and the header's "Applied to" / "Jobs
+tracked" figures come from Rails' `application_counts`, never from counting rows. One `<table>`
+renders as self-labelling cards below the 800px container query and as a real table inside it, so
+it follows the selected layout rather than the viewport. A row's status select writes `PATCH
+/api/job_posts/:id/application_status` with a blank stage and no note or follow-up date, reaches no
+draft or submit endpoint, and then invalidates and refetches the feed, because a status change can
+move the row out of the active tab and changes every tab's total.
+
+The web client's manual import (`web/src/components/manual-entry/`) makes the same two
+writes as the Go form, with no Rails change. `POST /api/job_posts` receives all five fields
+trimmed and wrapped as `{job_post: {...}}`, and the screen renders the top-level `import` outcome
+Rails returns — new, already tracked, or already submitted — each with its own sentence and a link
+to the posting Rails named, so a match leads to the existing record. The client's only check is
+the URL-or-text hint. The form sets `noValidate`, so the browser's own `type="url"` validation
+cannot block a value before Rails judges it, and a 422 renders Rails' `invalid_input` sentence as
+sent. Leaving the URL field (or pressing Look up details) calls `POST /api/job_posts/lookup`, which
+persists nothing; typing into the field sends nothing. An `ok` answer fills only fields the owner
+has not typed into — the title and company land in the Title and Company fields directly under
+the lookup control, whose note names what was filled. `unsupported`, `unavailable`, and a failed
+lookup request leave a warning and the fields as they were, and no lookup state (in flight or
+failed) disables or delays the import, because Rails' `EnrichJobPostJob` reads a URL-only import in
+the background anyway. Nothing is posted on render.
+
+The web client's profile screen (`web/src/components/profile/`) reads `GET /api/profile` and
+writes `PATCH /api/profile` with exactly the seven editable text/URL fields — never `email`,
+`phone`, or `street_address`, which Rails' `profile_params` would accept — so the encrypted contact
+details stay presence flags in both directions. The save's answer is the refreshed profile and is
+written straight into the query cache; the form is seeded once and reseeded only from that answer,
+so a focus refetch, or a failed one, never discards typing. A 422 renders Rails' own validation
+sentence. The screen embeds the push toggle, mounts the install guide only for the iOS gates where
+the owner must act outside the app (add to Home Screen, update iOS), and renders the sign-out
+control. Nothing writes on render.
+
+The web client's draft review (`web/src/components/draft-review/`) reads
+`GET /api/applications/:id` and renders `draft_ready`, the autofill warnings, the worker's failure
+reason and last report, and the worker-shaped preview. Only the answer values are editable, and
+`PATCH /api/applications/:id/draft` carries `answers` alone, so the ATS, apply URL, and resume
+reference stay Rails-owned. `POST /api/applications/:id/submit` is sent only from the explicit
+approve-and-submit click, which stays disabled until the draft is ready, every answer is filled,
+and Rails reports no warnings. Unsaved edits are saved first, and the submit is sent only if
+Rails' saved draft still passes that check. Rails' dispatcher remains the final gate, and its
+refusal codes render as sentences. Nothing is submitted or saved on render, and a non-`http(s)`
+apply URL renders as text rather than a link.
+
+The auth model is unchanged and stays entirely server-side, but the client's half of it is now in
+one place. Because the session cookie is httponly, being signed out can only be derived from
+responses, so `web/src/lib/auth.ts` subscribes to both TanStack caches and sends the owner to
+`/login` on a 401 from any read or write — replacing the per-call-site `IsUnauthorized` checks
+and "session expired" panels the Go screens each rendered by hand. A 403 does not sign anyone
+out. The login screen (`web/src/components/login.tsx`) posts the passphrase to
+`POST /api/session` outside the query cache and holds it in no state, and a new sign-out
+(`DELETE /api/session`, which Rails always served but no Go screen ever called) clears the cached
+reads and returns to the login screen.
+
+The web client keeps a small amount of **device-local UI state** in `localStorage`, and none
+of it is a source of truth: the layout preference (`waunder.layout`, `web/src/lib/layout.ts`)
+and the jobs feed's filter selection (`waunder.jobFilters`, `web/src/lib/job-filters.ts` —
+scored/unscored view, lifecycle bin, sort, score band, source, location, ingestion-date range,
+and page). Both keys and both stored shapes are preserved from the Go build so a selection made
+on the owner's devices survives the cutover in either direction. The selection only decides what
+the client **asks for**: `Api::JobPostsController#index` still performs every filter, sort, and
+page, and an unset filter is omitted from the query rather than sent as an empty value, so the
+server can never receive a literal `""` or an "all" sentinel to match against. Every read is
+total — absent, blocked, or corrupt storage resolves to the default selection.
+
+The web client's `vite-plugin-pwa` configuration preserves the current installed app identity:
+`/manifest.webmanifest` retains `Waunder`, `/`, standalone display, `#2d2c2c` colors, four
+`/icon.svg` icon records, and no `id` (so identity still derives from `start_url`). Workbox
+precaches content-hashed modules and revisioned constant public assets; its `needRefresh` signal
+drives `web/src/components/update-banner.tsx`, which leaves activation/reload as an explicit
+owner action.
+
+The web client's service worker (`web/src/sw.ts`, built with the plugin's `injectManifest`
+strategy) also fixes a live push defect without any Rails change. Rails sends
+`{title, body, data: {url, count}}`, which the go-app worker discarded — it read a
+`notification.path` Rails never sends and overwrote `data` — so the digest notification's click
+target has been dead. The new handlers read `data.url`, resolve it against the app origin and
+refuse anything that is not same-origin, show the notification with the app icon and badge, and
+on click focus an open window and message it to route in place rather than reloading it (opening
+a new window only when none is open). `POST`/`DELETE /api/push_subscription` and the VAPID key
+endpoint are untouched.
+
+`FE-27` supplies the Caddy container:
+`web/Caddyfile` serves the built SPA with `zstd`/`gzip` compression and proxies the existing
+API and Resend paths to `API_INTERNAL_URL`. Its container smoke test verifies that Caddy preserves
+the original browser `Host` header.
+- Serves the installable PWA: `index.html`, hashed assets, `app.css`, fonts/icons, the manifest
+  (`display: standalone`, no `id`, four `/icon.svg` records to keep iOS home-screen identity), and
+  `web/src/sw.ts` — a revisioned precache with an `index.html` navigation fallback, a `SKIP_WAITING`
+  handler for the update banner, and Rails' `{title, body, data: {url}}` push payload handling.
+- **PWA update path.** `registerType: "prompt"`: a new build raises the update banner
+  (`web/src/components/update-banner.tsx`), and Reload stays an explicit user action so an
+  in-progress edit is never discarded. `/app-worker.js` retires any leftover go-app worker.
+- Renders the iOS install + notification-permission guide (`install-guide.tsx`, logic in
+  `web/src/lib/platform.ts`), gating the permission request on iOS 16.4+ and home-screen install.
+  The public VAPID key is fetched from `GET /api/push/vapid_public_key`; the subscription is posted
+  to Rails through the same-origin `/api` proxy.
+- Reverse-proxies `/api/*` and `/webhooks/resend/inbound` via Caddy to `API_INTERNAL_URL`.
+- Renders the screens in `web/src/routes.tsx`: the ingestion-history landing (`/`), the jobs feed
+  (`/jobs`, with status/bin tabs, filters, sort, pagination, bulk lifecycle actions, and
+  score-on-demand), manual import (`/jobs/new`), job detail (`/jobs/:id`, with cover letter and
+  manual tracker), contacts/outreach (`/jobs/:id/contacts`), the application tracker
+  (`/applications`), draft review and approve+submit (`/applications/:id`), profile (`/profile`),
+  and login (`/login`). All fetches go through the same-origin `/api` proxy so the signed,
   HTTP-only session cookie is carried automatically — no token handling client-side.
-- Talks to Rails only through a small `components.RailsClient` interface (the live
-  implementation, `httpRailsClient`, uses stdlib `net/http`, which maps to browser `fetch` in
-  the WASM build). The interface is the test seam: render/component tests inject a mock and run
-  with no backend. The read shapes the client expects are `GET /api/job_posts` (the unified feed:
-  `RailsClient.Jobs(ctx, JobFeedParams)` carries the `status`/`state`/`sort`/`score_band`/
+- Talks to Rails only through `web/src/api/endpoints.ts` (zod-validated `fetch`); tests fake Rails
+  with MSW. The read shapes the client expects are `GET /api/job_posts` (the unified feed:
+  `jobs(params)` carries the `status`/`state`/`sort`/`score_band`/
   `source`/`location`/`date_from`/`date_to`/`page` query params and decodes the
   `{job_posts, page, application_counts}` envelope into a `JobPage`; the unscored view is just
   `Status: "unscored"`, so there is no separate `UnscoredJobs` method — INTAKE-07; the
@@ -309,7 +263,7 @@ The full topology and the rationale for the `/api` proxy routing decision live i
   `GET /api/job_posts/:id` (detail), `GET /api/digest` (digest), and
   `GET /api/ingestion_batches` (ingestion history — postings grouped into source+arrival-time
   batches by `IngestionBatchBuilder`, derived without any persisted batch link or migration;
-  `RailsClient.IngestionBatches(ctx, page)` carries the 1-based `page` and decodes the
+  `ingestionBatches(page)` carries the 1-based `page` and decodes the
   `{batches, page}` envelope into an `IngestionBatchPage` for Prev/Next — INTAKE-09).
   Rails now serves all of these
   (READ-01): session-guarded, read-only, exposing only client-safe fields. The feed returns
@@ -460,7 +414,7 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 
 **Read request** (e.g. `GET /api/jobs`):
 1. Browser issues the request to the `web` origin.
-2. The Go server matches the `/api/` prefix and reverse-proxies to the `api` service over
+2. Caddy in `web` matches the `/api/` prefix and reverse-proxies to the `api` service over
    Railway's private network (`API_INTERNAL_URL`).
 3. A Rails controller (an `Api::BaseController` subclass) handles the request.
 4. Rails queries PostgreSQL and builds the JSON response.
@@ -602,7 +556,7 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 ## Auth
 
 Waunder is a single-user private app. The browser **only ever talks to the `web` origin**;
-all `/api/*` traffic is forwarded server-side by the Go proxy to the `api` service. Because
+all `/api/*` traffic is forwarded server-side by the Caddy proxy to the `api` service. Because
 the frontend is same-origin, there is **no CORS** to configure, the service-worker scope and
 web-push registration stay clean, and Rails needs no public domain.
 
@@ -622,7 +576,7 @@ status-report endpoints — it does not use the human session. See RESOLVED-14 i
 | Railway managed PostgreSQL | Primary datastore; also backs solid_cache/solid_cable and retains dormant Solid Queue tables | Required |
 | Resend | Inbound email for forwarded job alerts (`email.received` → `POST /webhooks/resend/inbound`, Svix-signature-validated) — the first ingestion path. Inbound-only; the app sends no email (RESOLVED-13). | Required for email ingestion |
 | OpenRouter | LLM gateway for scoring, summaries, and drafts (structured JSON); model configurable by env | Required for scoring/drafting features |
-| Web Push (VAPID) | Push notifications via the go-app service worker (iOS 16.4+, PWA installed to home screen) | Required for the push digest |
+| Web Push (VAPID) | Push notifications via the web app's service worker (`web/src/sw.ts`) (iOS 16.4+, PWA installed to home screen) | Required for the push digest |
 | Portfolio project (`My_Portfolio`) | External source of truth for the resume; pushes its JSON Resume + exported PDF/markdown to `POST /api/profile/resume` (push-on-export). Waunder never reaches back into it. | Optional — provides the resume; manual upload is the fallback |
 | Active Storage (local disk service) | Stores the resume PDF blob attached to `ResumeDocument`. On Railway the local disk is ephemeral, but the portfolio re-pushes the PDF on every export, so it self-heals (RESOLVED-18). | Required to hold the worker-uploadable resume file |
 | Resident durable queue (Solid Queue or Redis/Sidekiq) | Optional replacement if bounded in-process jobs no longer meet delivery/volume needs | Optional — not active in low-cost production |
@@ -637,7 +591,7 @@ There is **no staging environment** — only Production (Railway) and Local dev.
 |---|---|---|---|---|
 | Production | Railway service `web` | Railway service `api` | Railway service `worker` | Railway managed Postgres |
 | Staging | N/A (no staging) | N/A (no staging) | N/A (no staging) | N/A (no staging) |
-| Local dev | `localhost:8000` (Go server, `make run`) | local Rails (`bin/rails s`, e.g. `:3000`) | local Node worker (`npm run dev`) | local/Docker Postgres |
+| Local dev | `localhost:8000` (Vite dev server, `npm run dev`) | local Rails (`bin/rails s`, e.g. `:3000`) | local Node worker (`npm run dev`) | local/Docker Postgres |
 
 See [`ENV_VARS.md`](ENV_VARS.md) for the canonical variable and secret matrix per environment.
 
@@ -652,9 +606,9 @@ are not durable across a process restart; persisted records remain retryable, an
 ## Constraints
 
 - The browser only ever talks to the `web` origin — never directly to Rails.
-- All `/api` traffic and the Resend inbound webhook go through the Go proxy; the Rails `api`
+- All `/api` traffic and the Resend inbound webhook go through the Caddy proxy in `web`; the Rails `api`
   service has no public domain.
-- Rails is the single source of truth — **no business logic in the Go server or the worker**.
+- Rails is the single source of truth — **no business logic in the web frontend or the worker**.
 - Schema changes go through Rails migrations only — never `ALTER TABLE` or `DROP COLUMN` directly.
 - Secrets are read from environment variables only — no hardcoded values anywhere.
 - Sensitive resume/profile fields must be encrypted at rest (Active Record Encryption) — never plaintext.

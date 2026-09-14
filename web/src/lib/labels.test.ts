@@ -37,7 +37,7 @@ import {
   trackerGroup,
 } from "./labels";
 
-/** Repository root, reached from `client/src/lib/`. */
+/** Repository root, reached from `web/src/lib/`. */
 const repoRoot = join(import.meta.dirname, "..", "..", "..");
 
 describe("matchScoreLabel", () => {
@@ -131,7 +131,7 @@ describe("sourceIconPath", () => {
     for (const source of ["linkedin", "glassdoor", "indeed"]) {
       const path = sourceIconPath(source);
       expect(path.startsWith("/icons/")).toBe(true);
-      expect(existsSync(join(repoRoot, "client", "public", path))).toBe(true);
+      expect(existsSync(join(repoRoot, "web", "public", path))).toBe(true);
     }
   });
 

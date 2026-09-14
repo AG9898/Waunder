@@ -5,13 +5,9 @@
 > Code conventions that affect test structure live in [`CONVENTIONS.md`](CONVENTIONS.md).
 
 Waunder has three deployed stacks, each with its own test runner: `api/` (Rails / RSpec),
-`web/` (Go / `go test`), and `workers/` (Node built-in test runner). A fourth, `client/`, is the
-in-progress replacement frontend and runs Vitest.
-
-> **Migrating:** `web/` is being replaced by the Vite + React + TypeScript project in `client/`,
-> whose test stack is Vitest + Testing Library + MSW. The `web/` sections below describe the
-> current Go/go-app suite and stay accurate until the cutover task removes it. See
-> [`GO_MIGRATION.md`](GO_MIGRATION.md).
+`web/` (Vite + React, Vitest + Testing Library + MSW), and `workers/` (Node built-in test runner).
+The `web/` Vitest suite was built as a parity port of the retired Go/go-app suite, so entries below
+cite the Go tests they transcribed ([`GO_MIGRATION.md`](GO_MIGRATION.md)).
 
 ---
 
@@ -23,22 +19,18 @@ cd api && bundle exec rspec                              # all specs
 cd api && bundle exec rspec spec/requests/api/health_spec.rb   # single file
 cd api && bin/ci                                         # full CI gate (style + security + tests)
 
-# --- web/ (Go + go-app) ---
-cd web && go test ./...                                  # all Go tests
-
 # --- workers/ (Node + TypeScript) ---
 cd workers && npm test                                   # all tests
 cd workers && node --import tsx --test src/safety.test.ts  # single file
 cd workers && npm run typecheck                          # tsc --noEmit
 
-# --- client/ (Vite + React + TypeScript, shadow frontend) ---
+# --- web/ (Vite + React + TypeScript) ---
 cd client && npm test                                    # all tests (vitest run)
 cd client && npx vitest run src/toolchain.test.tsx       # single file
 cd client && npm run typecheck                           # tsc --noEmit
 cd client && npm run lint                                # eslint .
 cd client && npm run build                               # vite build
-bash client/scripts/container-smoke.sh                   # build/run Caddy image smoke test
-node client/scripts/parity-gate.cjs                     # Go vs client visual parity report
+bash web/scripts/container-smoke.sh                   # build/run Caddy image smoke test
 ```
 
 ---
@@ -48,9 +40,8 @@ node client/scripts/parity-gate.cjs                     # Go vs client visual pa
 | Stack | Tool | Version | Location | Run Command |
 |---|---|---|---|---|
 | api (Rails) | RSpec (`rspec-rails ~> 8.0`) | Ruby 3.2.3 / Rails 8.1.3 | `api/spec/` | `cd api && bundle exec rspec` |
-| web (go-app) | Go testing (`go test`) | Go 1.26 | `web/**/*_test.go` | `cd web && go test ./...` |
 | workers | Node built-in test runner (`node --test`) + tsx | Node 22 / TS 5.7 | `workers/src/*.test.ts`, `workers/src/**/*.test.ts` | `cd workers && npm test` |
-| client (shadow frontend) | Vitest 5 + jsdom + Testing Library + `@testing-library/jest-dom` + MSW 2 | Node 22 / TS 5.9 / React 19 | `client/src/**/*.{test,spec}.{ts,tsx}` | `cd client && npm test` |
+| web | Vitest 5 + jsdom + Testing Library + `@testing-library/jest-dom` + MSW 2 | Node 22 / TS 5.9 / React 19 | `web/src/**/*.{test,spec}.{ts,tsx}` | `cd client && npm test` |
 
 ---
 
@@ -188,79 +179,14 @@ Be honest about the current state — most of the suite is still to be written.
 - **workers/** — `src/ats/handlers.test.ts`: Playwright fixture tests for Greenhouse, Lever, and
   Ashby handler registration, approved-answer fill/submit behavior, and required unknown /
   sensitive-field pause behavior.
-- **web/** — `components/pwa_test.go`: table-driven `go test` coverage of the PWA install/push
-  gating helpers — iOS/iPadOS detection and version parsing (`DetectIOS`), the iOS 16.4+ Web Push
-  threshold (`SupportsIOSWebPush`), and the install/permission gate decision (`EvaluatePushGate`).
-- **web/** — `components/jobs_test.go`, `components/applications_test.go`,
-  `components/login_test.go`, `components/client_test.go`: render tests for the job list, job
-  detail, applications tracker, and ingestion-history (batches) screens (scored fields, tracker state, empty,
-  error, and 401 states) plus the login form, driven by a mocked `RailsClient`. Render tests use
-  the go-app `NewTestEngine` (which fires `OnPreRender`, so data screens load in both `OnMount`
-  and `OnPreRender`). The `httpRailsClient` is exercised against an `httptest` server to assert
-  the `/api`-namespaced paths, the `Jobs(JobFeedParams)` filter/sort/state/page query building and
-  `{job_posts, page}` envelope decode, JSON decode of scored fields/route/tracker state,
-  session-cookie carry between requests, and 401 → `APIError`/`IsUnauthorized` mapping. Pure helpers (`MatchScoreLabel`,
-  `RouteLabel`, `jobIDFromPath`, `loginErrorStatus`) are table-tested.
-- **web/** — `components/profile_test.go`, `components/push_test.go`: render and unit tests for the
-  profile/resume screen and the embedded push toggle (WEB-04). Profile tests assert the editable
-  fields render, contact details show only as presence flags (never leaking PII), the resume
-  metadata/empty state, and the save path (`doSave`) writes via the mocked `RailsClient` with
-  reseed/error/401 handling. Push tests use a `mockPusher` standing in for the browser Push API
-  (`PushSubscriber`): they verify `doSubscribe` reads the public VAPID key, subscribes, and only
-  then persists to Rails; `doUnsubscribe` cancels the browser subscription before calling Rails;
-  the `applySubscribe`/`applyUnsubscribe`/`initialPushState`/`pushErrorMessage` state mappings; and
-  that rendering/mount never auto-subscribes (unsupported build renders guidance, supported build
-  renders the enable control without any VAPID fetch or persist).
-- **web/** — `components/contacts_test.go`: render and unit tests for the contacts/outreach screen
-  (WEB-05). They assert the saved candidates render (name, role line, relevance reason, LinkedIn
-  link), the empty/error/401 load states, and the explicit per-candidate `doGenerate` path (drafts
-  via the mocked `RailsClient` with the typed loose template, recording the message for manual
-  copy). Two safety tests lock in the product constraint: a full render lifecycle makes **zero**
-  `GenerateOutreach` calls (no auto-generate/send on mount), and the rendered screen exposes no
-  send affordance — only copy/manual-send guidance. Error-mapping (`applyGenerateResult`:
-  503 → not-configured, 401 → session-expired, generic) and the `contactRole`/`generateButtonLabel`/
-  `contactsJobIDFromPath` helpers are table-tested.
-- **web/** — `components/manual_entry_test.go`: render and unit tests for the manual job import
-  screen (WEB-06/WEB-15). They assert the form renders (listing URL, optional external application
-  URL, text/title/company inputs, submit, back link), the explicit `doSubmit` path posts the
-  **trimmed** input via the mocked `RailsClient` and then surfaces the returned `/jobs/:id` link,
-  that an empty form (no URL or text) never reaches the API (`inputPresent` gate), and that a full
-  render lifecycle makes zero `CreateJobPost` calls. The new/tracked/submitted/possible-match
-  result messages and links plus the `applyCreateResult` error mapping (401 → session-expired,
-  422 → invalid-input, generic → transient) are table-tested. The posting-lookup prefill is
-  covered by driving `doLookup` directly: the trimmed URL reaches the client, title/company/
-  posting text are filled from the result, owner-typed fields are never overwritten, an
-  unreadable posting leaves the form idle and submittable, an expired session is surfaced, and a
-  full render lifecycle makes zero `LookupPosting` calls.
-- **web/** — `components/jobs_test.go` (INTAKE-08 intake actions): render tests assert the Jobs
-  feed exposes per-row select checkboxes, per-row Backlog/Remove (Active bin) and Restore
-  (Backlog/Removed bins), and the multi-select bulk bar (Backlog/Remove selected, or Restore
-  selected); the job detail exposes the matching intake block keyed off `lifecycle_state`. The
-  explicit `doSetLifecycle` path (single, bulk via `selectedIDs`, and restore) calls the mocked
-  `SetJobLifecycle` (single id → member route, multiple → bulk) and the transitioned rows leave the
-  current bin view while selection clears; `applyToggleSelect` and the error mapping (401 →
-  session-expired, generic) are unit-tested. Two safety tests lock the constraint: a full render
-  lifecycle makes **zero** `SetJobLifecycle` calls on both `JobList` and `JobDetailView`.
 
-- **web/** — `components/jobs_test.go` + `components/applications_test.go` (INTAKE-09 landing/table
-  pagination): the ingestion-batches landing (`DigestView`) renders a Prev/Next pagination block
-  reading the page envelope (page indicator "Page N of M", Prev disabled on page 1, Next gated on
-  `has_next`); `applyNextPage`/`applyPrevPage` advance/stop and the advanced page is carried to the
-  mocked `IngestionBatches(ctx, page)`. The tracker table (`ApplicationsView`) loads with
-  `status=all` + `state=open` (TRACK-01 — the earlier all-jobs table left `status` unset and so
-  silently got the scored-only default, which is why it rendered empty), switches lifecycle bin and
-  sort via `applyBin`/`applySort` (each resetting to page 1),
-  paginates with Prev/Next (`applyNextPage`/`applyPrevPage`), and its header stats and group-tab
-  badges read the server's `application_counts` rather than counting the current page. The mocked
-  `Jobs` returns those counts via `mockClient.jobsCounts`. The mocked `IngestionBatches`
-  now returns an `IngestionBatchPage` and records the requested page (`gotBatchesPage`).
 
-- **client/** — `src/toolchain.test.tsx`: the `FE-01` scaffold smoke test. Renders a React element
+- **web/** — `src/toolchain.test.tsx`: the `FE-01` scaffold smoke test. Renders a React element
   through Testing Library into jsdom and asserts it with a jest-dom matcher, so a green run proves
   Vite + React + TypeScript, the jsdom environment, `vitest.setup.ts`, and the matcher type
   augmentation are all wired. Screen tests arrive with the ported components (`FE-08` onward).
 
-- **client/** — `src/api/schemas.test.ts` (`FE-03`): the API boundary contract. Fixtures are copied
+- **web/** — `src/api/schemas.test.ts` (`FE-03`): the API boundary contract. Fixtures are copied
   from what the Rails serializers actually emit, **including the keys they leave out** — the
   digest's six-key row, the job feed's abbreviated tracker, an `unavailable` posting lookup that
   carries only `status` and `error`, an application whose draft has not generated yet. Three
@@ -272,7 +198,7 @@ Be honest about the current state — most of the suite is still to be written.
   nullability at the type level, so `npm run typecheck` catches a widened or collapsed field even
   when no runtime assertion covers it.
 
-- **client/** — `src/api/http.test.ts` (`FE-04`): the transport contract, run against MSW rather
+- **web/** — `src/api/http.test.ts` (`FE-04`): the transport contract, run against MSW rather
   than a stubbed `fetch`, so headers, credentials, status handling, and body parsing all execute
   for real. The status matrix is the spine of the file: a 200 (schema-validated, and still
   absence-tolerant for a partial serializer payload), a 4xx carrying Rails'
@@ -281,17 +207,17 @@ Be honest about the current state — most of the suite is still to be written.
   `api request failed: status N[: body]` text, and truncating at 2048 bytes), and a 2xx whose body
   is unusable — non-JSON, wrong-typed, or the wrong shape entirely — raising `ResponseFormatError`.
   Two safety properties are pinned as tests, not comments: the transport refuses an off-origin
-  path, and no non-test file under `client/src/` may mention `document.cookie`, because the session
+  path, and no non-test file under `web/src/` may mention `document.cookie`, because the session
   cookie is httponly.
 
-- **client/** — `src/test/msw.ts` (`FE-04`): not a test, the shared harness the rest of the chain
+- **web/** — `src/test/msw.ts` (`FE-04`): not a test, the shared harness the rest of the chain
   builds on. `installMockApi()` installs the MSW lifecycle for a file (`listen` /
   `resetHandlers` / `close`) with `onUnhandledRequest: "error"`, and `jsonResponse` /
   `errorResponse` / `textResponse` / `captureRequest` cover the four shapes a Rails endpoint test
   needs. It is named `installMockApi`, not `useMockApi`, because the `react-hooks` lint rule reads
   a `use*` prefix as a hook and rejects the top-level call.
 
-- **client/** — `src/api/endpoints.test.ts` (`FE-05`): the endpoint, query-key, and QueryClient
+- **web/** — `src/api/endpoints.test.ts` (`FE-05`): the endpoint, query-key, and QueryClient
   contract. Each of the 25 ported `RailsClient` endpoints gets a table case registering an MSW
   handler at the *literal* path it expects, so a wrong path fails as an unhandled request before
   any assertion runs, and the captured `Request` pins the method, path, `Content-Type`, and body —
@@ -315,7 +241,7 @@ Be honest about the current state — most of the suite is still to be written.
   retried**, because replaying `POST /api/applications/:id/submit` would re-dispatch a trusted
   submit.
 
-- **client/** — `src/test/handlers.ts` (`FE-05`): not a test, the fake Rails the screen tasks build
+- **web/** — `src/test/handlers.ts` (`FE-05`): not a test, the fake Rails the screen tasks build
   against. `apiHandlers()` returns one handler per endpoint and `fixtures` the canned payloads.
   Every fixture is typed as its schema's *output* type, so a schema change fails
   `npm run typecheck` here rather than surfacing as a puzzling `ResponseFormatError` in an
@@ -323,7 +249,7 @@ Be honest about the current state — most of the suite is still to be written.
   requested page, detail handlers use the id from the URL, the intake toggle reflects the posted
   value — so pagination and navigation need no per-test handler.
 
-- **client/** — `src/lib/labels.test.ts` (`FE-06`): the display helpers, tested as *transcriptions*
+- **web/** — `src/lib/labels.test.ts` (`FE-06`): the display helpers, tested as *transcriptions*
   of the Go case tables (`TestMatchScoreLabel`, `TestMatchScoreBand`, `TestSourceLabel`,
   `TestSourceIconPath`, `TestSourceEmoji`, `TestTrackerGroupMapsPipelineStatus`) rather than as
   freshly reasoned expectations, because every returned string is consumed by `app.css` and by the
@@ -331,7 +257,7 @@ Be honest about the current state — most of the suite is still to be written.
   test, so its table is derived from `client.go` and the pill states `app.css` styles.
 
   Two assertions go past what a transcribed table can see. The brand-logo paths are resolved
-  against `client/public/icons/` **on disk**, because the migration-wide `/web/` prefix drop 404s
+  against `web/public/icons/` **on disk**, because the migration-wide `/web/` prefix drop 404s
   silently and costs only the logo inside an origin pill. And `trackerGroup` is checked against
   the Rails source: the test parses `Api::JobPostsController::APPLICATION_GROUPS` out of the
   controller (resolving `UNTRACKED_GROUP` from its own assignment) and asserts every status maps
@@ -339,7 +265,7 @@ Be honest about the current state — most of the suite is still to be written.
   asserting nothing. Reading a repo file from a Vitest test is fine — the jsdom environment still
   runs in Node, and `src/api/http.test.ts` already scans the source tree.
 
-- **client/** — `src/routes.test.tsx` (`FE-07`): the route table, driven through
+- **web/** — `src/routes.test.tsx` (`FE-07`): the route table, driven through
   `createMemoryRouter` over the **same exported `routes` array** the app hands
   `createBrowserRouter`, so the test cannot pass against a table the app does not use. It asserts
   the exact ten paths (nine plus the catch-all), that each path renders its screen, that
@@ -356,7 +282,7 @@ Be honest about the current state — most of the suite is still to be written.
   Route *order* is deliberately not asserted — React Router ranks a static segment above a dynamic
   one, verified by reversing the array, so the outcome is asserted instead of the mechanism.
 
-- **client/** — `src/components/app-chrome.test.tsx` (`FE-08`): the shared chrome, in three layers.
+- **web/** — `src/components/app-chrome.test.tsx` (`FE-08`): the shared chrome, in three layers.
   Markup and navigation are transcribed from `TestChromeNavigationAndLayout` and
   `TestNormalizeLayout` in `web/components/chrome_test.go`, with the active-tab table covering all
   nine paths plus an unknown one — the mapping the Go build spread across eight literal
@@ -377,22 +303,22 @@ Be honest about the current state — most of the suite is still to be written.
   `addEventListener` spy prove Auto is resolved by CSS with no viewport listener; jsdom implements
   no `matchMedia` at all, so the stub is what makes that an observation rather than a crash.
 
-- **client/** — `src/components/update-banner.test.tsx` (`FE-10`): the PWA manifest and update
+- **web/** — `src/components/update-banner.test.tsx` (`FE-10`): the PWA manifest and update
   prompt. It pins the current Go PWA identity fields and all four same-source icon records (with no
   manifest `id`), then mocks Workbox's `needRefresh` hook to prove the banner stays hidden until an
   update is waiting and its explicit Reload action activates the new worker.
 
-- **client/** — `src/test/app-worker.test.ts` (`FE-12`): executes the permanent legacy-worker
+- **web/** — `src/test/app-worker.test.ts` (`FE-12`): executes the permanent legacy-worker
   retirement script against fake service-worker globals. It asserts install waits for
   `skipWaiting`, activation deletes every named cache, unregisters and claims clients, best-effort
   reloads each window, and registers no fetch handler.
 
-- **client/** — `scripts/container-smoke.sh` (`FE-27`): builds the root-context Node-to-Caddy
+- **web/** — `scripts/container-smoke.sh` (`FE-27`): builds the root-context Node-to-Caddy
   image and exercises it against an isolated Node stub backend. It verifies both proxy paths retain
   methods, bodies, content type, custom headers, and the browser `Host`; an SPA deep link, legacy
   worker delivery, and `zstd`/`gzip` static compression are also asserted.
 
-- **client/** — `src/components/login.test.tsx` (`FE-09`): the login screen, transcribed from
+- **web/** — `src/components/login.test.tsx` (`FE-09`): the login screen, transcribed from
   `TestLoginRendersForm`, `TestLoginErrorStatus`, and `TestLoginButtonText` in
   `web/components/login_test.go` — the form's classes and attributes, all three status strings
   (`Enter your passphrase.`, `Incorrect passphrase.` on a 401, `Could not sign in. Please try
@@ -408,7 +334,7 @@ Be honest about the current state — most of the suite is still to be written.
   React state entirely — the input is uncontrolled and login is deliberately not a `useMutation`,
   since TanStack retains a mutation's `variables` in its cache.
 
-- **client/** — `src/lib/auth.test.tsx` (`FE-09`): the 401 boundary and sign-out. There is no Go
+- **web/** — `src/lib/auth.test.tsx` (`FE-09`): the 401 boundary and sign-out. There is no Go
   test to transcribe — the Go build checked `IsUnauthorized` per call site and had no sign-out — so
   this pins the replacement contract, driven through the *same* `installUnauthorizedRedirect` call
   `main.tsx` makes over a `createMemoryRouter` built from the app's own route table. A 401 from a
@@ -423,7 +349,7 @@ Be honest about the current state — most of the suite is still to be written.
   control is mounted by swapping one element into the app's route table, because `useSignOut` uses
   router hooks and belongs where `FE-25` will render it.
 
-- **client/** — `src/lib/push.test.ts` and `src/components/push-toggle.test.tsx` (`FE-13`): the
+- **web/** — `src/lib/push.test.ts` and `src/components/push-toggle.test.tsx` (`FE-13`): the
   push flow, in two layers. **Nothing in either file can send a push or show a permission prompt.**
   `push.test.ts` drives the real subscriber against a fake `PushEnvironment` — a plain object
   standing in for service-worker readiness, the permission prompt, and a `PushManager` — which is
@@ -440,7 +366,7 @@ Be honest about the current state — most of the suite is still to be written.
   off, on, denied) are asserted as distinct renderings, and the VAPID key is asserted to come from
   `GET /api/push/vapid_public_key` — never a build-time value.
 
-- **client/** — `src/lib/platform.test.ts` and `src/components/install-guide.test.tsx` (`FE-14`):
+- **web/** — `src/lib/platform.test.ts` and `src/components/install-guide.test.tsx` (`FE-14`):
   platform detection and the guidance it drives. `platform.test.ts` is a straight transcription of
   `web/components/pwa_test.go`'s three case tables, and it is the one Go test file worth
   transcribing rather than rewriting, because its rows encode facts that cannot be re-derived: an
@@ -461,7 +387,7 @@ Be honest about the current state — most of the suite is still to be written.
   correction this port makes: `install_guide.go` subscribed the browser and then discarded the
   subscription, so the test pins `POST /api/push_subscription` actually receiving it.
 
-- **client/** — `src/components/jobs/job-list.test.tsx` (`FE-15`): the jobs feed's list half,
+- **web/** — `src/components/jobs/job-list.test.tsx` (`FE-15`): the jobs feed's list half,
   transcribed from the render and pagination cases in `web/components/jobs_test.go`. Two things
   differ deliberately. The Go build could not invoke an `OnClick` from a test, so paging was only
   ever exercised through `applyPrevPage`/`applyNextPage`; here the buttons are actually pressed,
@@ -481,7 +407,7 @@ Be honest about the current state — most of the suite is still to be written.
   `page` is part of the query key. The error case uses a 422 rather than a 500 so it fails at
   once; the retry policy itself is covered in `endpoints.test.ts`.
 
-- **client/** — `src/lib/job-filters.test.ts` and `src/components/jobs/job-filters.test.tsx`
+- **web/** — `src/lib/job-filters.test.ts` and `src/components/jobs/job-filters.test.tsx`
   (`FE-16`): the feed's filter selection and its panel. The load-bearing assertions are the ones
   about **stored JSON**, not behaviour: `waunder.jobFilters` is written by the Go build on the
   owner's real devices and read by this one, in both directions until the `FE-30` cutover, so the
@@ -497,7 +423,7 @@ Be honest about the current state — most of the suite is still to be written.
   with a sentinel, and a `localStorage` getter that throws is asserted to still render the feed,
   mutation-checked by removing the guard.
 
-- **client/** — `src/components/jobs/job-actions.test.tsx` (`FE-17`): the feed's write half. Every
+- **web/** — `src/components/jobs/job-actions.test.tsx` (`FE-17`): the feed's write half. Every
   case drives the real `JobList` over MSW, because the properties that matter are only visible in
   the **request**. The Go test could assert that `SetJobLifecycle` had been called but not whether
   it sent one bulk `PATCH /api/job_posts/lifecycle` or N member `PATCH /api/job_posts/:id/lifecycle`
@@ -548,169 +474,14 @@ Be honest about the current state — most of the suite is still to be written.
 - Job specs for LLM orchestration with mocked OpenRouter responses.
 - Worker-dispatch specs for approved application submissions.
 
-**Web (`web/`, go-app):**
+**Web (`web/`, Vitest):**
 
-- Component / render tests for the job feed, job detail, approval flow, profile form, and draft
-  review screens.
-- API client tests with mocked Rails responses.
-- Push subscription flow tested behind an abstraction, with the browser Notification/Push APIs
-  mocked.
-- A PWA smoke check: manifest validity, service-worker registration, and installability.
-- Responsive/manual-workflow browser check: install the existing `workers/` Playwright
-  dependencies and Chromium, then run `cd web && make wasm server`. Start the shell with
-  `env -u API_INTERNAL_URL PORT=8094 ./bin/server`; in another terminal at the repository root,
-  run `node web/scripts/layout-smoke.cjs`. If using a preinstalled Chromium, set
-  `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to its executable. The script mocks all API requests,
-  blocks service workers for deterministic asset updates, and writes screenshots to a temporary
-  directory printed on success. This verifies Chromium at phone/tablet/desktop widths; physical
-  iPhone Safari/Home Screen behavior still benefits from an on-device check.
-
-**Automation (`workers/`):**
-
-- Playwright tests against fixture pages for Greenhouse, Lever, Ashby, and a mocked Easy
-  Apply-style flow.
-- Required pause/fail tests for: unknown questions, sensitive fields, missing resume data,
-  expired sessions, and unsupported form states.
-
-### Not covered yet
-
-- `web/` component render tests and an API-client/push-subscription abstraction (only the pure
-  install/push gating helpers are covered so far).
-- Rails webhook/job/dispatch specs.
-- The full end-to-end MVP integration scenario (see below).
-
----
-
-## Test File Inventory
-
-Keep this table up to date — add a row when adding a new test file.
-
-| File | Domain | What It Covers |
-|---|---|---|
-| `api/spec/models/application_draft_spec.rb` | API (Rails) | application draft association plus structured-answer and autofill JSON shapes |
-| `api/spec/models/application_route_spec.rb` | API (Rails) | application route type allowlist and confidence validation |
-| `api/spec/models/application_spec.rb` | API (Rails) | application status lifecycle validation and draft/audit associations |
-| `api/spec/models/audit_event_spec.rb` | API (Rails) | audit event application/status validation plus screenshot/log/metadata JSON shapes |
-| `api/spec/models/company_spec.rb` | API (Rails) | company name validation and job-post association |
-| `api/spec/models/cover_letter_draft_spec.rb` | API (Rails) | one-per-job association and encrypted-at-rest cover-letter body |
-| `api/spec/models/contact_candidate_spec.rb` | API (Rails) | contact candidate job-post association, relevance reason validation, and owned outreach drafts |
-| `api/spec/models/job_post_spec.rb` | API (Rails) | job post company/title validations, application-route and URL-identity associations, match-score bounds |
-| `api/spec/models/job_post_url_identity_spec.rb` | API (Rails) | URL-identity role allowlist, raw URL preservation, per-job alias uniqueness, same-owner shared identities, and cross-job database ownership enforcement |
-| `api/spec/models/outreach_draft_spec.rb` | API (Rails) | outreach draft contact-candidate association and manual-send message validation |
-| `api/spec/models/profile_spec.rb` | API (Rails) | profile name/JSON-shape validation, encrypted-at-rest ciphertext check for email/phone/address, deterministic-email queryability |
-| `api/spec/models/resume_document_spec.rb` | API (Rails) | resume document profile/title validation, parsed_structure default, encrypted-at-rest ciphertext check for raw_text/parsed_structure |
-| `api/spec/requests/api/auth_spec.rb` | API (Rails) | shared-secret session success/failure, protected endpoint gating, health bypass, worker bearer guard |
-| `api/spec/requests/api/cover_letter_drafts_spec.rb` | API (Rails) | authenticated current-letter read/generate, unavailable/upstream failure responses, and no Application side effect |
-| `api/spec/requests/api/intake_spec.rb` | API (Rails) | authenticated intake status, pause/resume, held-reference requeue, once-daily maintenance scheduling, and invalid-state rejection |
-| `api/spec/requests/api/applications_spec.rb` | API (Rails) | `POST /api/applications/:id/submit` approved clean-payload dispatch, audit event recording, approval-required/unsupported/unsafe refusal paths, and 401 auth gating with no enqueue on refusal; `GET /api/applications/:id` draft + job context + worker-shaped autofill preview, read-only (no audit/enqueue), not-found JSON shape, and auth gating; `PATCH /api/applications/:id/draft` reviewed autofill-answer persistence, safety warnings, malformed edit rejection, draft-required rejection, and auth |
-| `api/spec/requests/api/job_posts_spec.rb` | API (Rails) | `POST /api/job_posts` manual URL/text import with optional external application URL, typed new/tracked/submitted response, exact-identity alias/audit reuse without duplicate scoring, auth, and invalid-input errors; `GET /api/job_posts` scored+active oldest-first default feed with the `{number,size,total,has_next}` page envelope + auth; `GET /api/job_posts` `sort=score` ranking, `state=backlog`/active-default exclusion of backlog+removed, AND-combined `score_band`/`source`/`location`/`date_from`/`date_to` filters, and `JOBS_PAGE_SIZE`-driven pagination; `GET /api/job_posts?status=unscored` filtered/deferred feed with triage metadata; the TRACK-01 tracker surface (`status=all` unscored inclusion, `state=open` spanning active+backlog while excluding removed, embedded latest-`application` + `created_at` serialization, newest-application-wins when a job has several, `application` group filtering with untracked posts counted as not-applied, `application_counts` taken over the other filters only, and `sort=newest`/`sort=activity` ordering); `POST /api/job_posts/lookup` prefill read (fields returned, nothing persisted, unreadable postings answered 200 as `unavailable`, auth) and enrichment-before-scoring for a URL-only import; `POST /api/job_posts/:id/score` explicit scoring enqueue/manual override; `GET /api/job_posts/:id` scored detail with resolved route, not-found JSON shape, and auth |
-| `api/spec/services/job_post_triage_spec.rb` | API (Rails) | deterministic inbound title/location triage for developer/software/AI-adjacent roles, Vancouver/Calgary/remote prioritization, rejection reasons, remote-status inference, and env-driven daily budget parsing |
-| `api/spec/requests/api/digest_spec.rb` | API (Rails) | `GET /api/digest` latest digest of recently scored JobPosts (no scoring/LLM on read), empty-jobs case, and 401 auth gating |
-| `api/spec/requests/api/ingestion_batches_spec.rb` | API (Rails) | `GET /api/ingestion_batches` ingestion history grouped into source+arrival-time batches newest-first (no scoring/LLM on read), empty case, and 401 auth gating |
-| `api/spec/services/ingestion_batch_builder_spec.rb` | API (Rails) | `IngestionBatchBuilder` clustering: same-source within-gap grouping, gap-break into new batches, cross-source separation, window cutoff, empty case, and synthetic batch id |
-| `client/src/toolchain.test.tsx` | client (Vitest) | scaffold smoke test: React render into jsdom via Testing Library with a jest-dom matcher, proving the Vite/TS/Vitest/setup wiring |
-| `client/src/api/schemas.test.ts` | client (Vitest) | zod API boundary schemas: Go decode parity (missing key == `null` == zero value, unknown keys stripped), `match_score: null` kept distinct from `0`, partial serializer payloads (digest six-key row, feed's abbreviated tracker, undrafted application, `unavailable`/`unsupported` lookup), wrong-type rejection, `,omitempty` request fields staying absent, `JobFeedParams` rejecting an empty/`"All"` sentinel, and `expectTypeOf` type-level nullability parity |
-| `client/src/api/http.test.ts` | client (Vitest) | API transport over MSW: schema-validated 200, Rails `{error:{code,message}}` 4xx (with `apiErrorMessage` returning the envelope's own text, and `""` for a blank message that `message` replaces with the status-and-body fallback), 401 vs 403 and 401 through a wrapped `cause`, envelope-less 500 with Go's fallback message and 2048-byte truncation, non-JSON/wrong-typed/wrong-shape 2xx raising `ResponseFormatError`, JSON vs form vs bodyless writes, no-schema writes leaving the body unread, off-origin path refusal, and a scan proving no source file reads `document.cookie` |
-| `client/src/api/endpoints.test.ts` | client (Vitest) | endpoint/query-key/QueryClient contract over MSW: method, path, and request body of all 25 ported `RailsClient` endpoints (bodyless `POST` for score/submit, `{}` for cover-letter generate, form-encoded login, answers-only draft update, member-vs-bulk lifecycle split), an exported-set coverage check against the Go interface (plus the two endpoints with no Go counterpart: `logout`, whose own assertions live in `auth.test.tsx`, and `createContact`, whose request body is asserted in `contacts.test.tsx`), non-integer id refusal, `jobFeedQuery` parity fixtures produced by running Go's `Encode()` (omitted unset filters, untrimmed values, `+`/`!*'()` escaping, sorted keys, `page` only above 1), query-key prefix hierarchy and feed-page key identity, the retry matrix (transport/5xx retried; 401/403/422 and `ResponseFormatError` not) with mutations never retried, and a round trip of every endpoint through the shared handlers |
-| `client/src/lib/labels.test.ts` | client (Vitest) | display-helper parity: the Go case tables for `matchScoreLabel` (unscored statuses vs a real `0%`), `matchScoreBand` (75/50 thresholds, `null` ⇒ pending, exhaustive 0–100 sweep), `sourceLabel`, `sourceIconPath`, and `sourceEmoji` (logo-or-emoji, never both), a derived `lifecycleLabel` table, brand-logo paths resolved against `client/public/icons/` on disk to catch the `/web/` prefix drop, and `trackerGroup` checked against `APPLICATION_GROUPS` parsed out of the Rails controller source |
-| `client/src/routes.test.tsx` | client (Vitest) | route table over `createMemoryRouter` driving the app's own exported `routes`: the exact ten paths, each path rendering its screen asserted on the `app.css` page-container class transcribed from the Go screens, `/jobs/new` winning over `/jobs/:id`, the former `\d+` regexp ids arriving as route params, and an unknown path rendering the not-found screen with a link home; from `FE-15` it renders through the app's own `QueryClientProvider` and the shared MSW handlers, because a ported screen fetches on mount |
-| `client/src/components/app-chrome.test.tsx` | client (Vitest) | shared chrome parity: the Go navigation/`normalizeLayout` tables, the active tab derived from all nine paths (plus `/login` and an unknown path marking none), `waunder.layout` read and written as go-app's JSON-quoted value, unquoted/garbage/non-string stored values degrading to Auto, absent and throwing storage on both read and write (chrome still renders, choice still applied, `.layout-error` shown), `data-layout` on the document root, `public/app.css` parsed to prove Auto's 960px block matches explicit Desktop exactly and that the bottom bar and screen containers reserve the iPhone safe area, and no `matchMedia`/resize listener |
-| `client/src/components/update-banner.test.tsx` | client (Vitest) | PWA manifest identity (including four `/icon.svg` records and absent `id`) plus the Workbox `needRefresh` update banner and explicit reload action |
-| `client/src/sw.test.ts` | client (Vitest) | push and notification-click handlers driven with fake push/notificationclick events and a fake worker scope: Rails' `{title, body, data:{url, count}}` shown with the app icon and badge, an unparseable or absent body still notifying, `data.url` resolved against the app origin and clamped to it (cross-origin, `javascript:`, protocol-relative all falling back to `/`, including a target stored by an older worker), a click focusing an open window and posting the navigate message instead of `client.navigate` (no full reload), preferring a window already on the target, `openWindow` when none is open / focus is refused / only foreign-origin windows exist, the page-side `installSwNavigation` routing on that message alone, and `src/sw.ts` wiring both events plus the precache, `index.html` fallback, and `SKIP_WAITING` defaults it took over from the generated worker |
-| `client/src/test/app-worker.test.ts` | client (Vitest) | permanent `/app-worker.js` retirement worker through fake service-worker globals: install skip-waiting, all-cache deletion, self-unregister/client claim, best-effort window reload, and no fetch handler |
-| `client/scripts/container-smoke.sh` | client (container smoke) | root-context Node-to-Caddy image: API + Resend proxy request preservation, original `Host` behavior, SPA fallback, legacy worker, and zstd/gzip static compression |
-| `client/scripts/parity-gate.cjs` | client (visual parity) | `FE-28`: Go build vs Caddy image across all nine routes at mobile/desktop from identical Playwright-stubbed API fixtures, service workers enabled, pixel diff report in `client/parity-report/`, explained-difference allowlist, no writes on render, Tab-walk focus-ring comparison |
-| `client/scripts/handoff-check.cjs` | client (local integration) | signed Resend replay through the Caddy image into Rails, raw body and `svix-*` header preservation, `InboundEmail` persistence, and Go-worker retirement/cache clearing in persistent Chromium and Playwright WebKit contexts; the required iOS home-screen check remains manual |
-| `client/src/components/login.test.tsx` | client (Vitest) | login screen parity: the Go form markup/classes/attributes and all three status strings, the exact form-encoded `POST /api/session` body, success navigating to `/` with `REPLACE`, an empty submit sending no request, the in-flight disabled `Signing in…` button, and the passphrase appearing in no markup, no web storage, and no `console` call after a failed attempt |
-| `client/src/lib/auth.test.tsx` | client (Vitest) | the 401 auth boundary and sign-out, driven through the app's own `installUnauthorizedRedirect` over a memory router built from the real route table: a 401 from a read and from a write each redirect to a rendered `/login` with `REPLACE`, a 403 does not, the 401 is not retried first, no navigation when already on `/login`, unsubscribing stops it, and `DELETE /api/session` clears the query cache and returns to login — including a 401 counting as already signed out, and a 500 reporting a failure in place |
-| `client/src/lib/push.test.ts` | client (Vitest) | browser push flow against a **mocked PushManager** (no permission prompt, no real push): the Go `initialPushState` table, unsupported/denied/failed staying distinct states, the three `pushErrorMessage` strings, `readSubscription` reading both encryption keys off `toJSON()` and rejecting a subscription Rails could never encrypt to, permission requested before `pushManager.subscribe` (and a denied or dismissed prompt subscribing nothing), an unsupported browser neither prompting nor failing a read, unsubscribe cancelling the active subscription and propagating a browser failure, and the production environment reporting unsupported wherever there is no Push API |
-| `client/src/components/push-toggle.test.tsx` | client (Vitest) | push toggle parity over MSW plus a mocked `PushSubscriber`: **zero subscribe, zero persist, and zero VAPID fetches after a plain render** in both supported and unsupported browsers, the unsupported/off/on/denied states rendering distinctly, the VAPID key read from `GET /api/push/vapid_public_key` and passed to the browser, `POST /api/push_subscription` carrying the browser subscription, the in-flight disabled `Working…` control, an empty server key and an unsupported browser both landing on unsupported without touching the other side, no persist when the browser subscribe fails, 401 and 500 messages, and unsubscribe cancelling in the browser before `DELETE /api/push_subscription` (and leaving Rails alone when it cannot) |
-| `client/src/lib/platform.test.ts` | client (Vitest) | platform detection with no browser at all: the `pwa_test.go` user-agent case table (iPhone/iPad, an underscore patch version, **iPadOS masquerading as desktop Safari** via `maxTouchPoints > 1`, and `Mac OS X 10_15_7` never read as a version), the iOS 16.4 Web Push boundary, the push-gate table with the ordering case that offers an uninstalled iOS 17 device the install step rather than "unsupported", `navigator.standalone` and the `display-mode` media query each sufficing alone, and the browser readers degrading to every signal off when `matchMedia`/`PushManager`/`Notification` are missing or throw |
-| `client/src/components/install-guide.test.tsx` | client (Vitest) | install guide parity over MSW plus a mocked `PushSubscriber` and injected platform signals (no permission prompt, no real push): the four gates rendering their own copy and `.install-guide`/`.enable-notifications`/`.install-status` markup, the granted state winning over platform guidance, **zero VAPID fetches, zero subscribes, and zero persists after a plain render of every gate**, and the enable flow fetching the key, subscribing, and actually storing the subscription with `POST /api/push_subscription` — plus the declined/no-server-key/failed-store messages and the in-flight disabled button that stops a double post |
-| `client/src/components/jobs/job-list.test.tsx` | client (Vitest) | jobs feed list parity over MSW: the screen root with `AppChrome` as its first child, row title/company/link, whole-`className` score and lifecycle pill assertions across all four bands and all three bins (plus an absent state defaulting to active), the origin pill's unprefixed brand-logo path, emoji marker, and suppression for a sourceless posting, the absence of any location element, the exact feed query string (`sort=oldest&state=active&status=scored`, no `page` on page 1) with rows rendered in server order and none dropped, Prev/Next driven by the response envelope (disabled at both ends, advancing to `page=2`, stepping back served from cache), `pageIndicatorLabel`'s unknown-total fallback, and the loading, 422 error, 401 sign-in-link, and empty-feed states |
-| `client/src/lib/job-filters.test.ts` | client (Vitest) | jobs feed filter selection: the **stored `waunder.jobFilters` JSON**, asserted key-set and value against `jobFilterState`'s json tags transcribed from `web/components/jobs.go` (a bare object, not a quoted string like `waunder.layout`), a selection the Go build wrote restoring field for field, and `bin`/`page_num` round-tripping even though no control on this screen changes them; reading degrading to the defaults for absent/`null`/throwing storage, malformed JSON, a non-object value, a partial object, and an enum value Rails would answer with an empty feed; `activeFilterCount` counting the five filters and never the sort, view, or bin; `clearFilters` clearing filters plus sort while leaving the view and bin alone, returning to page 1, and not mutating its input; and `feedParams` omitting every unset filter rather than sending `""` |
-| `client/src/components/jobs/job-filters.test.tsx` | client (Vitest) | jobs feed filter panel, mostly driven through the real `JobList` over MSW so the assertions land on the **query string sent**: the panel collapsed by default with the `Filters & sort` label and an active-filter badge, every control rendered while collapsed, the no-filter option carrying a real empty `value` attribute (the go-app `source=All` bug ruled out directly rather than routed around), Reset disabled until a filter is set and then clearing filters and sort but not the view or bin, the view tabs marking `aria-selected` and swallowing a click on the current view, and end to end: a saved selection reaching the **first** request with no default fetch first, a change persisting in `jobs.go`'s shape and refetching, page returning to 1 on a filter change, a filter cleared to All sending no parameter at all, and the feed still rendering when `localStorage` throws on access |
-| `client/src/components/jobs/job-actions.test.tsx` | client (Vitest) | jobs feed write half over MSW, driven through the real `JobList` so every assertion lands on the **request actually sent**: the `lib/job-actions` case tables (bin order/labels, `scoreButtonLabel`, `bulkSelectionLabel`, non-mutating selection transitions, `visibleSelection` dropping ids not among the loaded rows), the bin tabs marking `aria-selected`, switching through the `state` parameter, returning to page 1, swallowing a click on the current bin, and restoring the saved bin into the **first** request; the manage bar grouping the row-named checkbox with the lifecycle buttons (never a bare row child) and offering Backlog+Remove in Active vs only Restore in Backlog/Removed; **zero lifecycle transitions and zero scoring requests after a full render**; a single row using the member `PATCH` and a multi-row selection using the collection `PATCH` in one request; a write refetching the feed rather than splicing the row out locally; the selection cleared for moved rows; every lifecycle control (bulk and all rows) disabled while one write is in flight and the bulk buttons disabled with nothing checked; a failed write reported once and never retried, with 401 vs 500 copy; and score-on-demand offered only in the Unscored view, posting to the member endpoint, showing the in-flight state on its own row only, refusing a second request while Rails reports `pending`, rendering one per-row error, and invalidating the feed on success |
-| `client/src/components/ingestion-batches/ingestion-batches.test.tsx` | client (Vitest) | ingestion landing parity over MSW: batches rendered in server order with their source, count, and time chip, one date header per day, **every posting present in the DOM while its batch is collapsed** (nothing clicked), score and lifecycle pills per posting, each link carrying `?from=digest&batch=<id>`, only the batch named by `?batch=` expanded, the empty state keeping the intake panel, a load error when either read fails, Prev/Next driven by the response envelope (page 1 sending no `page` param), **zero intake writes after a full render**, paused/running panels with the held count, resume reporting the queued-alert count and flipping the panel from the mutation's own response, pause promising alerts are held, a failed toggle reported once and never retried, the in-flight disabled `Updating…` button holding the batches on screen, and the date/time/count/source/message formatters asserted against output produced by running the Go originals |
-| `client/src/components/job-detail/job-detail.test.tsx` | client (Vitest) | job detail parity over MSW through a real router: the helper case tables transcribed from Go (`backLink`'s four query-string outcomes, `externalApplicationURL` accepting only external `http(s)` and rejecting `javascript:`/relative, `routeLabel`'s recommendation→type→unknown order, `parseJobId` falling back to 0, both apply-button labels); every scored field rendered with the `.job-score--high` band, the brand logo path, and the route link; an unscored posting banded `pending` not `low`; every optional block omitted when Rails sent it empty while the summary alone falls back; the `.job-workspace-actions` children asserted by class **and order**, since `app.css` positions them; **every LLM-generated block asserted to render into a tag the `overflow-wrap` reset parsed out of `public/app.css` covers**, using a long unbroken token; the id in the path requested and a non-id path asking for job 0; loading, 404, and 401 load states with the sign-in link; the route link falling back to `posting_url`, dropping entirely for a non-external URL, and the whole block absent when Rails resolved nothing; the contacts link and the batch-aware back link; **zero create-application and zero lifecycle requests after a full render**; Apply posting the job id, navigating to `/applications/:id`, and reporting a 500 or 401 once without retrying or navigating; and the intake controls offering Backlog+Remove vs Restore per bin (empty state counting as active), patching the member endpoint, re-reading the job rather than patching it locally, and leaving the bin alone on a failure |
-| `client/src/components/job-detail/tracker-action.test.tsx` | client (Vitest) | manual tracker parity, driven through the real `JobDetailScreen` over MSW so every assertion lands on the **request actually sent**: `canMarkApplied`'s full status table (offered for untracked/`interested`/`drafting`/`needs_review`, withheld for the six states it would walk backwards) and `pipelineStatusLabel`'s stage-suppression rules; both selects rendered on the posting's current state with the status line in both blocks, the quick action and no status line for an untracked posting, and the empty stage rendered as the **`none` sentinel** with no `value=""` option; **zero tracker writes after a full render**; `Mark as applied` sending exactly `{pipeline_status: applied, pipeline_stage: waiting}` while `/api/applications` and `/api/applications/:id/submit` stay at **zero requests**; `pipeline_note` and `next_follow_up_on` asserted **absent** from every payload; a status change sending a blank stage and Rails' default landing back in the select; the sentinel normalized back to `""` on the wire; **a stage change after a status change carrying the new status**, the regression AGENTS.md 2026-09-08 records; and a failed write reporting in both tracker blocks (401 as an expired session) while the status line stays put |
-| `client/src/components/job-detail/cover-letter.test.tsx` | client (Vitest) | cover-letter panel over MSW, rendered directly since it owns its own query and mutation: the saved letter read per job id and rendered with the copy control and a `Regenerate` label, the empty state's "never submit an application" copy with a `Generate` label, **zero `POST`s after a full render** (the one control that spends OpenRouter budget), generate disabled when the read failed so it cannot replace a letter it cannot show, the returned letter cached directly rather than re-read, the button disabled mid-flight, and Rails' three answers kept apart — 503 `llm_unavailable` ("try again later"), 502 `generation_failed` ("try again"), 401 (expired session) — with the saved letter untouched by a failure; plus the `CopyButton` tests Go never had: jsdom's absent `navigator.clipboard` yielding the manual-copy instruction with no throw, and a stubbed clipboard covering resolved ("Copied.") and rejected writes |
-| `client/src/components/contacts/contacts.test.tsx` | client (Vitest) | contacts and outreach parity over MSW through a real router, with every request the screen sends recorded via MSW's `request:start` event: the helper tables transcribed from Go (`contactRole`, the generate-button labels) plus `contactsBackHref` and the create form's trim-and-omit `contactInput` / `canSaveContact`; the chrome inside the page container ahead of the back link, the manual-send note, each candidate's role, relevance, and `rel="noopener noreferrer"` LinkedIn link, and a `javascript:` LinkedIn URL rendering no link; the id in the path requested and a non-id path asking for job 0 with the back link falling back to `/jobs`; the empty state still offering the create form, and 404/401 load states; **only the list read after a full render — zero drafts and zero saves**; **no send or submit affordance before or after a draft exists** (no `<form>`, every button typed `button`, no control, link, or class naming send/submit, no `mailto:`/`sms:`/`tel:`/messaging link, "send" appearing only in the two manual-send sentences) with the whole interaction's request log asserted; a draft generated for the clicked candidate from the typed template into a read-only textarea with the `.contact-outreach-copy` control while the other candidate stays idle; **the draft staying on its own candidate when a save reorders the list**; 503 `llm_unavailable` and 502 `generation_failed` rendered as different messages, 401 as an expired session, one request per click; the in-flight disabled button on one candidate only; the `app.css` textarea `overflow-wrap` rule parsed out of the stylesheet and a long unbroken token landing in a textarea it names; copying to a stubbed clipboard with no request sent, and the no-clipboard fallback; and saving a contact — Save disabled until a name and a relevance reason, the trimmed body omitting blank optional fields, the list re-read in Rails' order with the form cleared, Rails' 422 sentence rendered with the typed values kept, and 401/500 reported once without a retry |
-| `client/src/components/tracker/tracker.test.tsx` | client (Vitest) | application tracker parity over MSW with a small fake Rails (group filtering from `APPLICATION_GROUPS` transcribed from the controller, `application_counts` tallied from its rows, a successful status write updating them): `trackerDate` against a case table produced by running the Go original (offset kept rather than converted, lowercase `t`/`z` refused, `,` fraction, loose offset ranges, U+00A0 trimmed but U+FEFF not, leap days, year 0000) plus the params, empty-message, selection, paging, stage, and placeholder helper tables; **the first request carrying `status=all` and `state=open` as present parameters** (with no `application` and no `page`), tab, bin, and sort each sent and each returning to page 1, a repeated tab click sending nothing, and the tab totals and header stats kept while a new tab loads with the old rows replaced by `Loading…`; rows with their link, company, status select, stage pill, and Go-formatted dates, the `Not applied` placeholder only on an untracked row, every tab total and both stats taken from `application_counts` rather than row counts, the bin and sort options, envelope-driven Prev/Next, every tab's empty sentence, and 401/422 load states; **exactly one `<table>` whose every cell's `data-label` equals its `<th>`, with `.tracker-cell-job` leading each `tracker-row--<group>` row**, and `public/app.css` parsed to pin `content: attr(data-label)` and the hidden header on mobile, the container-query switch on the `.applications` root with no tracker rule in any `@media` block, explicit `table`/`table-header-group`/`table-row-group`/`table-row`/`table-cell` values with no `revert`, and the inset box-shadow tint on the leading cell with no row `border-left`; **zero status writes, drafts, or submits after a full render**; a write sending `{pipeline_status, pipeline_stage: ""}` to the job-post endpoint with note and follow-up absent, no `/api/applications` request, and a refetch that moves the row out of the Not applied tab and updates the totals; every status select disabled mid-write with `Saving…` on the edited row only until the refetch lands; the placeholder inert; and a 500 or 401 write reported once in `.tracker-status-error` with the rows kept and no retry |
-| `client/src/components/manual-entry/manual-entry.test.tsx` | client (Vitest) | manual import parity over MSW through a real router, with every request recorded via MSW's `request:start` event: the Go case tables for `importMessage`/`importLinkLabel` (plus a company-only label and an unknown status reading as new), the four outcomes' distinct sentences and labels, the import button label, `manualJobInput` trimming all five fields and sending every key, and the `importInputPresent` hint table; the chrome inside the page container ahead of the back link, the direct-child heading, and Go's labels, classes, types, and placeholders in order, with **no request after a full render**; a press posting the trimmed `{job_post:{...}}` with no lookup and the result link followed to `/jobs/42`; the new, already-tracked, already-submitted, and possible-match outcomes each with its own sentence, link label, `manual-entry-result--<outcome>` class, and a link to the posting Rails named; the outcome read from the top-level `import` key over a decoy inside `job_post`, and a missing `import` reading as new; the hint for an empty form, whitespace-only text, and a title/company/application URL with no job URL or text, sending nothing, then the same press going through; the hint replacing a shown result; **no client-side URL validation** — the form is `noValidate`, and a scheme-less URL and a `javascript:` application URL reach Rails as typed with Rails' joined 422 sentence rendered; a blank-message 422, a 500, and a 401 each reported once without a retry; the in-flight disabled `Importing…` button; the feed and ingestion-batch queries invalidated and the profile not; and the `app.css` textarea `overflow-wrap` rule naming `.manual-entry-text`. The posting lookup's own cases are in `lookup.test.tsx` |
-| `client/src/components/manual-entry/lookup.test.tsx` | client (Vitest) | posting lookup and prefill parity (`FE-24`) over MSW, with every request recorded via `request:start`: `lookupTarget`'s guards, touched-field tracking, a second lookup replacing a filled title but never a description, an `unavailable`/`unsupported` answer filling nothing even when it carries a listing, `joinFields`, and the lookup button labels; **no lookup while the URL is typed** and exactly one once the field is left; an `ok` answer prefilling only the empty fields and naming them in the note inside `.manual-entry-lookup`, with the URL field directly above the control and the filled title and company in the Title and Company fields directly under it (Go's layout — no separate display), then imported as filled; owner input kept, and **a field typed while the lookup is in flight kept**; `unavailable` and `unsupported` each warning with the fields left empty, then importing; a 500 and a network failure each warning once, never retried, then importing; a 401 naming the expired session with Import still enabled; **a lookup still in flight neither delaying nor disabling an import**, which sends the form as it stood when pressed; the same URL not reread unless Look up details is pressed; and no lookup without a URL |
-| `client/src/components/profile/profile.test.tsx` | client (Vitest) | profile screen parity (`FE-25`) over MSW with every request recorded via `request:start`: the Go case tables for `presenceLabel`, `resumeStatusClass` (plus neutral fallbacks), and `saveButtonLabel` over the four mutation statuses, plus `resumeFileLabel`, the seven-field table in `Render`'s order, `editFromProfile` copying exactly the editable keys from a read carrying raw PII, and `showInstallGuide` over all four gates; the chrome first and `Loading…` until the read lands; a profile with a resume (Go's `.profile-body` child order plus `.profile-session`, labels/classes/types/values, the submit button inside the form, the presence rows, and the three-item `.profile-resume-meta` list with its two-span status row) and without one (the empty sentence), plus pending/unnamed-file and unattached variants; **raw encrypted values served by a leaky fake never rendered, no `@` on screen, and seven inputs with no email/tel control**; **only the profile read after a full render**; 404/401 load errors with no form; **typing kept through a background refetch and through a failed one**; a save posting exactly the seven untrimmed keys, the in-flight disabled `Saving…`, `Saved` with `Profile saved.`, the form and contact rows reseeded from Rails' answer, and that answer cached with no second `GET`; a 500 reported once with the typed values kept and the cache unchanged; a 422 with and without Rails' sentence, a 500 with a raw message, a 403, and a 401 each mapped; the embedded push toggle subscribing, storing, and unsubscribing with no `PATCH`; the install guide mounted after the toggle for an iPhone tab and a too-old iPhone and left out for installed iOS and desktop browsers; and sign-out sending `DELETE /api/session` and landing on `/login`, or reporting a 500 and staying |
-| `client/src/components/draft-review/draft-review.test.tsx` | client (Vitest) | draft review and submit parity (`FE-26`) over MSW with every request recorded via `request:start`: the Go case tables for `submitButtonLabel`, `previewSaveButtonLabel`, `draftHeading`, and `submitResultLabel` (Go's sentence for `dispatched`, any other returned status rendered as sent), `canSubmit` over readiness, a blank ATS/URL, no answers, whitespace values by Go's `TrimSpace` (NBSP and NEL blank, BOM not), and warnings, `showWorkerReport`, and every submit-refusal code and save failure mapped to owner copy; Go's markup and child order with the chrome first, the collapsed `.draft-automation`, and the materials' copy controls; the id in the path requested; 404/401 load errors; **a not-ready draft and a warned draft each rendering their note and a disabled submit that sends nothing when pressed**, with warnings in the list and under their field; the worker's failure reason, a distinct report reason, logs, and screenshots, and no repeated reason; **no `input` or `select` in `.draft-body`, only the answer textareas**; the `app.css` `.draft-autofill-url` `word-break` rule parsed and a long apply URL rendered as that link's text, and a `javascript:` URL rendered as text with no link; **only the draft read after a full render — zero submits and zero draft writes**; a save sending exactly `{application_draft:{autofill_payload:{answers}}}` and reseeding from Rails' answer; the save control returning to idle on a later edit; a failed save keeping the edits; a cleared value disabling submit; **an explicit submit sending one `POST`, `Submitting…` while in flight, the returned status rendered, and a second press sending nothing after the refetch**; a dirty submit sending the `PATCH` then the `POST`; saved answers returning with warnings, or a failed save, stopping before any submit; and 422 `unsafe_payload`/`unsupported_ats`, 500, and 401 refusals each rendered once without a retry |
-| `client/src/test/handlers.ts` | client (Vitest, harness) | shared fake Rails: `apiHandlers()` covers every endpoint (echoing the requested page, the URL id, and the posted intake value) and `fixtures` exports schema-typed canned payloads, including an unscored row whose `match_score` stays `null` |
-| `api/spec/requests/api/push_subscriptions_spec.rb` | API (Rails) | `GET /api/push/vapid_public_key` public VAPID key read; `POST`/`DELETE /api/push_subscription` authenticated subscribe/unsubscribe, idempotent endpoint update, and 401 auth gating |
-| `api/spec/requests/api/worker_tasks_spec.rb` | API (Rails) | `GET /api/worker_tasks` worker-shaped task pull with bearer-only auth; `POST /api/worker_tasks/:id/report` status updates, audit screenshots/log refs, and human-session rejection |
-| `api/spec/requests/api/profile_spec.rb` | API (Rails) | `POST /api/profile/resume` JSON Resume → Profile + primary ResumeDocument mapping, PDF Active Storage attachment, encrypted-at-rest contact/raw_text check, idempotent re-sync, 401 unauth, 422 invalid/malformed; `GET`/`PATCH /api/profile` structured read/update with PII presence-flags only |
-| `api/spec/requests/api/health_spec.rb` | API (Rails) | `GET /api/health` — 200 status, JSON shape, database connectivity |
-| `api/spec/requests/webhooks/resend_spec.rb` | API (Rails) | Resend inbound webhook Svix verification, raw inbound-email persistence, enabled parse-job enqueueing, paused reference holding with no job, provider-only auth, and PII-safe logging |
-| `api/spec/services/inbound_email_parser_spec.rb` | API (Rails) | Deterministic known-sender (LinkedIn/Indeed/Glassdoor) parsing into normalized JobPosts and URL aliases, company reuse, and LLM-fallback flagging |
-| `api/spec/services/job_post_materializer_spec.rb` | API (Rails) | Shared inbound materialization stable URL-alias registration and retry-safe identity reuse without LLM calls |
-| `api/spec/services/inbound_email_llm_extractor_spec.rb` | API (Rails) | Mocked fallback extraction, URL-alias persistence, skip/empty/retry states, and no live network calls |
-| `api/spec/jobs/parse_inbound_email_job_spec.rb` | API (Rails) | ParseInboundEmailJob wiring to the parser service for known-sender and fallback paths, including deterministic triage filtering and daily scoring-budget deferral |
-| `api/spec/services/application_route_resolver_spec.rb` | API (Rails) | Deterministic ATS route-type detection from URL fixtures, recommended-route preference ranking, confidence, unknown→manual LLM fallback, ApplicationRoute persistence/idempotency, and resolved-application URL aliases |
-| `api/spec/services/job_url_identity_spec.rb` | API (Rails) | Pure host-aware URL identity keys: LinkedIn job-id canonicalization, tracking-parameter removal, generic/ATS job-component retention, invalid-input safety, and no HTTP/LLM construction |
-| `api/spec/services/job_post_url_identity_backfill_spec.rb` | API (Rails) | Historical URL alias backfill, blank URL skipping, rerun idempotency, deterministic collision ownership, and preserved duplicate audit records |
-| `api/spec/services/manual_job_post_importer_spec.rb` | API (Rails) | Manual import exact-identity lookup, novel alias/audit persistence, new/tracked/submitted result typing, and application-URL validation |
-| `api/spec/services/posting_metadata_fetcher_spec.rb` | API (Rails) | Deterministic posting metadata: LinkedIn guest top card (incl. `/comm/` URLs), Greenhouse/Lever/Ashby public endpoints, JSON-LD `JobPosting`, OpenGraph/`<title>` fallback, bounded redirects, non-HTTP + private-address refusal, unavailable-not-raising failures, and no LLM construction (injected fake transport, no live calls) |
-| `api/spec/services/job_post_enricher_spec.rb` | API (Rails) | Placeholder title/company backfill, owner-supplied fields preserved, blank-only description/location/compensation fills, unavailable/skipped no-ops, and no LLM use (stubbed fetcher) |
-| `api/spec/jobs/enrich_job_post_job_spec.rb` | API (Rails) | EnrichJobPostJob enqueues `ScoreJobPostJob` after enrichment, including when the posting could not be read |
-| `api/spec/services/openrouter_client_spec.rb` | API (Rails) | OpenRouter client: missing-key typed error, Nex default plus reasoning-none payload, env model/reasoning override, structured-JSON parse, prose/code-fence parse fallback, retry/exhaustion, and PII-safe logging via injected fake transport (no live calls) |
-| `api/spec/services/cover_letter_generator_spec.rb` | API (Rails) | mocked job/profile/primary-resume grounding, one-current-letter replacement, malformed/missing-key handling, no Application side effect, and PII-safe logging |
-| `api/spec/jobs/score_job_post_job_spec.rb` | API (Rails) | JobScorer/ScoreJobPostJob: scoring-field population from mocked LLM JSON, match_score clamping, string-list coercion, fallback-posting scoring, graceful skip with no API key, failed-on-error, PII-safe logging (mocked client) |
-| `api/spec/jobs/generate_application_draft_job_spec.rb` | API (Rails) | ApplicationDraftGenerator/GenerateApplicationDraftJob: draft generation from mocked LLM JSON, ATS-shaped autofill payload keyed to the resolved route (manual fallback for unknown), Profile data merged into autofill answers, malformed-answer dropping, graceful skip with no API key, failed-on-error, PII-safe logging (mocked client) |
-| `api/spec/jobs/expire_stale_job_posts_job_spec.rb` | API (Rails) | stale active auto-backlog plus 30-day removed-row retention scheduling/purge, with Application-protected and backlog exclusions |
-| `workers/src/safety.test.ts` | Worker safety | `isSensitiveField` detection + `partitionBySensitivity` splitting of answers |
-| `workers/src/worker.test.ts` | Worker orchestration | config loading, bearer-auth task fetch/report calls, clean idle without `API_INTERNAL_URL`, one-cycle poll orchestration, and unsupported-ATS safe failure |
-| `workers/src/ats/handlers.test.ts` | Worker ATS handlers | Playwright fixture coverage for Greenhouse/Lever/Ashby registration, approved field fill/submit, unknown required field pauses, and sensitive-field pauses |
-| `web/components/pwa_test.go` | Web (go-app PWA) | iOS/iPadOS detection + version parsing, iOS 16.4+ Web Push threshold, and the install/notification-permission gate decision |
-| `web/components/chrome_test.go` | Web (go-app PWA) | Shared navigation accessibility, persistent Import job entry, layout choices, invalid-preference fallback, copy-control initial state, empty-stage handling, and the pending-app-update banner (hidden with no update, shown after `applyAppUpdate(true)`, and latching so a later false reading cannot hide it) |
-| `web/scripts/layout-smoke.cjs` | Web (Playwright Chromium) | Eight screens at 320/390/768/960/1440px, layout persistence/resize, overflow, explicit manual tracking success/failure, stage clearing, copy success/blocked feedback, and no application writes on navigation; all API calls use local fixtures |
-| `web/components/jobs_test.go` | Web (go-app PWA) | Job list / detail / ingestion batches, visible Import job actions (including empty feed), lifecycle/filter/pagination behavior, manual application link fallback and safe URL handling, no regression of later tracking statuses, explicit cover-letter generate/regenerate/error behavior with no generation, application creation, or submit on render, explicit intake pause/resume state and error paths, held count, and no intake mutation on render via a mocked `RailsClient` |
-| `web/components/applications_test.go` | Web (go-app PWA) | Application tracker (TRACK-01) render tests: one row per intaked job with its inline status control and the "Not applied" placeholder, group tabs with server counts, the applied-to/tracked header split, bin + sort controls, Prev/Next pagination, per-tab empty states, and 401 handling. Query assertions pin `status=all` / `state=open` / `sort=newest`. Write-path tests cover the row status write going through the job-post endpoint plus a refetch, the inert placeholder, and error recovery; render tests assert 0 status writes, 0 draft creations, and 0 submits after a full lifecycle |
-| `web/components/login_test.go` | Web (go-app PWA) | Login form render and `loginErrorStatus`/`loginButtonText` status mapping (401 → "Incorrect passphrase") |
-| `web/components/client_test.go` | Web (go-app PWA) | `httpRailsClient` against `httptest`: `/api` paths, explicit focused cover-letter read/generate, intake GET/PATCH, Jobs filters/page decode, manual import application URL + typed result decode, scoring/job-post tracker/draft payloads, session-cookie carry, and API errors. The application-scoped `Applications`/`UpdateApplicationStatus` client tests were removed with those methods in TRACK-01; the Rails endpoints remain covered by `spec/requests/api/applications_spec.rb` |
-| `web/components/profile_test.go` | Web (go-app PWA) | Profile/resume render (editable fields, contact presence flags with no PII leak, resume metadata/empty) and `doSave` write path (reseed/error/401) via a mocked `RailsClient` |
-| `web/components/push_test.go` | Web (go-app PWA) | Push toggle subscribe/unsubscribe flow via a mocked `PushSubscriber` (public VAPID key fetched then persisted; browser cancel before Rails), state-mapping helpers, and no-auto-subscribe-on-render |
-| `web/components/contacts_test.go` | Web (go-app PWA) | Contacts/outreach render (candidate fields, empty/error/401), explicit `doGenerate` draft path, no-auto-generate-on-mount and no-send-affordance safety tests, and `applyGenerateResult`/`contactRole`/`generateButtonLabel`/`contactsJobIDFromPath` helpers, via a mocked `RailsClient` |
-| `web/components/manual_entry_test.go` | Web (go-app PWA) | Manual job import render (listing URL, optional external application URL, text/title/company form), explicit `doSubmit` posting trimmed input via the mocked `RailsClient` and surfacing the returned `/jobs/:id` link, new/tracked/submitted/possible-match messages, empty-form and render no-API-call gates, error mapping (401/422/transient), label helpers, and the `doLookup` prefill (fills only untouched fields, keeps owner input, stays usable on an unreadable posting, zero lookups on render) |
-
----
-
-## Writing New Tests
-
-### Rules
-
-- Unit tests must not hit live external services — mock OpenRouter, Resend, web push, and the
-  Playwright browser wherever possible.
-- Rails request specs assert both auth and the JSON response shape.
-- Encrypted-storage model specs verify that sensitive profile/resume fields are encrypted at
-  rest (not stored in plaintext).
-- Webhook specs must cover Resend inbound Svix signature validation, not just the happy-path body parse.
-- Worker safety tests are pure input/output over `isSensitiveField` / `partitionBySensitivity` —
-  no mocks.
-- Every new public endpoint (Rails), service/client object, go-app screen component, or ATS
-  handler needs at least one test before the task is marked done.
-- The end-to-end MVP scenario is the integration north star: email → ingest/score → push →
-  review → draft → approve → submit → status report.
-
-### Patterns
-
-**Rails (`api/`):**
-
-- Request specs use RSpec with `type: :request` and `require "rails_helper"`; drive endpoints
-  over HTTP and assert status + parsed JSON body.
-- Mock external clients (OpenRouter, Resend, web push) — never call the live services.
-- Model specs cover encrypted-field behavior directly on the model.
-
-**Web (`web/`, go-app):**
-
-- Use `go test` table-driven tests.
-- Mock the Rails API client behind an interface so component/render tests run without a backend.
-- Mock the browser Notification/Push APIs behind an abstraction for the push-subscription flow.
+- Vitest + jsdom + Testing Library; tests are colocated as `*.test.ts(x)` under `src/`.
+- Fake Rails with MSW (`src/test/msw.ts`, shared `src/test/handlers.ts`); never mock `fetch` directly.
+- Browser APIs (Push, service worker, platform detection) sit behind injectable seams, so no
+  permission prompt or real push is ever possible in a test.
+- Safety rules (no submit/generate/subscribe on mount, no outreach send affordance) are asserted
+  from MSW's request log.
 
 **Workers (`workers/`):**
 
@@ -723,9 +494,8 @@ Keep this table up to date — add a row when adding a new test file.
 
 1. Name the file per the stack convention:
    - Rails: `spec/<type>/<area>/<name>_spec.rb` (e.g. `spec/requests/api/jobs_spec.rb`).
-   - Web: `<name>_test.go`, colocated with the package under test.
    - Workers: `src/<name>.test.ts`, colocated with the module under test.
-   - Client: `src/<name>.test.ts` / `.test.tsx`, colocated with the module or component under test.
+   - Web: `src/<name>.test.ts` / `.test.tsx`, colocated with the module or component under test.
 2. Place it in the correct directory for its stack.
 3. Add a row to the Test File Inventory table above.
 4. Run that stack's suite before committing to confirm no regressions.

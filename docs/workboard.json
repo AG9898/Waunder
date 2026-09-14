@@ -2878,7 +2878,7 @@
       "id": "FE-30",
       "title": "Cut over atomically: delete Go, promote client to web, rewrite the docs",
       "description": "One commit that flips production. Repoint deploy/railway-web.Dockerfile, delete web/, and move client/ into web/. Then rewrite every doc that describes the Go frontend, following the cutover checklist in docs/GO_MIGRATION.md. AGENTS.md matters most because it is loaded into every agent session: its Quick Start, Build and Verification table, Repository Structure, Architecture summary, and the four obsolete go-app entries under Debugging and Gotchas are all wrong after this commit. Drop VAPID_PUBLIC_KEY from the web service in both ENV_VARS.md and the Railway dashboard. Verify the live deploy after pushing.",
-      "status": "todo",
+      "status": "done",
       "priority": "critical",
       "group_id": "FE",
       "depends_on": [

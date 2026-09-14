@@ -1,8 +1,9 @@
-# Build artifacts
-/web/app.wasm
-/bin/
-
-# Local env (never commit secrets)
+node_modules/
+dist/
+dist-ssr/
+coverage/
+.vite/
 .env
 .env.*
 !.env.example
+*.log

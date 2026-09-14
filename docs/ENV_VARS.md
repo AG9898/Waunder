@@ -6,10 +6,11 @@ If any other doc mentions a variable, it should link here rather than restate it
 > **Security rules:**
 > - Never commit secret values to source control.
 > - `.env` files containing secrets must be in `.gitignore`.
-> - There is **no** `NEXT_PUBLIC_*`/`VITE_*` convention here. The go-app frontend is served
->   same-origin behind the Go proxy and reads no browser-exposed backend secrets. The only
->   client-exposed value is `VAPID_PUBLIC_KEY`, which is **public by design** (it is handed to
->   the browser for the web-push subscription). Every other secret stays server-side in Rails.
+> - There is **no** `NEXT_PUBLIC_*`/`VITE_*` convention here. The React frontend is served
+>   same-origin behind Caddy and has no build-time or browser-exposed configuration at all. The
+>   only client-visible value is the Web Push public key, which is **public by design** and which
+>   the browser fetches from `GET /api/push/vapid_public_key` at subscribe time. Every secret stays
+>   server-side in Rails.
 > - Rotate any secret that may have been committed; update all affected environments immediately.
 > - Production secrets are set in the Railway service dashboard only — never in committed files.
 
@@ -17,22 +18,10 @@ If any other doc mentions a variable, it should link here rather than restate it
 
 ## Variable Matrix
 
-> **Migrating:** the `web` service is moving to Vite + React + TypeScript, built in the shadow
-> `client/` directory until cutover. The replacement client **already** fetches the push key from
-> `GET /api/push/vapid_public_key` at subscribe time (`FE-13`, `client/src/components/push-toggle.tsx`)
-> and carries no push configuration of its own, so `VAPID_PUBLIC_KEY` is dropped from `web` at
-> cutover and the no-`VITE_*` note above is restated. `API_INTERNAL_URL` and `PORT` are unchanged — `client/`'s Vite dev server already
-> reads `API_INTERNAL_URL` (default `http://localhost:3000`) for its `/api` and Resend-webhook
-> proxy, Node-side only, so it is never inlined into the browser bundle.
-> See [`GO_MIGRATION.md`](GO_MIGRATION.md).
-> `FE-27`'s shadow Caddy container consumes the same two runtime variables: `PORT` for its
-> HTTP-only listener and `API_INTERNAL_URL` for both preserved proxy paths. No new variable is
-> introduced, and this does not reconfigure the live Go service before cutover.
-
 | Variable | Required | Default | Description | Where set |
 |---|---|---|---|---|
-| `API_INTERNAL_URL` | Conditional (Required for prod `web`; set on `worker` only when trusted-submit automation should run) | none | Base URL of the Rails `api` service. The `web` server proxies `/api/*` and `/webhooks/resend/inbound` here, and the `worker` polls it. When unset, `web` disables the Rails proxy and serves standalone, and the worker idles/exits; production may intentionally leave it unset on `worker` to avoid idle Playwright compute. | `web` + optional `worker` runtime env (Railway private-network URL) |
-| `PORT` | No | `8000` | Port the Go `web` server listens on. | `web` runtime (Railway sets this automatically) |
+| `API_INTERNAL_URL` | Conditional (Required for prod `web`; set on `worker` only when trusted-submit automation should run) | none | Base URL of the Rails `api` service. Caddy in the `web` service proxies `/api/*` and `/webhooks/resend/inbound` here, and the `worker` polls it. Required by the `web` Caddyfile (an unset value leaves the proxy with no upstream, so API calls fail while the static app still serves); when unset on `worker` it idles/exits; production may intentionally leave it unset on `worker` to avoid idle Playwright compute. | `web` + optional `worker` runtime env (Railway private-network URL) |
+| `PORT` | No | `8080` (container), `8000` (Vite dev) | Port Caddy in the `web` container listens on. | `web` runtime (Railway sets this automatically) |
 | `DATABASE_URL` | Yes | none | PostgreSQL connection string. | `api` runtime (`api/.env`, Railway) |
 | `RAILS_MASTER_KEY` | Yes (prod) | none | Decrypts Rails encrypted credentials. | `api` runtime (Railway secret; locally `api/config/master.key`) |
 | `RAILS_ENV` | No | `development` | Rails environment (`production` on Railway). | `api` runtime |
@@ -54,7 +43,7 @@ If any other doc mentions a variable, it should link here rather than restate it
 | `RESEND_WEBHOOK_SECRET` | Conditional | none | Svix signing secret that validates Resend inbound (`email.received`) webhook signatures at `POST /webhooks/resend/inbound`; required for email ingestion (RESOLVED-13). | `api` runtime (secret) |
 | `RESEND_API_KEY` | Conditional | none | Resend account API key used by `ResendInboundClient` to fetch the **body** of a received email (`GET /emails/receiving/{email_id}`). The `email.received` webhook delivers only metadata — no text/html — so without this key `ParseInboundEmailJob` has no body to parse and every alert dead-ends. | `api` runtime (secret) |
 | `RESEND_INBOUND_DOMAIN` | Conditional | none | The Resend-verified receiving domain that forwarded job alerts are sent to (reference/config; e.g. `adenguo.com`). | `api` runtime |
-| `VAPID_PUBLIC_KEY` | Conditional | none | Web Push VAPID public key. **Public by design** — exposed to the browser at `GET /api/push/vapid_public_key`, and also read by the `web` server (when set) to forward into the PWA env so the go-app client can subscribe. The `client/` replacement fetches it from that endpoint instead, so the `web` half goes away at the `FE-30` cutover; `api` still needs it. | `api` runtime + `web` runtime (forwarded to PWA env, until cutover) |
+| `VAPID_PUBLIC_KEY` | Conditional | none | Web Push VAPID public key. **Public by design** — exposed to the browser at `GET /api/push/vapid_public_key`, which the web client reads at subscribe time. Only `api` reads it; the `web` service does not need it. | `api` runtime |
 | `VAPID_PRIVATE_KEY` | Conditional | none | Web Push VAPID private key; signs push messages. | `api` runtime (secret) |
 | `VAPID_SUBJECT` | Conditional | none | VAPID contact (`mailto:` address or URL). | `api` runtime |
 | `WORKER_POLL_INTERVAL_MS` | No | `15000` | Worker poll interval (ms) for fetching approved tasks. | `worker` runtime |
@@ -85,12 +74,11 @@ variables. Copy the relevant template to `.env` for local development; never com
 4. Keep the local `RAILS_MASTER_KEY` in `api/config/master.key` (already gitignored).
 5. Never commit `api/.env`.
 
-**web (Go + go-app):**
-1. Create `web/.env` from `web/.env.example`.
-2. Build and run with `make run` (defaults to `localhost:8000`).
-3. Set `API_INTERNAL_URL` to your local Rails URL (e.g. `http://localhost:3000`) so the
-   `/api` and Resend webhook proxy routes are active. If unset, the proxy is disabled and
-   the PWA serves standalone.
+**web (Vite + React + TypeScript):**
+1. `cd web && npm ci`.
+2. Run `npm run dev` (Vite on `localhost:8000`).
+3. `API_INTERNAL_URL` is read by the Node-side dev server only (default `http://localhost:3000`)
+   for the `/api` and Resend webhook proxy; it is never inlined into the browser bundle.
 
 **worker (Node + Playwright):**
 1. Create `workers/.env` from `workers/.env.example`.

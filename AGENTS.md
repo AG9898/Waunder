@@ -13,7 +13,7 @@ scores relevant job openings, notifies the user, drafts tailored application mat
 tracks contacts, and performs trusted application submission only after explicit per-application
 approval. It is a monorepo of three services deployed on Railway — `api/` (Rails 8.1 API,
 the single source of truth for all data, LLM orchestration, bounded in-process jobs, and worker dispatch),
-`web/` (a Go + go-app WebAssembly PWA shell plus a small server that reverse-proxies `/api/*`
+`web/` (a Vite + React + TypeScript PWA served by Caddy, which reverse-proxies `/api/*`
 and the Resend inbound webhook path to Rails — no business logic), and `workers/` (a Node +
 Playwright worker that executes only pre-approved structured submit tasks). Agents implement
 workboard tasks: features, fixes, schema migrations, and infra changes. The canonical task queue
@@ -23,7 +23,7 @@ is `docs/workboard.json`, and skills are available at `.claude/skills/` (synced 
 
 ## Quick Start
 
-Prerequisites: Ruby 3.2.3, Go 1.26, Node 22, PostgreSQL.
+Prerequisites: Ruby 3.2.3, Node 22, PostgreSQL.
 
 ```bash
 # --- api/ (Rails 8.1 API) ---
@@ -31,8 +31,9 @@ cd api && bin/setup          # install gems, prepare the database
 bin/rails s                  # start the API server
 bundle exec rspec            # run the test suite
 
-# --- web/ (Go + go-app PWA) ---
-cd web && make run           # build app.wasm + server, serve on :8000
+# --- web/ (Vite + React PWA) ---
+cd web && npm ci             # install dependencies
+npm run dev                  # Vite on :8000, proxying /api to API_INTERNAL_URL (default :3000)
 
 # --- workers/ (Node + Playwright) ---
 cd workers && npm install    # install dependencies
@@ -41,7 +42,7 @@ npm test                     # run worker tests
 
 # --- Lint / typecheck ---
 cd api && bin/rubocop        # Ruby lint (rubocop-rails-omakase)
-cd web && go vet ./...       # Go static checks
+cd web && npm run typecheck && npm run lint  # TypeScript + ESLint
 cd workers && npm run typecheck  # TypeScript type check
 ```
 
@@ -58,25 +59,24 @@ a fast check. Skip slow checks only when the task says so.
 | `cd api && bin/rubocop` | Ruby lint (rubocop-rails-omakase) | fast |
 | `cd workers && npm test` | Worker safety / unit tests | fast |
 | `cd workers && npm run typecheck` | TypeScript types (`tsc --noEmit`) | fast |
-| `cd client && npm test` | Shadow frontend tests (Vitest + jsdom) | fast |
-| `cd client && npm run typecheck` | Shadow frontend types (`tsc --noEmit`) | fast |
-| `cd client && npm run lint` | Shadow frontend lint (`eslint .`) | fast |
-| `cd client && npm run build` | Shadow frontend production build (`vite build`) | fast |
-| `cd web && go test ./...` | Go tests | fast |
-| `cd web && go vet ./...` | Go static checks | fast |
+| `cd web && npm test` | Frontend tests (Vitest + jsdom + MSW) | fast |
+| `cd web && npm run typecheck` | Frontend types (`tsc --noEmit`) | fast |
+| `cd web && npm run lint` | Frontend lint (`eslint .`) | fast |
+| `cd web && npm run build` | Frontend production build (`vite build`) | fast |
 | `cd api && bin/ci` | Full CI incl. brakeman + bundler-audit | slow |
-| `cd web && make wasm` | WASM frontend build (`GOOS=js GOARCH=wasm`) | slow |
+| `bash web/scripts/container-smoke.sh` | Build + run the Caddy web image; proxy, SPA fallback, compression | slow |
 
 ---
 
 ## Repository Structure
 
 ```
-web/           Go + go-app WebAssembly PWA (frontend) + small Go server
-  main.go         App routing + HTTP server that reverse-proxies /api/* + Resend webhook to Rails
-  components/     go-app UI components (compiled to WASM)
-  Makefile        wasm / server / run build targets
-  Dockerfile      Two-target (WASM + native server) build for Railway
+web/           Vite + React + TypeScript PWA, served by Caddy
+  index.html      Vite entry
+  vite.config.ts  Dev server + /api and Resend-webhook proxy + PWA manifest + Vitest config
+  Caddyfile       Static files + SPA fallback + /api and Resend webhook proxy to Rails
+  public/         app.css, fonts/, icons/, icon.svg, app-worker.js (legacy-worker kill switch)
+  src/            api/ (zod + fetch), components/, lib/, sw.ts, colocated *.test.ts(x)
 api/           Rails 8.1 API-only app (single source of truth)
   app/controllers/api/  Client-facing JSON endpoints (under /api)
   app/jobs/             Active Job background work (bounded async in production)
@@ -89,11 +89,7 @@ workers/       Node + TypeScript + Playwright automation worker
   src/types.ts    Shared task/payload types
   src/config.ts   Worker configuration
   src/ats/        Per-ATS form-fill logic
-client/        Vite + React + TypeScript PWA — shadow replacement for web/, not deployed
-               until the FE-30 cutover (see docs/GO_MIGRATION.md)
-  index.html      Vite entry
-  vite.config.ts  Dev server + /api and Resend-webhook proxy + Vitest config
-  src/            React source and colocated *.test.tsx
+deploy/        Root-context Railway Dockerfiles (railway-web.Dockerfile: Node build -> Caddy)
 docs/          Project docs and task queue
   INDEX.md        Documentation navigation map
   PRD.md          Product requirements and scope
@@ -119,7 +115,7 @@ Docs navigation: [`docs/INDEX.md`](docs/INDEX.md)
 ## Architecture
 
 - Rails (`api/`) is the single source of truth: it owns all data, LLM orchestration (OpenRouter), background jobs, Resend inbound webhooks, web-push dispatch, and worker dispatch.
-- The Go web server (`web/`) is app-shell + `/api` and Resend webhook reverse proxy only. It holds no business logic and no database access.
+- The web service (`web/`, React PWA behind Caddy) is app-shell + `/api` and Resend webhook reverse proxy only. It holds no business logic and no database access.
 - The browser only ever talks to the `web` origin. `/api/*` and the Resend inbound webhook path are proxied server-side to Rails over Railway's private network — no CORS, and Rails has no public domain.
 - Database schema changes happen exclusively through Rails migrations. Never alter tables directly.
 - Sensitive resume/profile fields are encrypted at rest with Active Record Encryption.
@@ -128,11 +124,9 @@ Docs navigation: [`docs/INDEX.md`](docs/INDEX.md)
 
 Full topology, component responsibilities, data flow, and deployment targets: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 
-**Frontend migration in flight (RESOLVED-24):** `web/` is being replaced by a Vite + React +
-TypeScript PWA behind Caddy, with Go removed entirely. Until the cutover task, `web/` is
-production and must not be edited or deleted — all new frontend work happens in `client/`.
-`api/` and `workers/` do not change. Plan of record, port map, preserved contracts, and
-verification gates: [`docs/GO_MIGRATION.md`](docs/GO_MIGRATION.md).
+**Frontend migration complete (RESOLVED-24, 2026-09-14):** Go was removed; `web/` is the Vite +
+React + TypeScript app. `app.css` and class names are verbatim from the Go build; styling upgrades
+are the `UI-*` chain. Migration record: [`docs/GO_MIGRATION.md`](docs/GO_MIGRATION.md).
 
 ---
 
@@ -142,7 +136,7 @@ verification gates: [`docs/GO_MIGRATION.md`](docs/GO_MIGRATION.md).
 
 - Never commit secrets or credentials.
 - Never bulk-rewrite `docs/workboard.json`; use targeted edits only.
-- Never put business logic in the Go web server or the worker — all logic and data live in Rails.
+- Never put business logic in the web frontend, its Caddy server, or the worker — all logic and data live in Rails.
 - Never auto-submit an application without explicit per-application user approval.
 - Never auto-answer unknown or sensitive fields (legal, demographic, salary, disability, sponsorship, identity) unless the user explicitly provided and approved those answers.
 - Never store sensitive resume/profile fields unencrypted.
@@ -243,9 +237,9 @@ Stop and report (do not continue) when:
 
 ## Debugging & Gotchas
 
-- The `web/` service is one Go package compiled twice: to WebAssembly (`GOOS=js GOARCH=wasm`) for the frontend, and to a native binary for the server. On the client `app.RunWhenOnBrowser()` takes over and the server code never runs; on the server it is a no-op and HTTP starts.
-- The Go server reads `API_INTERNAL_URL` to proxy `/api/*` and `/webhooks/resend/inbound`. When unset, the proxy is disabled and the PWA still serves standalone in local dev — so a missing API_INTERNAL_URL is not a crash, just no backend.
-- The Go server listens on `$PORT` (default 8000).
+- `web/Caddyfile` reads `API_INTERNAL_URL` to proxy `/api/*` and `/webhooks/resend/inbound`, preserving the browser's `Host` header (Go used to rewrite it). In local dev, Vite's `server.proxy` does the same from `API_INTERNAL_URL` (default `http://localhost:3000`).
+- Caddy listens on `$PORT` (container default 8080; Vite dev uses 8000) with automatic HTTPS off, since Railway terminates TLS.
+- Keep `web/public/app-worker.js` deployed forever: it retires go-app's cache-first service worker on devices that have not opened the app since cutover.
 - There is no staging environment: only Production (Railway) and local dev.
 
 ---
@@ -253,7 +247,7 @@ Stop and report (do not continue) when:
 ## Environment Variables
 
 Names agents commonly need (no values here): `API_INTERNAL_URL` (Rails base URL for the web
-proxy), `PORT` (web server port, default 8000), `OPENROUTER_*` (LLM gateway + `OPENROUTER_MODEL`),
+proxy), `PORT` (web Caddy port, container default 8080), `OPENROUTER_*` (LLM gateway + `OPENROUTER_MODEL`),
 VAPID keys (web push), Active Record Encryption keys, auth secrets (`APP_SHARED_SECRET`,
 `SESSION_SECRET`, `WORKER_SERVICE_TOKEN`), `RESEND_WEBHOOK_SECRET` (inbound email), `DATABASE_URL`,
 `ACTIVE_JOB_MAX_THREADS` (low-cost queue concurrency), and a conditional `REDIS_URL` (only if a
@@ -1531,3 +1525,9 @@ produces the diff PNG. An exact-match result is only evidence after you view a s
 that it shows loaded content, not two identical spinners. The one real defect this found, the
 bins/filters order on `/jobs`, passed every Vitest case, because no test compared sibling order
 across components. Screens assembled from separately ported pieces need a DOM-order assertion.
+
+### 2026-09-14 — Go→React cutover landed; Go-baseline gates were deleted
+`FE-30` removed Go, moved `client/` to `web/`, and dropped `VAPID_PUBLIC_KEY` from the Railway `web`
+service. The `FE-28` parity gate and `FE-29` handoff check were deleted, not moved, because both
+build the Go app as their baseline; `web/scripts/container-smoke.sh` is the remaining container
+check. Source comments citing `web/components/*.go` refer to the retired build in git history.

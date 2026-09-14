@@ -16,7 +16,7 @@ moving any file under `docs/`, update this file in the same commit.
 | [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | System topology, runtime boundaries, and component responsibilities |
 | [`docs/CONVENTIONS.md`](CONVENTIONS.md) | Coding standards, naming rules, and idiomatic patterns |
 | [`docs/DECISIONS.md`](DECISIONS.md) | Architectural decision log (open and resolved) |
-| [`docs/GO_MIGRATION.md`](GO_MIGRATION.md) | Frontend migration from Go/go-app to TypeScript: rationale, decisions, preserved contracts, verification |
+| [`docs/GO_MIGRATION.md`](GO_MIGRATION.md) | Completed (2026-09-14) frontend migration from Go/go-app to React + TypeScript: rationale, decisions, preserved contracts, verification, cutover deltas |
 | [`docs/ENV_VARS.md`](ENV_VARS.md) | Canonical environment variable and secret matrix |
 | [`docs/PRODUCTION_SETUP.md`](PRODUCTION_SETUP.md) | Production setup runbook and non-secret live integration facts |
 | [`docs/STYLE_GUIDE.md`](STYLE_GUIDE.md) | UI style system, visual direction, and frontend styling integration rules |

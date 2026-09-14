@@ -111,7 +111,7 @@ What existing code or docs does this affect?>
 
 **Alternatives rejected:** Exposing Rails on its own public domain and having the browser call it cross-origin — would require CORS handling and complicate service-worker/push scope.
 
-**Affects:** [`web/main.go`](../web/main.go), [`ARCHITECTURE.md`](ARCHITECTURE.md), `API_INTERNAL_URL` in [`ENV_VARS.md`](ENV_VARS.md).
+**Affects:** [`web/Caddyfile`](../web/Caddyfile) (originally `web/main.go`), [`ARCHITECTURE.md`](ARCHITECTURE.md), `API_INTERNAL_URL` in [`ENV_VARS.md`](ENV_VARS.md).
 
 ---
 
@@ -433,7 +433,7 @@ already a JSON-only contract under `/api` with an httponly signed session cookie
 verbatim so the port is screenshot-verifiable; Tailwind and component libraries are a separate later
 phase. The migration is built in a shadow `client/` directory with `web/` serving production
 untouched, and lands in one atomic cutover commit that repoints
-`deploy/railway-web.Dockerfile`, deletes `web/`, and renames `client/` to `web/`. Full plan of
+`deploy/railway-web.Dockerfile`, deletes `web/`, and renames `client/` to `web/` (landed 2026-09-14). Full plan of
 record, port map, preserved contracts, and verification gates: [`GO_MIGRATION.md`](GO_MIGRATION.md).
 
 **Why:** Four measured reasons. (1) go-app serves static assets through plain `http.FileServer`

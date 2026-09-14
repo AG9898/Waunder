@@ -6,9 +6,11 @@
 > env vars, and style rules are rewritten in their own docs at cutover (see
 > [Cutover doc checklist](#cutover-doc-checklist)).
 
-**Status:** in progress — decided 2026-09-10, chain started 2026-09-10 with `FE-01` (the
-`client/` toolchain). Production still runs the Go/go-app PWA and keeps running it until the
-final cutover task (`FE-30`).
+**Status:** done — decided 2026-09-10, chain `FE-01` … `FE-29` built in the shadow `client/`
+directory, and `FE-30` cut production over on 2026-09-14 in one commit. Go is gone from the
+repository; `web/` is now the Vite + React + TypeScript app. References to `client/` below are
+historical and now mean `web/`. Remaining: the owner's on-device iOS home-screen check
+([`PRODUCTION_SETUP.md`](PRODUCTION_SETUP.md#pwa-cutover-recovery)).
 
 **Decision record:** [`DECISIONS.md`](DECISIONS.md) RESOLVED-24.
 **Task chain:** `FE-01` … `FE-30` in [`workboard.json`](workboard.json), then `UI-01` … `UI-05`.
@@ -1555,7 +1557,26 @@ production runs Go would be false. `FE-30` owns all of it:
 
 ---
 
-## Notes for agents working the chain
+## Cutover result (`FE-30`, 2026-09-14)
+
+What actually differed from the plan:
+
+- `deploy/railway-web.Dockerfile` already built the Node-to-Caddy image since `FE-27`; the cutover
+  only repointed its `client/` paths to `web/`.
+- `client/scripts/parity-gate.cjs` (`FE-28`) and `client/scripts/handoff-check.cjs` (`FE-29`) were
+  deleted rather than moved: both built and served the Go app as their baseline, so they cannot run
+  once Go is removed. Their results are recorded above. `scripts/container-smoke.sh` moved with the
+  app. The Go-era `web/scripts/layout-smoke.cjs` went with `web/`.
+- `src/lib/labels.test.ts` resolved icon assets under `client/public/`; it now resolves `web/public/`.
+- `VAPID_PUBLIC_KEY` was removed from the Railway `web` service variables; `api` keeps it.
+- Source comments that cite `web/components/*.go` were left as-is: they name the retired
+  implementation each port reproduced, which remains in git history.
+- The docs in the checklist above were rewritten in the same commit.
+- Pending: the owner's iOS home-screen check after deploy (delete-and-re-add fallback documented).
+
+---
+
+## Notes for agents working the chain (historical)
 
 - Until `FE-30`, `web/` is production. Do not edit it, and do not delete it.
 - All new work goes in `client/`. It is not wired to Railway and cannot break production.
