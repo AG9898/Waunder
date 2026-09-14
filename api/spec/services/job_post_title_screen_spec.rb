@@ -37,7 +37,13 @@ RSpec.describe JobPostTitleScreen do
     "Cloud Engineer, CAD Platform" => "platform_operations",
     "Senior Developer" => "software_engineering",
     "Salesforce Developer" => "software_engineering",
-    "Frontend Engineering Intern" => "software_engineering"
+    "Frontend Engineering Intern" => "software_engineering",
+    "Mobile App Developer" => "software_engineering",
+    "Android App Developer" => "software_engineering",
+    "App Developer" => "software_engineering",
+    "React Native Developer" => "software_engineering",
+    "Mid-Level Developer" => "software_engineering",
+    "Remote Developer" => "software_engineering"
   }.each do |title, family|
     it "accepts #{title.inspect} as #{family}" do
       result = described_class.call(title)
@@ -60,6 +66,8 @@ RSpec.describe JobPostTitleScreen do
     "AI Engineer Jobs in Canada",
     "Real Estate Developer",
     "Business Developer",
+    "Senior Business Developer",
+    "Remote Real Estate Developer",
     "Marketing Developer",
     "DevOps Manager",
     "Cloud Engineering Manager",
