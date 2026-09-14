@@ -439,7 +439,7 @@ describe("profile screen", () => {
     expect(save).toHaveTextContent("Save profile");
     expect(save).toBeEnabled();
     expect(container.querySelector(".profile-save-error")).toBeNull();
-    expect(container.querySelector(".profile-save-ok")).toBeNull();
+    expect(container.querySelector(".toast")).toBeNull();
 
     const contact = requireElement(container, ".profile-contact");
     expect(contact.querySelector("h2")).toHaveTextContent("Contact details");
@@ -618,7 +618,7 @@ describe("profile save", () => {
     expect(saveButton(container)).toBeDisabled();
 
     await waitFor(() => {
-      expect(container.querySelector(".profile-save-ok")?.textContent).toBe("Profile saved.");
+      expect(container.querySelector(".toast")).toHaveTextContent("Profile saved.");
     });
     expect(saveButton(container)).toHaveTextContent("Saved");
     expect(saveButton(container)).toBeEnabled();
@@ -665,7 +665,7 @@ describe("profile save", () => {
     );
     expect(saveButton(container)).toHaveTextContent("Save profile");
     expect(saveButton(container)).toBeEnabled();
-    expect(container.querySelector(".profile-save-ok")).toBeNull();
+    expect(container.querySelector(".toast")).toBeNull();
     expect(input(container, ".profile-full-name").value).toBe("Augusta Ada King");
     expect(client.getQueryData(queryKeys.profile())).toMatchObject({ full_name: "Ada Lovelace" });
     // A write is never retried.

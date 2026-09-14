@@ -58,6 +58,7 @@ import { clearSelection, toggleSelection, visibleSelection } from "../../lib/job
 import { emptyFeedText, feedParams, pageIndicatorLabel } from "../../lib/job-feed";
 import { readSelection, writeSelection, type FeedBin } from "../../lib/job-filters";
 import { lifecycleErrorMessage, scoreErrorMessage } from "../../lib/messages";
+import { showToast } from "../../lib/toast";
 import { AppChrome } from "../app-chrome";
 import { LoadError, Loading } from "../load-state";
 import { JobBulkActions, JobManageBar, type JobManageContext } from "./job-actions";
@@ -121,7 +122,6 @@ export function JobList() {
               count={bulkIds.length}
               bin={selection.bin}
               busy={lifecycle.busy}
-              error={lifecycle.message}
               onLifecycle={(state) => manage.onLifecycle(bulkIds, state)}
             />
             <ul className="job-list-items">
@@ -208,6 +208,10 @@ function useJobWrites() {
       setSelected((current) => clearSelection(current, ids));
       await invalidateFeeds();
     },
+    // Transient feedback (UI-05): the failure is a toast, not a paragraph that outlives it.
+    onError: (error) => {
+      showToast(lifecycleErrorMessage(error), "danger");
+    },
   });
 
   const scoreMutation = useMutation({
@@ -253,7 +257,6 @@ function useJobWrites() {
     scoreErrors,
     lifecycle: {
       busy: lifecycleMutation.isPending,
-      message: lifecycleMutation.isError ? lifecycleErrorMessage(lifecycleMutation.error) : "",
     },
     manage: {
       lifecycleBusy: lifecycleMutation.isPending,

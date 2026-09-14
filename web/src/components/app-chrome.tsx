@@ -39,6 +39,7 @@ import {
   writeLayout,
 } from "../lib/layout";
 import type { LayoutPreference } from "../lib/layout";
+import { Toaster } from "./ui/toast";
 import { UpdateBanner } from "./update-banner";
 
 /** Shown when the layout choice was applied but could not be persisted. */
@@ -130,6 +131,7 @@ export function AppChrome() {
         ))}
       </nav>
       <UpdateBanner />
+      <Toaster />
       {storageFailed ? (
         <p className="layout-error" role="status">
           {STORAGE_ERROR}

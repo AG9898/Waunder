@@ -106,14 +106,12 @@ export interface JobBulkActionsProps {
   count: number;
   bin: FeedBin;
   busy: boolean;
-  /** The shared lifecycle failure message, or `""`. */
-  error: string;
   onLifecycle: (state: FeedBin) => void;
 }
 
 /**
  * The bulk bar above the list: the selection count, the bin-appropriate bulk buttons, and the
- * one lifecycle error shared by every lifecycle write on the screen.
+ * lifecycle writes; a failed write is reported as a toast (UI-05).
  *
  * The count is the **visible** selection, which is a deliberate correction to the Go build.
  * There, `selectedCount()` counted every id ever checked, so switching bins could leave
@@ -121,7 +119,7 @@ export interface JobBulkActionsProps {
  * `selectedIDs()` (rows-only) was empty — an enabled control that does nothing. Counting what
  * a click would actually send makes the disabled state honest.
  */
-export function JobBulkActions({ count, bin, busy, error, onLifecycle }: JobBulkActionsProps) {
+export function JobBulkActions({ count, bin, busy, onLifecycle }: JobBulkActionsProps) {
   return (
     <div className="job-bulk-actions">
       <span className="job-bulk-count">{bulkSelectionLabel(count)}</span>
@@ -132,7 +130,6 @@ export function JobBulkActions({ count, bin, busy, error, onLifecycle }: JobBulk
         labels={BULK_LABELS}
         onLifecycle={onLifecycle}
       />
-      {error === "" ? null : <p className="job-lifecycle-error">{error}</p>}
     </div>
   );
 }

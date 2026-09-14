@@ -465,7 +465,7 @@ describe("lifecycle writes", () => {
     );
 
     await waitFor(() =>
-      expect(container.querySelector(".job-lifecycle-error")).toHaveTextContent(
+      expect(container.querySelector(".toast")).toHaveTextContent(
         "Could not update the job. Please try again.",
       ),
     );
@@ -486,7 +486,7 @@ describe("lifecycle writes", () => {
     );
 
     await waitFor(() =>
-      expect(container.querySelector(".job-lifecycle-error")).toHaveTextContent(
+      expect(container.querySelector(".toast")).toHaveTextContent(
         "Your session expired. Please sign in again.",
       ),
     );

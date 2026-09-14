@@ -47,6 +47,7 @@ import { queryKeys } from "../../api/keys";
 import type { Profile, ProfileContact, ProfileEdit } from "../../api/schemas";
 import { useSignOut } from "../../lib/auth";
 import { profileSaveErrorMessage } from "../../lib/messages";
+import { showToast } from "../../lib/toast";
 import { evaluatePushGate, platformState, readPlatformSignals } from "../../lib/platform";
 import type { PlatformSignals } from "../../lib/platform";
 import {
@@ -135,6 +136,7 @@ function ProfileForm({ profile }: { profile: Profile }) {
       queryClient.setQueryData(queryKeys.profile(), saved);
       // `applySaveResult` reseeded the form, so the fields show what Rails stored.
       setEdit(editFromProfile(saved));
+      showToast("Profile saved.");
     },
   });
 
@@ -172,11 +174,6 @@ function ProfileForm({ profile }: { profile: Profile }) {
       {save.isError ? (
         <p className="profile-save-error" role="alert">
           {profileSaveErrorMessage(save.error)}
-        </p>
-      ) : null}
-      {save.isSuccess ? (
-        <p className="profile-save-ok" role="status">
-          Profile saved.
         </p>
       ) : null}
     </form>

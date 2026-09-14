@@ -256,6 +256,19 @@ columns, a compact title, hairline sections, and one primary action where possib
 
 ---
 
+### Toasts And Motion (UI-05)
+
+- Transient mutation feedback uses toasts (`web/src/lib/toast.ts` store, `web/src/components/ui/toast.tsx`
+  viewport rendered by `AppChrome`): a failed lifecycle write (feed and job detail), a failed tracker
+  status write, and "Profile saved.". Toasts sit in one `aria-live="polite"` region labelled
+  Notifications, carry a dismiss button, auto-dismiss after 6s, and do not stack duplicates.
+- Permanent states stay inline on the screen they describe: draft warnings and submit gating,
+  scoring failures, validation and save errors (profile, contacts, manual import), and load errors.
+- Motion is enter-only (`waunder-enter`, 140–160ms, opacity never below 0.6) on routed screen roots,
+  feed rows, ingestion batches, and toasts, declared only inside
+  `@media (prefers-reduced-motion: no-preference)` so reduced motion gets none. `.draft-review` is
+  excluded so nothing delays or obscures its submit gating.
+
 ## Integration Rules
 
 - Ship styling from `web/public/app.css`, linked from `web/index.html` (not imported from `src/`,

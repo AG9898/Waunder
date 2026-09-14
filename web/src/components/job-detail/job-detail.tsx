@@ -44,6 +44,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router";
 
 import { createApplication, fetchJob, setJobLifecycle } from "../../api/endpoints";
 import { queryKeys } from "../../api/keys";
+import { showToast } from "../../lib/toast";
 import type { JobDetail, JobRoute } from "../../api/schemas";
 import {
   applyButtonLabel,
@@ -270,6 +271,9 @@ function LifecycleControls({ jobId, state }: { jobId: number; state: string }) {
         queryClient.invalidateQueries({ queryKey: queryKeys.ingestionBatches.root() }),
       ]);
     },
+    onError: (error) => {
+      showToast(lifecycleErrorMessage(error), "danger");
+    },
   });
 
   const onSet = useCallback(
@@ -319,9 +323,6 @@ function LifecycleControls({ jobId, state }: { jobId: number; state: string }) {
           Restore to active
         </button>
       )}
-      {mutation.isError ? (
-        <p className="job-lifecycle-error">{lifecycleErrorMessage(mutation.error)}</p>
-      ) : null}
     </div>
   );
 }

@@ -188,6 +188,7 @@ Be honest about the current state — most of the suite is still to be written.
 - **web/** — `src/components/tailwind-probe.test.tsx` (`UI-01`): asserts `tailwind.css` imports only
   the theme and utilities layers (no Preflight), that every `@theme` token equals its `app.css`
   `:root` value, that `app.css` is still linked, and renders the unrouted Tailwind probe.
+- **web/** — `src/components/ui/toast.test.tsx` (`UI-05`): the toast viewport announces through a polite live region, dismisses on click and after its duration, and does not stack duplicates; screen tests read transient write feedback from `.toast`, and `vitest.setup.ts` clears the toast store after each case.
 - **web/** — `src/components/ui/ui.test.tsx` (`UI-02`): renders the vendored Button, Input, Select,
   Dialog, and Sheet primitives, asserts their token utilities, prop-driven open/close and
   Escape-to-`onClose`, the `@source` opt-in, and that `package.json` gained no runtime UI dependency.

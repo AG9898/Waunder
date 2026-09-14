@@ -3054,7 +3054,7 @@
       "id": "UI-05",
       "title": "Add toasts for transient feedback and motion polish",
       "description": "Replace inline error paragraphs with toasts for transient mutation feedback such as a saved status or a failed lifecycle write, while keeping permanent states inline where they belong: draft warnings, scoring failures, and validation errors stay on the screen they describe. Add restrained route and list transitions that respect prefers-reduced-motion.",
-      "status": "todo",
+      "status": "done",
       "priority": "low",
       "group_id": "UI",
       "depends_on": [

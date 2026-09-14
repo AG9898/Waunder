@@ -2365,3 +2365,25 @@ html { scroll-padding-bottom: var(--screen-bottom); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* ------------------------------------------------------------
+   Motion polish (UI-05): restrained enter transitions for route
+   containers, list rows, and toasts. Only ever applied under
+   prefers-reduced-motion: no-preference, so reduced motion gets
+   none at all. Draft review is deliberately excluded: nothing may
+   delay or obscure its submit gating. Opacity never starts below
+   0.6, so no state is ever hidden while it animates.
+   ------------------------------------------------------------ */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes waunder-enter {
+    from { opacity: 0.6; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+  }
+  .digest, .job-list, .manual-entry, .job-detail, .contacts-view,
+  .applications, .profile {
+    animation: waunder-enter 160ms ease-out;
+  }
+  .job-list-item, .digest-batch, .toast {
+    animation: waunder-enter 140ms ease-out;
+  }
+}

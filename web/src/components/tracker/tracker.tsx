@@ -51,6 +51,7 @@ import { queryKeys } from "../../api/keys";
 import type { ApplicationCounts, PageMeta } from "../../api/schemas";
 import { pageIndicatorLabel } from "../../lib/job-feed";
 import { trackerErrorMessage } from "../../lib/messages";
+import { showToast } from "../../lib/toast";
 import {
   DEFAULT_TRACKER_SELECTION,
   TRACKER_BIN_OPTIONS,
@@ -102,11 +103,6 @@ export function TrackerScreen() {
       <TrackerGroupTabs group={selection.group} counts={counts} onSelect={onSelectGroup} />
       <TrackerControls selection={selection} onChange={setSelection} />
       <TrackerColumns visibility={columnVisibility} onChange={setColumnVisibility} />
-      {write.error === "" ? null : (
-        <p className="tracker-status-error" role="alert">
-          {write.error}
-        </p>
-      )}
       {isPending || isPlaceholderData ? (
         <Loading />
       ) : isError ? (
@@ -149,7 +145,7 @@ const ZERO_COUNTS: ApplicationCounts = {
 };
 
 /**
- * The status write shared by every row: the in-flight flag, which row it is for, the failure copy,
+ * The status write shared by every row: the in-flight flag, which row it is for (a failure is a toast, UI-05),
  * and the change handler.
  *
  * A status change sends a **blank** stage, as Go's `ApplicationStatusUpdate{PipelineStatus: status}`
@@ -168,6 +164,9 @@ function useStatusWrite() {
         queryClient.invalidateQueries({ queryKey: queryKeys.applications.root() }),
       ]);
     },
+    onError: (error) => {
+      showToast(trackerErrorMessage(error), "danger");
+    },
   });
 
   const { isPending, mutate } = mutation;
@@ -184,7 +183,6 @@ function useStatusWrite() {
   return {
     saving: isPending,
     savingId: isPending ? (mutation.variables?.jobId ?? 0) : 0,
-    error: mutation.isError ? trackerErrorMessage(mutation.error) : "",
     onStatusChange,
   };
 }

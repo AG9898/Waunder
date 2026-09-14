@@ -942,7 +942,7 @@ describe("tracker writes", () => {
       Array.from(statusSelectFor("Principal Engineer").options).map((option) => option.value),
     ).not.toContain("not_applied");
     expect(tabCount("Applied")).toBe("2");
-    expect(container.querySelector(".tracker-status-error")).toBeNull();
+    expect(container.querySelector(".toast")).toBeNull();
   });
 
   it("lets the refetch move a row out of the tab it was edited in", async () => {
@@ -1009,9 +1009,13 @@ describe("tracker writes", () => {
     fireEvent.change(statusSelectFor("Principal Engineer"), { target: { value: "applied" } });
 
     await waitFor(() => {
-      expect(screen.getByRole("alert").textContent).toBe("Could not update application status.");
+      expect(container.querySelector(".toast")).toHaveTextContent(
+        "Could not update application status.",
+      );
     });
-    expect(screen.getByRole("alert")).toHaveClass("tracker-status-error");
+    // Announced through the polite live region, and dismissible (UI-05).
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss notification" }));
+    expect(container.querySelector(".toast")).toBeNull();
     expect(container.querySelectorAll(".tracker-row")).toHaveLength(2);
     expect(statusSelectFor("Principal Engineer").value).toBe("not_applied");
     expect(statusSelectFor("Principal Engineer")).toBeEnabled();
@@ -1027,7 +1031,9 @@ describe("tracker writes", () => {
     fireEvent.change(statusSelectFor("Principal Engineer"), { target: { value: "applied" } });
 
     await waitFor(() => {
-      expect(screen.getByRole("alert").textContent).toBe(SESSION_EXPIRED);
+      expect(screen.getByRole("region", { name: "Notifications" })).toHaveTextContent(
+        SESSION_EXPIRED,
+      );
     });
   });
 });
