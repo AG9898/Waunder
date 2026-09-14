@@ -33,17 +33,17 @@ RSpec.describe InboundEmailLlmExtractor do
   it "extracts postings into JobPosts and clears the fallback flag" do
     client = FakeLlmClient.new(
       "postings" => [
-        { "title" => "Data Scientist", "company" => "VRIFY", "location" => "Vancouver",
+        { "title" => "AI Engineer", "company" => "VRIFY", "location" => "Vancouver",
           "posting_url" => "https://example.com/jobs/1" }
       ]
     )
-    email = inbound_email(text: "VRIFY is hiring a Data Scientist")
+    email = inbound_email(text: "VRIFY is hiring an AI Engineer")
 
     result = nil
     expect { result = described_class.new(email, client: client).call }.to change(JobPost, :count).by(1)
 
     expect(result.status).to eq("llm_parsed")
-    expect(result.job_posts.first.title).to eq("Data Scientist")
+    expect(result.job_posts.first.title).to eq("AI Engineer")
     expect(result.job_posts.first.company.name).to eq("VRIFY")
     expect(result.job_posts.first.url_identities.pluck(:role, :identity_key)).to contain_exactly(
       [ "source", "url:https://example.com/jobs/1" ],
@@ -52,6 +52,25 @@ RSpec.describe InboundEmailLlmExtractor do
     )
     expect(email.reload.raw_payload.dig("parse_result", "status")).to eq("llm_parsed")
     expect(email.raw_payload.dig("parse_result", "needs_llm_fallback")).to be(false)
+  end
+
+  it "completes extraction without materializing postings rejected by the title screen" do
+    client = FakeLlmClient.new(
+      "postings" => [
+        { "title" => "Data Scientist", "company" => "VRIFY", "location" => "Vancouver" }
+      ]
+    )
+    email = inbound_email(text: "VRIFY is hiring a Data Scientist")
+
+    result = nil
+    expect { result = described_class.new(email, client: client).call }.not_to change(JobPost, :count)
+
+    expect(result.status).to eq("llm_parsed")
+    expect(email.reload.raw_payload.dig("parse_result", "needs_llm_fallback")).to be(false)
+    expect(email.raw_payload.dig("parse_result", "title_screen")).to include(
+      "accepted" => 0,
+      "rejected" => 1
+    )
   end
 
   it "keeps the fallback flag and creates nothing when the model finds no postings" do

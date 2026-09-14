@@ -31,8 +31,9 @@ class InboundEmailParser
       return Result.new(job_posts: [], parser: parser_class, fallback: true)
     end
 
-    job_posts = persist(postings)
-    mark_parsed!(parser_class)
+    screening = InboundPostingTitleFilter.call(postings)
+    job_posts = persist(screening.accepted_postings)
+    mark_parsed!(parser_class, screening.summary)
     Result.new(job_posts: job_posts, parser: parser_class, fallback: false)
   end
 
@@ -66,11 +67,12 @@ class InboundEmailParser
     postings.filter_map { |posting| JobPostMaterializer.new(posting).call }
   end
 
-  def mark_parsed!(parser_class)
+  def mark_parsed!(parser_class, screening)
     update_parse_result(
       "status" => "parsed",
       "parser" => parser_class.source_name,
-      "needs_llm_fallback" => false
+      "needs_llm_fallback" => false,
+      "title_screen" => screening
     )
   end
 

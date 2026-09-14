@@ -43,10 +43,19 @@ class InboundEmailLlmExtractor
 
     payload = client.complete_json(messages)
     postings = normalize(payload)
-    job_posts = postings.filter_map { |posting| JobPostMaterializer.new(posting).call }
+    screening = InboundPostingTitleFilter.call(postings)
+    job_posts = screening.accepted_postings.filter_map { |posting| JobPostMaterializer.new(posting).call }
 
-    status = job_posts.any? ? STATUS_EXTRACTED : STATUS_EMPTY
-    update_parse_result(status, job_posts: job_posts.size, needs_llm_fallback: job_posts.empty?)
+    # A model response containing only off-scope postings was still extracted
+    # successfully. Mark it complete so a retry does not pay for the same LLM
+    # extraction again merely because no JobPost was materialized.
+    status = postings.any? ? STATUS_EXTRACTED : STATUS_EMPTY
+    update_parse_result(
+      status,
+      job_posts: job_posts.size,
+      needs_llm_fallback: postings.empty?,
+      title_screen: screening.summary
+    )
     Rails.logger.info(
       "InboundEmailLlmExtractor #{status} inbound_email_id=#{inbound_email.id} job_posts=#{job_posts.size}"
     )

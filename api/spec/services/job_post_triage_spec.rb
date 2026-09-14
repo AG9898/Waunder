@@ -33,7 +33,7 @@ RSpec.describe JobPostTriage do
     result = described_class.new(post).call
 
     expect(result).to be_rejected
-    expect(post.reload.triage_reasons).to include("title_missing_target_role", "title_matches_exclusion")
+    expect(post.reload.triage_reasons).to include("title_matches_exclusion")
   end
 
   it "rejects otherwise relevant roles outside priority locations when not remote" do

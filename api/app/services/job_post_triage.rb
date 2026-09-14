@@ -27,42 +27,6 @@ class JobPostTriage
     def rejected? = status == STATUS_REJECTED
   end
 
-  TITLE_PATTERNS = [
-    /software/i,
-    /\bdeveloper\b/i,
-    /\bdev\b/i,
-    /front[\s-]?end/i,
-    /back[\s-]?end/i,
-    /full[\s-]?stack/i,
-    /platform/i,
-    /infrastructure/i,
-    /site reliability/i,
-    /\bsre\b/i,
-    /devops/i,
-    /cloud engineer/i,
-    /\bAI\b/i,
-    /artificial intelligence/i,
-    /machine learning/i,
-    /\bML\b/i,
-    /data scientist/i,
-    /data engineer/i
-  ].freeze
-
-  EXCLUDED_TITLE_PATTERNS = [
-    /recruit/i,
-    /\bsales\b/i,
-    /account executive/i,
-    /customer success/i,
-    /marketing/i,
-    /nurse/i,
-    /pharmac/i,
-    /technician/i,
-    /\bCAD\b/i,
-    /mechanical/i,
-    /civil/i,
-    /electrical/i
-  ].freeze
-
   def self.auto_score_daily_limit
     raw = ENV.fetch(AUTO_SCORE_DAILY_LIMIT_ENV, DEFAULT_AUTO_SCORE_DAILY_LIMIT).to_s.strip
     return DEFAULT_AUTO_SCORE_DAILY_LIMIT if raw.blank?
@@ -103,25 +67,19 @@ class JobPostTriage
     reasons = []
     score = 0
 
-    if relevant_title?(title)
-      score += title_score(title)
+    title_result = JobPostTitleScreen.call(title)
+    if title_result.accepted?
+      score += title_score(title_result.family)
       reasons << "title_matches_target_roles"
     else
-      reasons << "title_missing_target_role"
-    end
-
-    if excluded_title?(title)
-      score -= 35
-      reasons << "title_matches_exclusion"
+      reasons << title_result.reason
     end
 
     location_result = classify_location(location)
     score += location_result.fetch(:score)
     reasons << location_result.fetch(:reason)
 
-    status = if reasons.include?("title_missing_target_role") ||
-        reasons.include?("title_matches_exclusion") ||
-        !location_result.fetch(:acceptable)
+    status = if title_result.rejected? || !location_result.fetch(:acceptable)
       STATUS_REJECTED
     else
       STATUS_ELIGIBLE
@@ -135,21 +93,13 @@ class JobPostTriage
     )
   end
 
-  def relevant_title?(title)
-    TITLE_PATTERNS.any? { |pattern| title.match?(pattern) }
-  end
-
-  def excluded_title?(title)
-    EXCLUDED_TITLE_PATTERNS.any? { |pattern| title.match?(pattern) }
-  end
-
-  def title_score(title)
-    case title
-    when /artificial intelligence|\bAI\b|machine learning|\bML\b/i then 65
-    when /software|developer|front[\s-]?end|back[\s-]?end|full[\s-]?stack/i then 60
-    when /platform|infrastructure|site reliability|\bsre\b|devops|cloud engineer/i then 55
-    else 50
-    end
+  def title_score(family)
+    {
+      "ai_engineering" => 65,
+      "software_engineering" => 60,
+      "platform_operations" => 55,
+      "data_engineering" => 50
+    }.fetch(family, 50)
   end
 
   def classify_location(location)

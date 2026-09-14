@@ -263,14 +263,24 @@ dispatch.
   matching stable URL identity before creating a JobPost and idempotently records stable `source`
   and `posting` aliases before route resolution. Alias registration is local database work only:
   never fetch a URL or construct an LLM client for it.
+- Bulk inbound candidates pass `JobPostTitleScreen` through `InboundPostingTitleFilter` **before**
+  `JobPostMaterializer`. The versioned, phrase-based allowlist accepts software development,
+  AI/ML/LLM/agentic engineering, platform/DevOps/SRE/cloud, and data engineering; explicit
+  management, data science/analytics, developer-relations, sales/solutions/support, AI-training,
+  and non-software-engineering exclusions win. Rejected candidates create no Company, JobPost,
+  route, URL identity, or scoring job; aggregate candidate/accepted/rejected counts and reasons are
+  stored under `InboundEmail.raw_payload.parse_result.title_screen`. An LLM extraction containing
+  only screened-out candidates is still `llm_parsed` so it is never paid for repeatedly. Manual
+  imports bypass this automatic gate.
 - **Already submitted** is defined by `Application.status == "submitted"`, which is written after
   a successful worker report. `pipeline_status == "applied"` and non-terminal automation states
   must not be used as a submission duplicate signal.
-- Bulk inbound JobPosts must pass deterministic `JobPostTriage`
+- Materialized bulk inbound JobPosts must pass deterministic `JobPostTriage`
   (`app/services/job_post_triage.rb`) before automatic scoring. The triage rules are title/location
-  only: target developer/software/AI/ML/platform/data-adjacent titles and prioritize Vancouver,
+  only: it reuses `JobPostTitleScreen` for the title result and prioritizes Vancouver,
   Calgary, then remote; unknown or broad Canada/BC/Alberta location is allowed but lower priority.
-  Rejected inbound posts are kept as `scoring_status: "filtered"`, and eligible posts beyond
+  Title failures should normally have been screened out before materialization; location-rejected
+  inbound posts are kept as `scoring_status: "filtered"`, and eligible posts beyond
   `JOB_TRIAGE_AUTO_SCORE_DAILY_LIMIT` are kept as `scoring_status: "deferred"`. Manual job entries
   and explicit `POST /api/job_posts/:id/score` requests bypass the inbound budget.
 - A JobPost carries three independent status axes; do not overload one for another. `scoring_status`
@@ -532,6 +542,10 @@ and reports auditable results back.
 - `JobPost.lifecycle_state = removed` sets `expires_at` to
   `REMOVED_JOB_RETENTION_DAYS` (default 30). Maintenance may hard-delete only expired removed rows
   with no Application; `backlog` is never part of the purge relation.
+- Historical title-policy cleanup uses `api/bin/cleanup-off-scope-job-posts --dry-run` first.
+  `--apply` soft-removes only non-manual failures with no Application, generated cover letter,
+  saved contact, manual triage override, or owner lifecycle action; it records a
+  `title_screen_cleanup` audit event and never hard-deletes directly.
 
 - **Migrations only.** All schema changes go through Rails migrations — never `ALTER TABLE` or
   drop/alter columns directly.

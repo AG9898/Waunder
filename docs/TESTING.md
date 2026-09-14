@@ -107,14 +107,22 @@ Be honest about the current state — most of the suite is still to be written.
 - **api/** — `spec/models/contact_candidate_spec.rb` and `spec/models/outreach_draft_spec.rb`:
   model specs for contact-candidate job linkage, relevance-reason validation, outreach-draft
   association, and manual-send message validation.
+- **api/** — `spec/services/job_post_title_screen_spec.rb` and
+  `spec/services/inbound_posting_title_filter_spec.rb`: table-driven accepted/rejected title-family
+  boundaries plus aggregate pre-materialization screening counts and reasons.
 - **api/** — `spec/services/inbound_email_parser_spec.rb`: service specs for the deterministic
-  known-sender (LinkedIn/Indeed/Glassdoor) email parser, normalized JobPost and URL-alias
-  persistence, company reuse, and LLM-fallback flagging for unknown senders and empty parses.
+  known-sender (LinkedIn/Indeed/Glassdoor) email parser, pre-materialization title screening,
+  normalized JobPost and URL-alias persistence, company reuse, and LLM-fallback flagging for
+  unknown senders and empty parses.
 - **api/** — `spec/services/job_post_materializer_spec.rb`: inbound materialization coverage for
   stable source/posting/application URL-alias registration and retry-safe identity reuse without
   LLM calls.
 - **api/** — `spec/services/inbound_email_llm_extractor_spec.rb`: mocked LLM-fallback extraction,
-  no-posting/skip/retry states, and shared URL-alias persistence without live network calls.
+  no-posting/skip/retry states, screened-only completion without materialization, and shared
+  URL-alias persistence without live network calls.
+- **api/** — `spec/services/off_scope_job_post_cleanup_spec.rb`: dry-run reporting, audited
+  soft-removal, manual-import exclusion, and application-history preservation for historical
+  title-policy cleanup.
 - **api/** — `spec/jobs/parse_inbound_email_job_spec.rb`: job spec wiring the inbound parse job
   to the parser service for both the known-sender and LLM-fallback paths.
 - **api/** — `spec/services/application_route_resolver_spec.rb`: deterministic route-type

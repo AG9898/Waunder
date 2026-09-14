@@ -1531,3 +1531,10 @@ across components. Screens assembled from separately ported pieces need a DOM-or
 service. The `FE-28` parity gate and `FE-29` handoff check were deleted, not moved, because both
 build the Go app as their baseline; `web/scripts/container-smoke.sh` is the remaining container
 check. Source comments citing `web/components/*.go` refer to the retired build in git history.
+
+### 2026-09-14 — Inbound title screening now precedes JobPost materialization
+Bulk alert candidates pass the versioned `JobPostTitleScreen` through `InboundPostingTitleFilter`
+before `JobPostMaterializer`; rejected titles create no Company, JobPost, route, URL identity, or
+scoring job, while aggregate counts/reasons remain in the inbound email `parse_result`. Manual
+imports bypass the gate, and historical cleanup must begin with
+`api/bin/cleanup-off-scope-job-posts --dry-run`; apply mode soft-removes only owner-untouched rows.

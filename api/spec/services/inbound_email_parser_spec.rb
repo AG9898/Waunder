@@ -80,19 +80,18 @@ RSpec.describe InboundEmailParser do
       result = described_class.new(email).call
 
       expect(result.parser.source_name).to eq("linkedin")
-      expect(result.job_posts.size).to eq(2)
+      expect(result.job_posts.size).to eq(1)
 
-      first = result.job_posts.first
-      expect(first.title).to eq("Senior Geo Data Scientist")
-      expect(first.company.name).to eq("VRIFY")
-      expect(first.location).to eq("Canada (Remote)")
-      expect(first.posting_url).to eq("https://www.linkedin.com/jobs/view/4388176608/")
-
-      second = result.job_posts.last
-      expect(second.title).to eq("Software Engineer")
-      expect(second.company.name).to eq("Microsoft")
-      expect(second.location).to eq("Vancouver, BC (Hybrid)")
-      expect(second.posting_url).to eq("https://www.linkedin.com/jobs/view/4431317239/")
+      post = result.job_posts.sole
+      expect(post.title).to eq("Software Engineer")
+      expect(post.company.name).to eq("Microsoft")
+      expect(post.location).to eq("Vancouver, BC (Hybrid)")
+      expect(post.posting_url).to eq("https://www.linkedin.com/jobs/view/4431317239/")
+      expect(email.reload.raw_payload.dig("parse_result", "title_screen")).to include(
+        "candidates" => 2,
+        "accepted" => 1,
+        "rejected" => 1
+      )
     end
 
     it "parses a native LinkedIn digest (title / company / location / View job: URL)" do
@@ -172,11 +171,9 @@ RSpec.describe InboundEmailParser do
       result = described_class.new(email).call
 
       expect(result.parser.source_name).to eq("glassdoor")
-      post = result.job_posts.sole
-      expect(post.title).to eq("Product Manager")
-      expect(post.company.name).to eq("Initech")
-      expect(post.location).to eq("Remote, US")
-      expect(post.source).to eq("glassdoor")
+      expect(result.job_posts).to be_empty
+      expect(result.fallback?).to be(false)
+      expect(email.reload.raw_payload.dig("parse_result", "title_screen", "rejected")).to eq(1)
     end
 
     it "parses a manually forwarded Glassdoor 'Jobs for You' digest (.ca, ★ layout, salary)" do
@@ -213,22 +210,14 @@ RSpec.describe InboundEmailParser do
 
       expect(result.fallback?).to be(false)
       expect(result.parser.source_name).to eq("glassdoor")
-      expect(result.job_posts.size).to eq(2)
+      expect(result.job_posts.size).to eq(1)
 
-      first = result.job_posts.first
-      expect(first.title).to eq("AI Training Specialist – Quantitative")
-      expect(first.company.name).to eq("DataAnnotation")
-      expect(first.location).to eq("Hamilton")
-      expect(first.compensation).to eq("$55 - $60 (Employer Est.)")
-      expect(first.source).to eq("glassdoor")
-      expect(first.posting_url).to eq("https://www.glassdoor.ca/job-listing/index.htm?jl=1010108476620")
-      expect(first.source_url).to include("partner/jobListing.htm")
-
-      second = result.job_posts.second
-      expect(second.title).to eq("Intermediate Software Engineer")
-      expect(second.company.name).to eq("Jobber")
-      expect(second.location).to eq("Vancouver")
-      expect(second.compensation).to eq("$107K - $144K (Employer Est.)")
+      post = result.job_posts.sole
+      expect(post.title).to eq("Intermediate Software Engineer")
+      expect(post.company.name).to eq("Jobber")
+      expect(post.location).to eq("Vancouver")
+      expect(post.compensation).to eq("$107K - $144K (Employer Est.)")
+      expect(email.reload.raw_payload.dig("parse_result", "title_screen", "rejected")).to eq(1)
     end
 
     it "parses a native Glassdoor digest (rated + unrated blocks, nbsp rating, footer links)" do
@@ -259,7 +248,7 @@ RSpec.describe InboundEmailParser do
 
       expect(result.fallback?).to be(false)
       expect(result.parser.source_name).to eq("glassdoor")
-      expect(result.job_posts.size).to eq(2)
+      expect(result.job_posts.size).to eq(1)
 
       flash = result.job_posts.find { |p| p.company.name == "Flash Pharmacy" }
       expect(flash.title).to eq("AI Developer")
@@ -267,12 +256,8 @@ RSpec.describe InboundEmailParser do
       expect(flash.compensation).to eq("$70K (Employer Est.)")
       expect(flash.posting_url).to eq("https://www.glassdoor.ca/job-listing/index.htm?jl=1010176128342")
 
-      cad = result.job_posts.find { |p| p.title == "CAD Technician - Burnaby Office" }
-      expect(cad.company.name).to eq("Underhill Geomatics")
-      expect(cad.location).to eq("Burnaby")
-      expect(cad.compensation).to eq("$30 - $37 (Employer Est.)")
-
       expect(result.job_posts.map(&:title)).to all(satisfy { |t| t !~ /easy apply/i && t !~ /\A\$/ })
+      expect(email.reload.raw_payload.dig("parse_result", "title_screen", "rejected")).to eq(1)
     end
 
     it "ignores the Glassdoor header search link and does not treat it as a posting" do
