@@ -22,7 +22,22 @@ RSpec.describe JobPostTitleScreen do
     "MLOps Engineer" => "ai_engineering",
     "Site Reliability Engineer" => "platform_operations",
     "Cloud Engineer" => "platform_operations",
-    "Staff Data Engineer" => "data_engineering"
+    "Staff Data Engineer" => "data_engineering",
+    "Software Engineering Intern" => "software_engineering",
+    "Software Engineering Co-op" => "software_engineering",
+    "Software Engineering Lead" => "software_engineering",
+    "Engineer II, Software" => "software_engineering",
+    "Platform Engineering Lead" => "platform_operations",
+    "Software Engineer, Marketing Platform" => "software_engineering",
+    "Data Engineer - Sales Analytics" => "data_engineering",
+    "Software Developer - Pharmacy Systems" => "software_engineering",
+    "CAD Software Developer" => "software_engineering",
+    "Software Engineer - Technician Scheduling" => "software_engineering",
+    "AI Engineer, Marketing Automation" => "ai_engineering",
+    "Cloud Engineer, CAD Platform" => "platform_operations",
+    "Senior Developer" => "software_engineering",
+    "Salesforce Developer" => "software_engineering",
+    "Frontend Engineering Intern" => "software_engineering"
   }.each do |title, family|
     it "accepts #{title.inspect} as #{family}" do
       result = described_class.call(title)
@@ -42,7 +57,21 @@ RSpec.describe JobPostTitleScreen do
     "Mechanical Engineer",
     "Product Manager",
     "Account Executive",
-    "AI Engineer Jobs in Canada"
+    "AI Engineer Jobs in Canada",
+    "Real Estate Developer",
+    "Business Developer",
+    "Marketing Developer",
+    "DevOps Manager",
+    "Cloud Engineering Manager",
+    "SRE Manager",
+    "Site Reliability Director",
+    "Infrastructure Manager",
+    "Director of Cloud Infrastructure",
+    "Marketing Coordinator",
+    "Sales Associate",
+    "Pharmacy Technician",
+    "CAD Technician",
+    "Front End Associate"
   ].each do |title|
     it "rejects #{title.inspect}" do
       expect(described_class.call(title)).to be_rejected

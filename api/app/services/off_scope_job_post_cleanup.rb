@@ -84,12 +84,13 @@ class OffScopeJobPostCleanup
       job_post.contact_candidates.any? ||
       job_post.cover_letter_draft.present? ||
       job_post.triage_status == JobPostTriage::STATUS_MANUAL_OVERRIDE ||
-      owner_lifecycle_event?(job_post)
+      owner_audit_event?(job_post)
   end
 
-  def owner_lifecycle_event?(job_post)
+  def owner_audit_event?(job_post)
     job_post.audit_events.any? do |event|
-      event.event_type == "lifecycle_changed" && event.metadata["reason"] != "stale_sweep"
+      event.event_type == ManualJobPostImporter::MATCH_EVENT_TYPE ||
+        (event.event_type == "lifecycle_changed" && event.metadata["reason"] != "stale_sweep")
     end
   end
 

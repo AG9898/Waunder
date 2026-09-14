@@ -3,8 +3,7 @@
 require "json"
 require "optparse"
 
-options = { dry_run: true, sample_limit: OffScopeJobPostCleanup::SAMPLE_LIMIT } if defined?(OffScopeJobPostCleanup)
-options ||= { dry_run: true, sample_limit: 25 }
+options = { dry_run: true }
 
 OptionParser.new do |parser|
   parser.banner = "Usage: bin/cleanup-off-scope-job-posts [--dry-run | --apply] [--sample-limit N]"

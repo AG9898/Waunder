@@ -55,4 +55,18 @@ RSpec.describe OffScopeJobPostCleanup do
     expect(manual.reload.lifecycle_state).to eq("active")
     expect(tracked.reload.lifecycle_state).to eq("active")
   end
+
+  it "preserves inbound posts the owner matched through a manual import" do
+    matched = job_post(title: "Data Scientist")
+    matched.audit_events.create!(
+      event_type: ManualJobPostImporter::MATCH_EVENT_TYPE,
+      metadata: { "status" => ManualJobPostImporter::IMPORT_ALREADY_TRACKED }
+    )
+
+    report = described_class.new(dry_run: false).call
+
+    expect(report.preserved).to eq(1)
+    expect(report.removed).to eq(0)
+    expect(matched.reload.lifecycle_state).to eq("active")
+  end
 end
