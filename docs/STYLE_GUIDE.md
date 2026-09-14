@@ -35,7 +35,9 @@ source of truth; the stylesheet is `web/public/app.css`, linked from `web/index.
 > copied into the repo with no Radix, `cva`, `clsx`, or `tailwind-merge` runtime dependency — the same
 > self-hosting policy as the font and brand logos. They use only token utilities, so they inherit the
 > paper/sage palette above. `Select` is a native `<select>` (OS picker on phones) and `Dialog`/`Sheet`
-> wrap the native `<dialog>`. No shipped screen renders them yet; `ui.test.tsx` pins the dependency list.
+> wrap the native `<dialog>`. The jobs feed's filter drawer (`UI-03`) is the first screen using `Dialog`: a trigger with the
+> active-filter count opens a native modal `.job-filters-drawer`, bottom-anchored on narrow layouts and
+> right-anchored inside the 800px container query; `ui.test.tsx` pins the dependency list.
 >
 > The class *suffixes* this file specifies — `.job-score--high|mid|low|pending`,
 > `.job-status--active|backlog|removed`, `.tracker-row--<group>` — plus the brand-logo paths
@@ -210,7 +212,11 @@ figures where possible.
   (new, already tracked, already submitted, or possible match) and link to the returned record.
 - Inputs and textareas use warm surface fill, strong hairline border, 12px radius, and a
   visible sage focus ring.
-  The `FE-28` parity gate checks primary-button rings with a keyboard Tab walk and computed
+  Every sage-filled button (and the vendored `Button`) uses `--focus-ring-strong` — a surface gap
+  inside a strong sage outer ring — because the soft sage `--focus-ring` disappears against a sage
+  fill (`UI-03`, replacing the Go build's `.login-submit`-only override). Verify with a keyboard Tab
+  walk and computed `box-shadow`.
+  The `FE-28` parity gate checked primary-button rings with a keyboard Tab walk and computed
   `box-shadow`, not with a screenshot taken right after `focus()`.
 - Error and success messages use soft status pills. Loading uses a gentle opacity pulse.
 - Empty feed/list states (`.digest-empty`, `.job-list-empty`, `.tracker-empty`,

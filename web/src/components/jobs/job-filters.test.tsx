@@ -78,7 +78,7 @@ function renderPanel(selection: Partial<JobFilterSelection> = {}) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* The collapsed panel                                                         */
+/* The filter drawer                                                           */
 /* -------------------------------------------------------------------------- */
 
 describe("the filter panel", () => {
@@ -97,12 +97,40 @@ describe("the filter panel", () => {
     ]);
   });
 
-  it("is collapsed by default, so the controls do not push the feed off a phone screen", () => {
+  it("keeps the drawer closed by default, so the controls do not push the feed off a phone screen", () => {
     const { container } = renderPanel();
 
-    const panel = container.querySelector<HTMLDetailsElement>(".job-filters-panel");
-    expect(panel).not.toBeNull();
-    expect(panel?.open).toBe(false);
+    const drawer = container.querySelector<HTMLDialogElement>(".job-filters-drawer");
+    expect(drawer).not.toBeNull();
+    expect(drawer?.open).toBe(false);
+    expect(container.querySelector(".job-filters-summary")).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+  });
+
+  it("opens the drawer from the trigger and closes it with Done", () => {
+    const { container } = renderPanel();
+    const trigger = container.querySelector(".job-filters-summary") as HTMLButtonElement;
+    const drawer = container.querySelector(".job-filters-drawer") as HTMLDialogElement;
+
+    fireEvent.click(trigger);
+    expect(drawer.open).toBe(true);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.click(container.querySelector(".job-filters-close") as HTMLButtonElement);
+    expect(drawer.open).toBe(false);
+  });
+
+  it("closes the drawer on Escape (the dialog's cancel event)", () => {
+    const { container } = renderPanel();
+    const drawer = container.querySelector(".job-filters-drawer") as HTMLDialogElement;
+
+    fireEvent.click(container.querySelector(".job-filters-summary") as HTMLButtonElement);
+    expect(drawer.open).toBe(true);
+
+    fireEvent(drawer, new Event("cancel", { cancelable: true }));
+    expect(drawer.open).toBe(false);
   });
 
   it("labels the summary with the same words jobs.go used", () => {
@@ -132,7 +160,7 @@ describe("the filter panel", () => {
   });
 
   it("renders every control, collapsed or not", () => {
-    // <details> keeps its children mounted, which is why the panel needs no open/closed state.
+    // The native <dialog> keeps its children mounted while closed.
     const { container } = renderPanel();
 
     for (const selector of [

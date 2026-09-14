@@ -13,13 +13,15 @@
  * `OnClick` handlers to be testable at all (AGENTS.md 2026-06-13). Here they are `lib/`
  * functions (`changeSelection`, `clearFilters`), so the handlers below are one line each.
  *
- * ## The panel is collapsed by default, and that is a mobile decision
+ * ## The filters live in a drawer (UI-03)
  *
- * Six controls expanded above the feed push every row off a phone screen, so they live in a
- * native `<details>` with an active-filter count on the summary — no JavaScript, no open/closed
- * state to keep, and the browser's own disclosure semantics for a screen reader. `<details>`
- * keeps its children mounted while closed, so the rendered markup is the same either way and a
- * test does not have to open the panel to assert on a control.
+ * Six controls expanded above the feed push every row off a phone screen, so a trigger button
+ * (with the active-filter count) opens them in the vendored `Dialog` — a native modal `<dialog>`,
+ * so focus trapping, Escape-to-close, and focus return to the trigger come from the browser. The
+ * dialog keeps its children mounted while closed, so the rendered markup is the same either way
+ * and a test does not have to open the drawer to assert on a control. `app.css` anchors it to the
+ * bottom edge, and to the right edge inside the desktop container query. This replaced the Go
+ * build's native `<details>` panel; the `waunder.jobFilters` selection shape is untouched.
  *
  * ## The bin tabs are not here
  *
@@ -28,7 +30,9 @@
  * faithfully), so that task adds a control over state that already exists rather than widening
  * this contract.
  */
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+
+import { Dialog } from "../ui/dialog";
 import {
   SCORE_BAND_OPTIONS,
   SORT_OPTIONS,
@@ -55,99 +59,128 @@ export function JobFilters({ selection, onChange, children }: JobFiltersProps) {
     onChange(changeSelection(selection, patch));
   };
   const active = activeFilterCount(selection);
+  const [open, setOpen] = useState(false);
 
   return (
     <>
       <ViewSelector view={selection.view} onSelect={(view) => change({ view })} />
       {children}
-      <details className="job-filters-panel">
-        <summary className="job-filters-summary">
-          <span className="job-filters-summary-label">Filters &amp; sort</span>
-          {active > 0 ? <span className="job-filters-summary-count">{active}</span> : null}
-        </summary>
-        <div className="job-filters">
-          <label className="job-filter">
-            <span>Score</span>
-            <select
-              className="job-filter-score-band"
-              value={selection.scoreBand}
-              onChange={(event) => change({ scoreBand: event.target.value as ScoreBandFilter })}
-            >
-              {SCORE_BAND_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="job-filter">
-            <span>Source</span>
-            <select
-              className="job-filter-source"
-              value={selection.source}
-              onChange={(event) => change({ source: event.target.value })}
-            >
-              {SOURCE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="job-filter">
-            <span>Location</span>
-            <input
-              className="job-filter-location"
-              type="search"
-              placeholder="e.g. Vancouver"
-              value={selection.location}
-              onChange={(event) => change({ location: event.target.value })}
-            />
-          </label>
-          <label className="job-filter">
-            <span>From</span>
-            <input
-              className="job-filter-date-from"
-              type="date"
-              value={selection.dateFrom}
-              onChange={(event) => change({ dateFrom: event.target.value })}
-            />
-          </label>
-          <label className="job-filter">
-            <span>To</span>
-            <input
-              className="job-filter-date-to"
-              type="date"
-              value={selection.dateTo}
-              onChange={(event) => change({ dateTo: event.target.value })}
-            />
-          </label>
-          <label className="job-filter">
-            <span>Sort</span>
-            <select
-              className="job-filter-sort"
-              value={selection.sort}
-              onChange={(event) => change({ sort: event.target.value as FeedSort })}
-            >
-              {SORT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+      <div className="job-filters-panel">
         <button
-          className="job-filters-reset"
           type="button"
-          disabled={active === 0}
+          className="job-filters-summary"
+          aria-haspopup="dialog"
+          aria-expanded={open}
           onClick={() => {
-            onChange(clearFilters(selection));
+            setOpen(true);
           }}
         >
-          Reset filters
+          <span className="job-filters-summary-label">Filters &amp; sort</span>
+          {active > 0 ? <span className="job-filters-summary-count">{active}</span> : null}
         </button>
-      </details>
+        <Dialog
+          open={open}
+          onClose={() => {
+            setOpen(false);
+          }}
+          title="Filters & sort"
+          className="job-filters-drawer"
+        >
+          <div className="job-filters">
+            <label className="job-filter">
+              <span>Score</span>
+              <select
+                className="job-filter-score-band"
+                value={selection.scoreBand}
+                onChange={(event) => change({ scoreBand: event.target.value as ScoreBandFilter })}
+              >
+                {SCORE_BAND_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="job-filter">
+              <span>Source</span>
+              <select
+                className="job-filter-source"
+                value={selection.source}
+                onChange={(event) => change({ source: event.target.value })}
+              >
+                {SOURCE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="job-filter">
+              <span>Location</span>
+              <input
+                className="job-filter-location"
+                type="search"
+                placeholder="e.g. Vancouver"
+                value={selection.location}
+                onChange={(event) => change({ location: event.target.value })}
+              />
+            </label>
+            <label className="job-filter">
+              <span>From</span>
+              <input
+                className="job-filter-date-from"
+                type="date"
+                value={selection.dateFrom}
+                onChange={(event) => change({ dateFrom: event.target.value })}
+              />
+            </label>
+            <label className="job-filter">
+              <span>To</span>
+              <input
+                className="job-filter-date-to"
+                type="date"
+                value={selection.dateTo}
+                onChange={(event) => change({ dateTo: event.target.value })}
+              />
+            </label>
+            <label className="job-filter">
+              <span>Sort</span>
+              <select
+                className="job-filter-sort"
+                value={selection.sort}
+                onChange={(event) => change({ sort: event.target.value as FeedSort })}
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="job-filters-drawer-footer">
+            <button
+              className="job-filters-reset"
+              type="button"
+              disabled={active === 0}
+              onClick={() => {
+                onChange(clearFilters(selection));
+              }}
+            >
+              Reset filters
+            </button>
+            <button
+              type="button"
+              className="job-filters-close"
+              onClick={() => {
+                setOpen(false);
+              }}
+            >
+              Done
+            </button>
+          </div>
+        </Dialog>
+      </div>
     </>
   );
 }

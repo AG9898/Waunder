@@ -94,6 +94,7 @@
   --shadow-sm: 0 1px 2px rgba(45,44,44,.04), 0 1px 3px rgba(45,44,44,.05);
   --shadow-md: 0 2px 6px rgba(45,44,44,.05), 0 10px 28px rgba(45,44,44,.06);
   --focus-ring: 0 0 0 3px rgba(94,125,106,.30);
+  --focus-ring-strong: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-accent-strong);
 
   /* Layout */
   --page-max: 560px;
@@ -1185,7 +1186,9 @@ button { font-family: inherit; }
   box-shadow: var(--focus-ring);
 }
 
-/* Jobs feed — collapsible filter + sort panel */
+/* Jobs feed — filter + sort drawer (UI-03). The trigger keeps the old summary's
+   look; the controls live in a native <dialog> anchored to the bottom edge on
+   narrow layouts and the right edge inside the desktop container query. */
 .job-filters-panel {
   margin: 0 0 var(--space-5);
   border: 1px solid var(--color-border);
@@ -1193,29 +1196,66 @@ button { font-family: inherit; }
   background: var(--color-surface);
 }
 .job-filters-summary {
+  appearance: none;
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  width: 100%;
   padding: 10px var(--space-4);
+  border: 0;
+  background: transparent;
+  font-family: inherit;
   font-size: var(--text-sm);
   font-weight: 600;
   color: var(--color-ink);
   cursor: pointer;
-  list-style: none;
+  text-align: left;
   user-select: none;
 }
-.job-filters-summary::-webkit-details-marker { display: none; }
 .job-filters-summary::after {
-  content: "▾";
+  content: "›";
   margin-left: auto;
   color: var(--color-ink-soft);
-  transition: transform .14s ease;
 }
-.job-filters-panel[open] .job-filters-summary::after { transform: rotate(180deg); }
 .job-filters-summary:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: var(--radius-md);
+}
+.job-filters-drawer {
+  position: fixed;
+  inset: auto 0 0 0;
+  width: 100%;
+  max-width: none;
+  max-height: 85dvh;
+  margin: 0;
+  padding: var(--space-4) 0 calc(var(--space-4) + env(safe-area-inset-bottom));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--color-surface);
+  overflow-y: auto;
+}
+.job-filters-drawer::backdrop { background: rgba(45,44,44,.32); }
+.job-filters-drawer > h2 { margin: 0 var(--space-4) var(--space-3); }
+.job-filters-drawer-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
+}
+.job-filters-drawer-footer .job-filters-reset { margin: 0; }
+.job-filters-close {
+  appearance: none;
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: #fff;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
 }
 .job-filters-summary-count {
   display: inline-flex;
@@ -2009,12 +2049,27 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
 }
 .login-status { text-align: center; }
 
-/* The shared sage-soft :focus-visible ring is too low-contrast against the
-   sage-filled primary button itself (.login-submit) to read as a focus
-   indicator. Layer a light inset ring under the sage outer ring so keyboard
-   focus stays visible on this screen's only interactive button. */
-.login-submit:focus-visible {
-  box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-accent-strong);
+/* The shared sage-soft :focus-visible ring is too low-contrast against any
+   sage-filled button. Every sage-filled control gets a two-layer ring: a
+   surface gap inside a strong sage outer ring (UI-03). */
+.login-submit:focus-visible,
+.manual-entry-submit:focus-visible,
+.draft-submit-button:focus-visible,
+.draft-preview-save:focus-visible,
+.job-apply-button:focus-visible,
+.job-cover-letter-generate:focus-visible,
+.profile-save:focus-visible,
+.contact-outreach-generate:focus-visible,
+.intake-toggle:focus-visible,
+.push-toggle-enable:focus-visible,
+.job-list-score-button:focus-visible,
+.enable-notifications:focus-visible,
+.job-filters-close:focus-visible,
+.job-list-import:focus-visible,
+.manual-application .job-route-link:focus-visible,
+[data-slot="button"]:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring-strong);
 }
 
 /* --------------------------------------------------------------------------
@@ -2196,7 +2251,14 @@ html { scroll-padding-bottom: var(--screen-bottom); }
 @container (min-width: 800px) {
   .job-feed-workspace { grid-template-columns: 260px minmax(0, 1fr); align-items: start; gap: 32px; }
   .job-feed-controls { position: sticky; top: 24px; }
-  .job-feed-controls .job-filters { grid-template-columns: minmax(0, 1fr); }
+  .job-filters-drawer {
+    inset: 0 0 0 auto;
+    width: min(360px, 100%);
+    max-height: none;
+    height: 100dvh;
+    border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+  }
+  .job-filters-drawer .job-filters { grid-template-columns: minmax(0, 1fr); }
   .job-list-items { gap: 20px; }
   .job-list-link { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) auto; padding: 18px 20px; }
   .job-list-link .job-title { grid-column: 1; grid-row: 1 / span 2; }

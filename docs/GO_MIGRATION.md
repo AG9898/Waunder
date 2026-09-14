@@ -74,8 +74,8 @@ is application architecture bent around a framework limitation.
 ### 4. Library ecosystem — the original motivation
 
 The screens that remain unsatisfying are exactly the ones that want mature components: the tracker
-and all-jobs tables (sorting, column visibility, virtualization), the filter panel (currently a
-native `<details>`), and interaction feedback (currently inline error paragraphs).
+and all-jobs tables (sorting, column visibility, virtualization), the filter panel (a native `<details>` in the
+Go build; a native-`<dialog>` drawer since `UI-03`, with no `vaul` dependency), and interaction feedback (currently inline error paragraphs).
 
 ---
 

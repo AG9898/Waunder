@@ -2991,7 +2991,7 @@
       "id": "UI-03",
       "title": "Replace the jobs feed filter panel with a drawer",
       "description": "Move the jobs feed filters out of the native details/summary panel into a proper drawer, which is the first interaction the go-app version could not do well. The persisted filter shape must not change: waunder.jobFilters keeps the same key and JSON so a saved selection still loads. Fix the focus-visible ring on the sage primary buttons properly while here, rather than the single narrow override the Go version carried.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "UI",
       "depends_on": [
