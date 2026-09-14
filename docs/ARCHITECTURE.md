@@ -145,6 +145,18 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 > drafts, and the saves. Rails' 503 `llm_unavailable` and 502 `generation_failed` render as distinct
 > messages, and a saved contact appears by re-reading the list rather than being inserted locally.
 >
+> The shadow client's application tracker (`client/src/components/tracker/`) is the same
+> `GET /api/job_posts` read the Go `ApplicationsView` makes, with `status=all` and `state=open` sent
+> explicitly on every request — the feed's scored-only default would otherwise hide the
+> triage-deferred postings the owner may still have applied to — plus the chosen group
+> (`application`), bin, sort, and page. The group tab totals and the header's "Applied to" / "Jobs
+> tracked" figures come from Rails' `application_counts`, never from counting rows. One `<table>`
+> renders as self-labelling cards below the 800px container query and as a real table inside it, so
+> it follows the selected layout rather than the viewport. A row's status select writes `PATCH
+> /api/job_posts/:id/application_status` with a blank stage and no note or follow-up date, reaches no
+> draft or submit endpoint, and then invalidates and refetches the feed, because a status change can
+> move the row out of the active tab and changes every tab's total.
+>
 > The auth model is unchanged and stays entirely server-side, but the client's half of it is now in
 > one place. Because the session cookie is httponly, being signed out can only be derived from
 > responses, so `client/src/lib/auth.ts` subscribes to both TanStack caches and sends the owner to

@@ -28,7 +28,7 @@
  * ## Placeholders
  *
  * Every element below is a placeholder until its screen task lands (`FE-16` … `FE-26`; the
- * task id is on each route — `/`, `/login`, `/jobs`, `/jobs/:id`, and `/jobs/:id/contacts` are
+ * task id is on each route — `/`, `/login`, `/jobs`, `/jobs/:id`, `/jobs/:id/contacts`, and `/applications` are
  * ported, so they carry none). A
  * placeholder carries the **real root class** the Go screen renders, because that class is what
  * `public/app.css` styles the page container with and what the parity gate compares.
@@ -49,6 +49,7 @@ import { IngestionBatchesScreen } from "./components/ingestion-batches/ingestion
 import { JobDetailScreen } from "./components/job-detail/job-detail";
 import { JobList } from "./components/jobs/job-list";
 import { LoginScreen } from "./components/login";
+import { TrackerScreen } from "./components/tracker/tracker";
 
 /**
  * A stand-in for a screen that has not been ported yet. `rootClass` is the screen's
@@ -88,7 +89,7 @@ export const routes: RouteObject[] = [
   { path: "/jobs/new", element: placeholder("manual-entry", "Import a job", "FE-23") },
   { path: "/jobs/:id", element: <JobDetailScreen /> },
   { path: "/jobs/:id/contacts", element: <ContactsScreen /> },
-  { path: "/applications", element: placeholder("applications", "Applications", "FE-22") },
+  { path: "/applications", element: <TrackerScreen /> },
   { path: "/applications/:id", element: placeholder("draft-review", "Draft review", "FE-26") },
   { path: "/profile", element: placeholder("profile", "Profile", "FE-25") },
   { path: "*", element: notFoundScreen() },

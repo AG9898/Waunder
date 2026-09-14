@@ -31,6 +31,16 @@ source of truth; the stylesheet is integrated through go-app's `app.Handler`.
 > are produced by `client/src/lib/labels.ts` in the ported app (`web/components/client.go` in
 > production), with identical thresholds and strings. Renaming a band or a state there
 > silently unstyles a pill, so treat those return values as part of this style contract.
+>
+> The tracker's responsive table carries its markup contract into
+> `client/src/components/tracker/` unchanged: one `<table class="tracker-table">`, a `data-label` on
+> every `.tracker-cell` that matches its column header (the only label a phone shows),
+> `.tracker-cell-job` as every row's leading cell (it paints the group tint in table mode), and
+> `tracker-row tracker-row--<group>` from `trackerRowClass`. `tracker.test.tsx` parses `app.css` to
+> pin the rules that markup depends on — the `attr(data-label)` card labels, the explicit table
+> display values inside the 800px container query, and the inset box-shadow tint — so restyling the
+> tracker means updating that test deliberately. A pipeline stage with no label renders no
+> `.tracker-stage` pill rather than an empty one.
 
 ---
 

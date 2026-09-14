@@ -2600,7 +2600,7 @@
       "id": "FE-22",
       "title": "Port the application tracker table",
       "description": "Port web/components/applications.go: one table over GET /api/job_posts with status=all and state=open, with each job's latest application attached by Rails. Group tabs come from application_counts. One markup renders as self-labelling cards on mobile and a real table inside the existing container query, so it follows the selected layout rather than the viewport. Note that status must be sent explicitly as all: leaving it unset gets the scored-only default, which is what made this table render empty before.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FE",
       "depends_on": [

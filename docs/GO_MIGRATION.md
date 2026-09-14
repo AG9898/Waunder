@@ -1096,6 +1096,57 @@ Five things this pass settled:
 
 ---
 
+## The application tracker — done (`FE-22`)
+
+`client/src/components/tracker/` is `/applications`: `tracker.tsx` (the read, the header stats, the group
+tabs, the bin and sort selects, the table with Prev/Next, and the status write every row shares) and
+`tracker-row.tsx` (one `<tr>` and its status control). `src/lib/tracker.ts` holds the pure half:
+`trackerParams`, the tab/bin/sort option tables and their page-resetting transitions,
+`trackerEmptyMessage`, `trackerStatusValue` / `trackerStageLabel`, `trackerRowClass`, and
+`trackerDate` / `trackerUpdatedLabel`. The selection is local state, not `localStorage` — Go never
+persisted it.
+
+Five things this pass settled:
+
+- **`status=all` is asserted on the wire, not in a params object.** `trackerParams` always sets
+  `status: "all"` and the bin (`open` by default), and the All tab sends no `application` parameter at
+  all rather than a sentinel. Leaving `status` unset is exactly what rendered the Go table empty in
+  production (the server default is scored-only and triage leaves most postings unscored), and a green
+  spec with scored fixtures could not see it. `tracker.test.tsx` asserts `URLSearchParams.has("status")`
+  on the first request; deleting the field from `trackerParams` fails four tests, which was checked by
+  mutation rather than assumed.
+- **One markup, two layouts, proven half in the DOM and half in the stylesheet.** The screen renders
+  exactly one `<table>`; every `<td>` carries a `data-label` equal to its column's `<th>`, the title cell
+  leads every row as `.tracker-cell-job`, and each row's class is `tracker-row tracker-row--<group>`.
+  jsdom has no layout, so the test parses `public/app.css`: the unconditional rules paint
+  `content: attr(data-label)` and visually hide the header; inside `@container (min-width: 800px)` the
+  table, header group, row group, row, and cell get explicit `table` / `table-header-group` /
+  `table-row-group` / `table-row` / `table-cell` values and no tracker rule anywhere uses `revert`; the
+  group tint is `inset 3px 0 0 <colour>` on `.tracker-row--<group> .tracker-cell-job`, with no
+  `border-left` on a row selector in that block; and no `@media` block mentions the tracker, so the
+  switch follows the selected layout through the `.applications` container rather than the viewport.
+- **A status write invalidates, and waits for the refetch.** A row's select sends
+  `{pipeline_status, pipeline_stage: ""}` to `PATCH /api/job_posts/:id/application_status` (a blank stage
+  asks Rails for that status's default; note and follow-up stay absent), then invalidates `jobs.root()`
+  and `applications.root()` and awaits both. Every status select stays disabled — with `Saving…` on
+  the edited row only — until the refetched page lands, and that refetch is what moves a row out of the
+  "Not applied" tab and updates every tab's total. `FE-20`'s `useTrackerWrite` is not reused: it binds
+  one job id per hook, while this screen needs one in-flight flag shared by every row, as Go's
+  `savingID` was. The "Not applied" placeholder, and an empty value, are never writes.
+- **The totals stay on screen while a new tab loads; the rows do not.** `placeholderData:
+  keepPreviousData` keeps the previous page's `application_counts` in the header stats and the tabs,
+  and `isPlaceholderData` renders `Loading…` in place of the rows. That is Go's behaviour — `load()`
+  set the rows loading and left `counts` alone — without showing one tab's rows under another tab.
+- **`trackerDate` reads the literal too, and Go's RFC 3339 parser is its own dialect.** The case table
+  in the test is output from running the Go original under Go 1.26: lowercase `t`/`z` are refused, a
+  fraction may use `,` but needs a digit, offsets up to `+24:00` and a minute of `60` parse, U+00A0 is
+  trimmed while U+FEFF is not (so the port cannot use `String.prototype.trim`), and year `0000` parses
+  — which is why the day range is counted by hand rather than through `Date.UTC`, whose years 0–99
+  land in the 1900s. One deliberate difference from Go: a stage with no label renders no `.tracker-stage`
+  pill, where Go painted an empty one.
+
+---
+
 ## Service worker handoff
 
 **This is the highest-risk item in the migration.** Without explicit handling, the installed PWA

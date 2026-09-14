@@ -1465,3 +1465,15 @@ request the real `fetch` path sent, so the test asserts the exact sequence rathe
 counts. And `client/src/api/keys.ts`'s mutation → invalidation table is a plan, not a contract: its
 `generateOutreach` row named a read that never carries drafts, so check the Rails serializer before
 wiring an invalidation from it.
+
+### 2026-09-13 — Tracker port: keepPreviousData for the totals, and Go's RFC 3339 is its own dialect
+FE-22's tracker keeps `application_counts` on screen during a tab switch with
+`placeholderData: keepPreviousData` and renders `Loading…` for the rows while `isPlaceholderData` is
+true, which reproduces Go's "rows loading, counts untouched" without showing one tab's rows under
+another; its status write awaits the invalidation, so one in-flight flag disables every row's select
+until the refetch lands. Running the Go original showed `time.Parse(time.RFC3339, …)` (Go 1.26)
+refuses lowercase `t`/`z`, accepts a `,` fraction and offsets up to `+24:00` with a minute of 60, and
+`strings.TrimSpace` strips U+00A0 but not U+FEFF — so port it with an explicit regex and a hand-rolled
+trim, never `trim()` or `Date.UTC` (which maps years 0–99 onto the 1900s). `formatBatchTime` in
+`client/src/lib/ingestion-batches.ts` accepts `[Tt]`/`[Zz]` where Go refuses them: harmless while Rails
+sends uppercase, but not byte-for-byte Go. Go is installed at `/usr/local/go/bin/go`, not on `PATH`.
