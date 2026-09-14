@@ -25,26 +25,22 @@
  *   own not-found state from the 404. Rails stays the authority on whether an id exists,
  *   which it already was for `/jobs/999999`.
  *
- * ## Placeholders
+ * ## Root classes
  *
- * Every element below is a placeholder until its screen task lands (`FE-16` … `FE-26`; the
- * task id is on each route — `/`, `/login`, `/jobs`, `/jobs/new`, `/jobs/:id`, `/jobs/:id/contacts`, `/applications`, and `/profile`
- * are ported, so they carry none). A
- * placeholder carries the **real root class** the Go screen renders, because that class is what
- * `public/app.css` styles the page container with and what the parity gate compares.
- * Keeping it here means the route test asserts the same thing before and after each port:
- * swapping a placeholder for the real screen is a one-line change in this file and no
- * change in the test, and a ported screen that drops its root class fails immediately
- * rather than at the screenshot gate.
+ * All nine screens are ported (`FE-15` … `FE-26`). Each renders the **real root class** the Go
+ * screen rendered, because that class is what `public/app.css` styles the page container with
+ * and what the parity gate compares; `routes.test.tsx` asserts it per path, so a screen that
+ * drops its root class fails there rather than at the screenshot gate.
  *
- * The two helpers below are deliberately lowercase element factories, not React
- * components: they are called once while this module initializes, so nothing here has
- * state, hooks, or a render of its own to keep this file pure route data.
+ * The not-found helper below is deliberately a lowercase element factory, not a React
+ * component: it is called once while this module initializes, so nothing here has state,
+ * hooks, or a render of its own to keep this file pure route data.
  */
 import { Link } from "react-router";
 import type { RouteObject } from "react-router";
 
 import { ContactsScreen } from "./components/contacts/contacts";
+import { DraftReviewScreen } from "./components/draft-review/draft-review";
 import { IngestionBatchesScreen } from "./components/ingestion-batches/ingestion-batches";
 import { JobDetailScreen } from "./components/job-detail/job-detail";
 import { JobList } from "./components/jobs/job-list";
@@ -52,19 +48,6 @@ import { LoginScreen } from "./components/login";
 import { ManualEntryScreen } from "./components/manual-entry/manual-entry";
 import { ProfileScreen } from "./components/profile/profile";
 import { TrackerScreen } from "./components/tracker/tracker";
-
-/**
- * A stand-in for a screen that has not been ported yet. `rootClass` is the screen's
- * page-container class from `app.css`; `task` names the workboard task that replaces it.
- */
-function placeholder(rootClass: string, title: string, task: string) {
-  return (
-    <div className={rootClass}>
-      <h1>{title}</h1>
-      <p>Not ported yet — this screen arrives in {task}.</p>
-    </div>
-  );
-}
 
 /**
  * Rendered for any path outside the nine. go-app had no equivalent: an unrouted path
@@ -92,7 +75,7 @@ export const routes: RouteObject[] = [
   { path: "/jobs/:id", element: <JobDetailScreen /> },
   { path: "/jobs/:id/contacts", element: <ContactsScreen /> },
   { path: "/applications", element: <TrackerScreen /> },
-  { path: "/applications/:id", element: placeholder("draft-review", "Draft review", "FE-26") },
+  { path: "/applications/:id", element: <DraftReviewScreen /> },
   { path: "/profile", element: <ProfileScreen /> },
   { path: "*", element: notFoundScreen() },
 ];

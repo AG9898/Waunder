@@ -2730,7 +2730,7 @@
       "id": "FE-26",
       "title": "Port the draft review and submit screen",
       "description": "Port web/components/draft.go: GET /api/applications/:id renders draft_ready, autofill_warnings, failure_reason, the latest worker report context, and the worker-shaped autofill payload. Reviewed answers are editable and saved through PATCH /api/applications/:id/draft, while Rails-owned ATS, apply URL, and resume metadata stay read-only. Submit stays disabled until the draft is ready and warnings are clear; Rails' dispatcher remains the final safety gate and the client must never bypass it.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FE",
       "depends_on": [

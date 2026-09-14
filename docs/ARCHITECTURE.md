@@ -182,6 +182,17 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 > the owner must act outside the app (add to Home Screen, update iOS), and renders the sign-out
 > control. Nothing writes on render.
 >
+> The shadow client's draft review (`client/src/components/draft-review/`) reads
+> `GET /api/applications/:id` and renders `draft_ready`, the autofill warnings, the worker's failure
+> reason and last report, and the worker-shaped preview. Only the answer values are editable, and
+> `PATCH /api/applications/:id/draft` carries `answers` alone, so the ATS, apply URL, and resume
+> reference stay Rails-owned. `POST /api/applications/:id/submit` is sent only from the explicit
+> approve-and-submit click, which stays disabled until the draft is ready, every answer is filled,
+> and Rails reports no warnings. Unsaved edits are saved first, and the submit is sent only if
+> Rails' saved draft still passes that check. Rails' dispatcher remains the final gate, and its
+> refusal codes render as sentences. Nothing is submitted or saved on render, and a non-`http(s)`
+> apply URL renders as text rather than a link.
+>
 > The auth model is unchanged and stays entirely server-side, but the client's half of it is now in
 > one place. Because the session cookie is httponly, being signed out can only be derived from
 > responses, so `client/src/lib/auth.ts` subscribes to both TanStack caches and sends the owner to

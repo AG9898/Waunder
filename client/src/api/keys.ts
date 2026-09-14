@@ -35,7 +35,8 @@
  * | `setJobLifecycle` | `jobs.root()`, `digest()`, `ingestionBatches.root()` |
  * | `generateCoverLetter` | `jobs.coverLetter(id)` |
  * | `createApplication` | `applications.root()`, `jobs.detail(id)`, `jobs.list()` prefix via `jobs.root()` |
- * | `updateApplicationDraft`, `submitApplication` | `applications.draft(id)`, `jobs.root()` |
+ * | `updateApplicationDraft` | `jobs.root()`; its answer is the refreshed draft, written into `applications.draft(id)` directly |
+ * | `submitApplication` | `applications.draft(id)`, `jobs.root()` |
  * | `updateJobApplicationStatus` | `jobs.root()`, `applications.root()` |
  * | `updateProfile` | none — its answer is the refreshed profile, written into `profile()` directly |
  * | `createContact` | `jobs.contacts(jobId)` |

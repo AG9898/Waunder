@@ -1513,3 +1513,13 @@ with `await act(() => delay(20))` when nothing visible is supposed to change. Se
 mount `InstallGuide` unconditionally beside `PushToggle`: the guide reads notification *permission*
 and the toggle reads the *subscription*, so after an unsubscribe they contradict each other
 (`showInstallGuide` limits the guide to the two iOS gates).
+
+### 2026-09-14 — React Compiler lint rejects a memoized multi-mutation handler; the chrome has a select
+FE-26's approve-and-submit handler awaits two mutations in sequence, and wrapping it in `useCallback`
+fails `npm run lint` with `react-hooks/preserve-manual-memoization` ("this dependency may be
+modified later"); a plain `async` function in the component body is the fix, and TanStack's
+`mutateAsync` keeps both errors in the mutation cache so the 401 redirect still fires. Separately,
+`AppChrome` renders the layout `<select>`, so an "only these controls are editable" assertion must be
+scoped below the chrome (`.draft-body`), not to the whole screen container. A screen that lets the
+owner edit server-owned data should show the server's copy until the first edit rather than seeding
+once, or a focus refetch that completes an in-progress draft never reaches the screen.

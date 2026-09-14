@@ -633,7 +633,7 @@ No Go toolchain, no `go.mod`, no `Makefile`, no `app.wasm`.
 | `web/components/jobs.go` — `JobDetailView` | ~570 | `src/components/job-detail/` |
 | `web/components/jobs.go` — `DigestView` | ~450 | `src/components/ingestion-batches/` |
 | `web/components/applications.go` | 653 | `src/components/tracker/` |
-| `web/components/draft.go` | 576 | `src/components/draft-review/` |
+| `web/components/draft.go` | 576 | `src/components/draft-review/` + `src/lib/draft-review.ts` |
 | `web/components/manual_entry.go` | 477 | `src/components/manual-entry/` + `src/lib/manual-entry.ts` |
 | `web/components/contacts.go` | 325 | `src/components/contacts/` + `src/lib/contacts.ts` |
 | `web/components/push.go` + `push_browser.go` | 427 | `src/components/push-toggle.tsx` + `src/lib/push.ts` (244 lines of code; the `FuncOf`/`Release`/promise-to-channel `await` adapter disappears) |
@@ -1298,6 +1298,52 @@ One correction to earlier notes: the push toggle is **not** inside `<form classN
 `profile.go` renders it as a sibling of the form in `.profile-body`, so `FE-13`'s `type="button"` is
 defensive rather than necessary; the comments in `push-toggle.tsx` and `install-guide.tsx` now say
 so.
+
+## The draft review and submit — done (`FE-26`)
+
+`client/src/components/draft-review/draft-review.tsx` is the screen, `autofill-answers.tsx` is the
+autofill preview (ATS, apply URL, warnings, the editable answers, and the save), and
+`src/lib/draft-review.ts` holds the pure half (`draftHeading`, `draftReady`, `autofillReady`,
+`autofillPresent`, `canSubmit`, the button and note labels, `submitResultLabel`, `warningFor`, and
+`showWorkerReport`); `submitErrorMessage`, `draftSaveErrorMessage`, and `blockedSubmitMessage` join
+`src/lib/messages.ts`. Markup, classes, and copy are Go's, including the collapsed
+`<details class="draft-automation">` holding the preview, the worker report, and `.draft-submit`.
+All nine routes are now ported, so `routes.tsx` has no placeholders left.
+
+Six things this pass settled:
+
+- **Submit is one explicit click, gated twice.** The button is disabled until `canSubmit` holds for
+  the answers *on screen* (Rails' `draft_ready`, an ATS, an apply URL, at least one answer, no blank
+  field or value by Go's `strings.TrimSpace`, and no `autofill_warnings`), and the handler re-checks
+  the same rule. Rails' `ApplicationSubmitDispatcher` is still the gate that matters; the screen only
+  renders its refusal codes as Go's sentences. The test proves by mutation that removing the client
+  gate fails the not-ready and warning cases, and that a submit fired from an effect fails the
+  zero-writes-after-render assertion.
+- **A dirty submit saves first and re-checks Rails' answer.** As in Go's `approveAndSubmit`, unsaved
+  edits are `PATCH`ed and the submit is sent only if the draft Rails returns still passes
+  `canSubmit`, because Rails recomputes the warnings from what it stored. One `SubmitPhase` spans
+  both requests; both run through `mutateAsync`, so a 401 from either still reaches the sign-in
+  redirect in `lib/auth.ts`.
+- **Answers follow Rails until the owner edits one.** Go fetched once. The query client refetches on
+  focus, and a draft opened while `GenerateApplicationDraftJob` is still running arrives empty, so a
+  seed-once form would keep showing "Preparing draft..." after Rails finished. The screen shows Rails'
+  answers until the first edit and the owner's from then until a save succeeds. The save's answer is
+  written into `applications.draft(id)` directly (`keys.ts`'s table now says so), and a failed
+  *refetch* keeps the draft on screen rather than swapping it for the load error.
+- **The submit result reads the status Rails returned.** Go hardcoded "dispatched". Rails answers
+  `dispatched`, for which `submitResultLabel` is Go's sentence byte for byte, and any other status is
+  rendered as sent. After a submit the draft and job queries are re-read rather than patched locally
+  the way Go's `applySubmitResult` set `applied`/`waiting`.
+- **The apply URL is filtered before it becomes a link.** Go rendered `apply_url` straight into an
+  `href`. Both the intro's `Open application` link and the `.draft-autofill-url` link now go through
+  the job detail's `externalApplicationURL`, and a non-`http(s)` URL renders as text in a
+  `<span class="draft-autofill-url">` instead. The URL is the link's text, so it relies on `app.css`'s
+  `.draft-autofill-url { word-break: break-all; }` to wrap at phone width, and the test parses that
+  rule out of the stylesheet. `rel="noopener noreferrer"` is added. A deliberate `FE-28` difference
+  only for a URL that was never safe to link.
+- **Only the answer values are editable.** The ATS, the apply URL, the resume reference, and each
+  answer's field name render as text, and `updateApplicationDraft` sends `answers` alone. The test
+  asserts the exact `PATCH` body and that `.draft-body` holds no `input` or `select`.
 
 ---
 

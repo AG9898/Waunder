@@ -207,3 +207,49 @@ export function profileSaveErrorMessage(error: unknown): string {
 export function lookupErrorMessage(error: unknown): string {
   return isUnauthorized(error) ? SESSION_EXPIRED : POSTING_UNREADABLE;
 }
+
+/** `blockedSubmitMessage` / `submitErrorStatus`'s sentence for a draft Rails has not finished. */
+const DRAFT_NOT_READY = "The draft is still being prepared. Try again in a moment.";
+/** The sentence for a payload Rails' dispatcher refused as unresolved or sensitive. */
+const MANUAL_REVIEW_REQUIRED = "Manual review is required before auto-submit.";
+/** `submitErrorStatus`'s `unsupported_ats` sentence. */
+const UNSUPPORTED_ATS = "Auto-submit is not supported for this application route.";
+/** `submitErrorStatus`'s `invalid_payload` sentence. */
+const INVALID_PAYLOAD = "The autofill preview needs review before submit.";
+/** `submitErrorStatus`'s message for any other refusal or failure. */
+const SUBMIT_FAILED = "Submit failed. Please try again.";
+/** `previewSaveErrorStatus`'s message for a failed `PATCH /api/applications/:id/draft`. */
+const DRAFT_SAVE_FAILED = "Could not save the autofill preview. Please try again.";
+
+/**
+ * A refused or failed `POST /api/applications/:id/submit`, keyed on the `error.code` Rails'
+ * `ApplicationSubmitDispatcher` answered with. Nothing reached the worker in any branch.
+ */
+export function submitErrorMessage(error: unknown): string {
+  if (isUnauthorized(error)) return SESSION_EXPIRED;
+  switch (apiErrorCode(error)) {
+    case "draft_required":
+      return DRAFT_NOT_READY;
+    case "unsafe_payload":
+      return MANUAL_REVIEW_REQUIRED;
+    case "unsupported_ats":
+      return UNSUPPORTED_ATS;
+    case "invalid_payload":
+      return INVALID_PAYLOAD;
+    default:
+      return SUBMIT_FAILED;
+  }
+}
+
+/** A failed save of the reviewed autofill answers: Rails still holds the previous answers. */
+export function draftSaveErrorMessage(error: unknown): string {
+  return isUnauthorized(error) ? SESSION_EXPIRED : DRAFT_SAVE_FAILED;
+}
+
+/**
+ * `blockedSubmitMessage`: why a submit stopped *before* reaching Rails' submit endpoint, because
+ * the answers Rails stored on the save that preceded it came back with warnings or incomplete.
+ */
+export function blockedSubmitMessage(hasWarnings: boolean): string {
+  return hasWarnings ? MANUAL_REVIEW_REQUIRED : DRAFT_NOT_READY;
+}

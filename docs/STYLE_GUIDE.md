@@ -189,6 +189,9 @@ figures where possible.
   the primary actions precede the assessment and secondary tracking/organization follows it.
   Draft generation and outreach live in an expandable section; draft-review materials have
   copy controls with success/blocked feedback, and automation controls are collapsed initially.
+  The autofill preview's apply URL is rendered as its own link text, so `.draft-autofill-url`
+  carries `word-break: break-all` to wrap at phone width; a URL that is not `http(s)` renders as
+  plain text in the same class rather than as a link.
   Existing notes/follow-up dates survive status-only edits; clearing a stage uses a real select
   sentinel mapped back to an empty API value (Rails still defaults Applied to Waiting).
 - Primary actions use sage filled buttons; secondary actions use outline/surface buttons.
