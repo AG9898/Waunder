@@ -1494,6 +1494,25 @@ button { font-family: inherit; }
   font-size: var(--text-xs);
   color: var(--color-ink-faint);
 }
+/* UI-04: header sort buttons, the Columns control, and virtualization spacers. */
+.tracker-sort {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.tracker-sort[data-sort="asc"]::after { content: " \2191"; }
+.tracker-sort[data-sort="desc"]::after { content: " \2193"; }
+.tracker-columns { margin: 0 0 var(--space-4); font-size: var(--text-sm); color: var(--color-ink-soft); }
+.tracker-columns summary { cursor: pointer; font-weight: 600; }
+.tracker-columns-list { display: flex; flex-wrap: wrap; gap: var(--space-3); padding-top: var(--space-2); }
+.tracker-column-toggle { display: flex; align-items: center; gap: 6px; }
+.tracker-spacer,
+.tracker-spacer td { display: block; padding: 0; border: 0; }
 .tracker-status-error {
   margin: 0 0 var(--space-4);
   padding: var(--space-3) var(--space-4);
@@ -2332,6 +2351,8 @@ html { scroll-padding-bottom: var(--screen-bottom); }
   .tracker-cell-status { padding-top: 11px; }
   .tracker-status { justify-content: flex-start; }
   .tracker-cell-date { white-space: nowrap; }
+  .tracker-spacer { display: table-row; }
+  .tracker-spacer td { display: table-cell; }
   .draft-materials { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 40px; align-items: start; }
   .draft-resume-emphasis { grid-column: 1 / -1; }
   .profile-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }

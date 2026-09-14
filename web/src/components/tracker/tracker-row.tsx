@@ -30,11 +30,12 @@
  * Every other choice goes up to the screen, which writes `PATCH
  * /api/job_posts/:id/application_status` — never a draft, never a submit.
  */
-import { type ChangeEvent, useCallback } from "react";
+import { type ChangeEvent, type Ref, useCallback } from "react";
 import { Link } from "react-router";
 
 import type { JobSummary } from "../../api/schemas";
 import { PIPELINE_STATUS_OPTIONS } from "../../lib/pipeline";
+import type { TrackerColumnId } from "../../lib/tracker-columns";
 import {
   NOT_APPLIED_OPTION,
   trackerDate,
@@ -46,6 +47,11 @@ import {
 
 export interface TrackerRowProps {
   job: JobSummary;
+  /** The visible columns, in order; the Job column is always first. */
+  columns: readonly TrackerColumnId[];
+  /** The row's position, for the virtualizer's measurement. */
+  index?: number;
+  ref?: Ref<HTMLTableRowElement>;
   /** True while *this* row's write is in flight, so only it says "Saving…". */
   saving: boolean;
   /** True while *any* row's write is in flight: one write at a time, as Go's `savingID` was. */
@@ -54,7 +60,15 @@ export interface TrackerRowProps {
   onStatusChange: (jobId: number, value: string) => void;
 }
 
-export function TrackerRow({ job, saving, disabled, onStatusChange }: TrackerRowProps) {
+export function TrackerRow({
+  job,
+  columns,
+  index,
+  ref,
+  saving,
+  disabled,
+  onStatusChange,
+}: TrackerRowProps) {
   const status = trackerStatusValue(job.application);
   const stage = trackerStageLabel(job.application);
 
@@ -66,47 +80,55 @@ export function TrackerRow({ job, saving, disabled, onStatusChange }: TrackerRow
   );
 
   return (
-    <tr className={trackerRowClass(job.application)}>
+    <tr ref={ref} data-index={index} className={trackerRowClass(job.application)}>
       <td className="tracker-cell tracker-cell-job" data-label="Job">
         <Link className="tracker-job-link" to={`/jobs/${job.id}`}>
           {job.title}
         </Link>
       </td>
-      <td className="tracker-cell tracker-cell-company" data-label="Company">
-        {job.company}
-      </td>
-      <td className="tracker-cell tracker-cell-status" data-label="Status">
-        <div className="tracker-status">
-          <select
-            className="tracker-status-select"
-            aria-label={`Application status for ${job.title}`}
-            disabled={disabled}
-            value={status}
-            onChange={onChange}
-          >
-            {status === NOT_APPLIED_OPTION ? (
-              <option value={NOT_APPLIED_OPTION}>Not applied</option>
+      {!columns.includes("company") ? null : (
+        <td className="tracker-cell tracker-cell-company" data-label="Company">
+          {job.company}
+        </td>
+      )}
+      {!columns.includes("status") ? null : (
+        <td className="tracker-cell tracker-cell-status" data-label="Status">
+          <div className="tracker-status">
+            <select
+              className="tracker-status-select"
+              aria-label={`Application status for ${job.title}`}
+              disabled={disabled}
+              value={status}
+              onChange={onChange}
+            >
+              {status === NOT_APPLIED_OPTION ? (
+                <option value={NOT_APPLIED_OPTION}>Not applied</option>
+              ) : null}
+              {PIPELINE_STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {stage === "" ? null : <span className="tracker-stage">{stage}</span>}
+            {saving ? (
+              <span className="tracker-saving" role="status">
+                Saving…
+              </span>
             ) : null}
-            {PIPELINE_STATUS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          {stage === "" ? null : <span className="tracker-stage">{stage}</span>}
-          {saving ? (
-            <span className="tracker-saving" role="status">
-              Saving…
-            </span>
-          ) : null}
-        </div>
-      </td>
-      <td className="tracker-cell tracker-cell-date" data-label="Intaked">
-        {trackerDate(job.created_at)}
-      </td>
-      <td className="tracker-cell tracker-cell-date" data-label="Updated">
-        {trackerUpdatedLabel(job)}
-      </td>
+          </div>
+        </td>
+      )}
+      {!columns.includes("intaked") ? null : (
+        <td className="tracker-cell tracker-cell-date" data-label="Intaked">
+          {trackerDate(job.created_at)}
+        </td>
+      )}
+      {!columns.includes("updated") ? null : (
+        <td className="tracker-cell tracker-cell-date" data-label="Updated">
+          {trackerUpdatedLabel(job)}
+        </td>
+      )}
     </tr>
   );
 }

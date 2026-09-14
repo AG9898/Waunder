@@ -1605,3 +1605,11 @@ What actually differed from the plan:
   sending, and the draft-review submit button stays gated on `draft_ready` with no warnings.
 - Keep the API contract read-only in this chain. If a screen appears to need an endpoint change,
   stop and report rather than editing `api/`.
+
+## Tracker on TanStack Table — done (`UI-04`)
+
+`web/src/components/tracker/tracker-table.tsx` adds what the Go table could not: header sorting
+over the loaded page, column visibility (Job is never hideable), and window virtualization past
+60 rows (`lib/tracker-columns.ts`). The card/table switch is still the `@container (min-width:
+800px)` query, the group tint is still the inset box-shadow on `.tracker-cell-job`, and group tabs,
+counts, and status writes (invalidate and refetch) are unchanged; `tracker.test.tsx` covers each.

@@ -17,7 +17,16 @@ describe("vendored UI primitives", () => {
       dependencies: Record<string, string>;
     };
     expect(Object.keys(pkg.dependencies).sort()).toEqual(
-      ["@tanstack/react-query", "react", "react-dom", "react-router", "zod"].sort(),
+      // UI-04 deliberately adds TanStack Table + Virtual for the tracker; nothing else is allowed.
+      [
+        "@tanstack/react-query",
+        "@tanstack/react-table",
+        "@tanstack/react-virtual",
+        "react",
+        "react-dom",
+        "react-router",
+        "zod",
+      ].sort(),
     );
   });
 

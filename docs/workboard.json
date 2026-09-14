@@ -3023,7 +3023,7 @@
       "id": "UI-04",
       "title": "Rebuild the tracker table on TanStack Table",
       "description": "Give the tracker the table behaviour the Go version could not: column sorting, column visibility, and virtualization for long lists. The mobile self-labelling card layout must survive, still driven by the existing container query rather than the viewport, and group tabs, counts, and row writes keep their current behaviour including invalidate-and-refetch after a status change.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "UI",
       "depends_on": [

@@ -1031,3 +1031,83 @@ describe("tracker writes", () => {
     });
   });
 });
+
+/* -------------------------------------------------------------------------- */
+/* TanStack Table: sorting, visibility, virtualization (UI-04)                 */
+/* -------------------------------------------------------------------------- */
+
+describe("tracker table behaviour", () => {
+  function titles(container: HTMLElement): string[] {
+    return Array.from(container.querySelectorAll("tbody .tracker-job-link")).map(
+      (link) => link.textContent ?? "",
+    );
+  }
+
+  it("sorts the loaded rows by a header click without a new request, and back to Rails' order", async () => {
+    rows = [
+      { ...fixtures.scoredJob, id: 1, title: "Bravo", application: null },
+      { ...fixtures.scoredJob, id: 2, title: "Alpha", application: null },
+      { ...fixtures.scoredJob, id: 3, title: "Charlie", application: null },
+    ];
+    const { container } = await loadedTracker();
+    const before = requests.length;
+    const jobHeader = () => container.querySelector("th.tracker-col-job") as HTMLElement;
+    const sortButton = () => within(jobHeader()).getByRole("button", { name: "Job" });
+
+    expect(titles(container)).toEqual(["Bravo", "Alpha", "Charlie"]);
+    fireEvent.click(sortButton());
+    expect(titles(container)).toEqual(["Alpha", "Bravo", "Charlie"]);
+    expect(jobHeader()).toHaveAttribute("aria-sort", "ascending");
+    // The header still reads just "Job", so it keeps matching every cell's data-label.
+    expect(jobHeader().textContent).toBe("Job");
+    fireEvent.click(sortButton());
+    expect(titles(container)).toEqual(["Charlie", "Bravo", "Alpha"]);
+    fireEvent.click(sortButton());
+    expect(titles(container)).toEqual(["Bravo", "Alpha", "Charlie"]);
+    expect(requests.length).toBe(before);
+  });
+
+  it("hides a column's header and cells together, and never offers to hide Job", async () => {
+    const { container } = await loadedTracker();
+    const toggles = container.querySelectorAll(".tracker-column-toggle");
+    expect(Array.from(toggles).map((t) => t.textContent)).toEqual([
+      "Company",
+      "Status",
+      "Intaked",
+      "Updated",
+    ]);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Company" }));
+
+    const headers = Array.from(container.querySelectorAll("thead th")).map((th) => th.textContent);
+    expect(headers).toEqual(["Job", "Status", "Intaked", "Updated"]);
+    for (const row of Array.from(container.querySelectorAll<HTMLTableRowElement>("tbody tr"))) {
+      expect(Array.from(row.cells).map((cell) => cell.dataset.label)).toEqual(headers);
+      expect(row.cells[0]).toHaveClass("tracker-cell-job");
+    }
+  });
+
+  it("virtualizes a long page behind spacer rows and renders a short one in full", async () => {
+    rows = Array.from({ length: 400 }, (_, i) => ({
+      ...fixtures.scoredJob,
+      id: i + 1,
+      title: `Job ${String(i + 1)}`,
+      application: null,
+    }));
+    const { container } = await loadedTracker();
+
+    const rendered = container.querySelectorAll("tbody tr.tracker-row");
+    expect(rendered.length).toBeGreaterThan(0);
+    expect(rendered.length).toBeLessThan(400);
+    expect(container.querySelector("tbody tr.tracker-spacer")).not.toBeNull();
+  });
+
+  it("gives virtualization spacers explicit display values in both layouts", () => {
+    const css = stylesheet();
+    const mobile = rulesOf(unconditional(css));
+    const desktop = rulesOf(atRuleBody(css, "@container (min-width: 800px)"));
+    expect(declared(mobile, ".tracker-spacer", "display")).toBe("block");
+    expect(declared(desktop, ".tracker-spacer", "display")).toBe("table-row");
+    expect(declared(desktop, ".tracker-spacer td", "display")).toBe("table-cell");
+  });
+});

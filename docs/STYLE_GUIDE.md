@@ -177,6 +177,12 @@ figures where possible.
   with the Jobs bin tabs) select All / Not applied / Applied / In progress / Closed, each with a
   count badge; the strip scrolls horizontally so five tabs stay reachable on a phone. Lifecycle
   bin and sort sit under them as plain labelled selects (`.tracker-controls`).
+- The tracker table runs on TanStack Table (UI-04): a header click sorts only the loaded page
+  (direction in `aria-sort` and the `.tracker-sort[data-sort]` arrow, so header text still equals
+  each cell's `data-label`); a collapsed `.tracker-columns` control hides Company/Status/dates
+  (never Job, which leads the row and paints the tint) and drops header and cells together; pages
+  over 60 rows are window-virtualized with measured rows and `.tracker-spacer` rows given explicit
+  block/table display in both layouts. The server Sort select still orders the feed.
 - The tracker rows (`.tracker-table`) are one responsive markup, not two: on mobile each row is a
   card whose cells label themselves via `data-label` + `::before`, and inside the 800px container
   query the same table reverts to real `table` display with a sunken header row, hairline

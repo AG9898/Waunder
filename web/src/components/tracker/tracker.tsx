@@ -43,6 +43,7 @@
  * every row — the single in-flight flag is what disables all thirty selects at once.
  */
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { SortingState, VisibilityState } from "@tanstack/react-table";
 import { type ChangeEvent, useCallback, useState } from "react";
 
 import { fetchJobs, updateJobApplicationStatus } from "../../api/endpoints";
@@ -71,7 +72,8 @@ import {
 } from "../../lib/tracker";
 import { AppChrome } from "../app-chrome";
 import { LoadError, Loading } from "../load-state";
-import { TrackerRow } from "./tracker-row";
+import { HIDEABLE_TRACKER_COLUMNS } from "../../lib/tracker-columns";
+import { TrackerTable } from "./tracker-table";
 
 export function TrackerScreen() {
   const [selection, setSelection] = useState<TrackerSelection>(DEFAULT_TRACKER_SELECTION);
@@ -82,6 +84,10 @@ export function TrackerScreen() {
     placeholderData: keepPreviousData,
   });
   const write = useStatusWrite();
+  // Held here, not in the table, so a header sort and hidden columns survive the refetch that
+  // unmounts the table behind "Loading…".
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
 
   const counts = data?.application_counts ?? ZERO_COUNTS;
 
@@ -95,6 +101,7 @@ export function TrackerScreen() {
       <TrackerHeader counts={counts} />
       <TrackerGroupTabs group={selection.group} counts={counts} onSelect={onSelectGroup} />
       <TrackerControls selection={selection} onChange={setSelection} />
+      <TrackerColumns visibility={columnVisibility} onChange={setColumnVisibility} />
       {write.error === "" ? null : (
         <p className="tracker-status-error" role="alert">
           {write.error}
@@ -108,28 +115,15 @@ export function TrackerScreen() {
         <p className="tracker-empty">{trackerEmptyMessage(selection.group)}</p>
       ) : (
         <div className="tracker-wrap">
-          <table className="tracker-table">
-            <thead>
-              <tr>
-                <th className="tracker-col-job">Job</th>
-                <th className="tracker-col-company">Company</th>
-                <th className="tracker-col-status">Status</th>
-                <th className="tracker-col-date">Intaked</th>
-                <th className="tracker-col-date">Updated</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.job_posts.map((job) => (
-                <TrackerRow
-                  key={job.id}
-                  job={job}
-                  saving={write.savingId === job.id}
-                  disabled={write.saving}
-                  onStatusChange={write.onStatusChange}
-                />
-              ))}
-            </tbody>
-          </table>
+          <TrackerTable
+            jobs={data.job_posts}
+            sorting={sorting}
+            onSortingChange={setSorting}
+            columnVisibility={columnVisibility}
+            savingId={write.savingId}
+            saving={write.saving}
+            onStatusChange={write.onStatusChange}
+          />
           <TrackerPagination
             page={data.page}
             onPrevious={() => {
@@ -303,6 +297,39 @@ function TrackerControls({
         </select>
       </label>
     </div>
+  );
+}
+
+/**
+ * Which optional columns show. Job is not offered: it leads every row and paints the group tint.
+ * A hidden column drops both its header and its cells, so card labels stay paired with headers.
+ */
+function TrackerColumns({
+  visibility,
+  onChange,
+}: {
+  visibility: VisibilityState;
+  onChange: (update: (current: VisibilityState) => VisibilityState) => void;
+}) {
+  return (
+    <details className="tracker-columns">
+      <summary>Columns</summary>
+      <div className="tracker-columns-list">
+        {HIDEABLE_TRACKER_COLUMNS.map((column) => (
+          <label key={column.id} className="tracker-column-toggle">
+            <input
+              type="checkbox"
+              checked={visibility[column.id] !== false}
+              onChange={(event) => {
+                const checked = event.target.checked;
+                onChange((current) => ({ ...current, [column.id]: checked }));
+              }}
+            />
+            {column.label}
+          </label>
+        ))}
+      </div>
+    </details>
   );
 }
 
