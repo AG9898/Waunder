@@ -8,3 +8,4 @@
 /workers/.env
 /workers/.env.*
 !/workers/.env.example
+client/parity-report/

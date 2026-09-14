@@ -82,6 +82,21 @@ function renderPanel(selection: Partial<JobFilterSelection> = {}) {
 /* -------------------------------------------------------------------------- */
 
 describe("the filter panel", () => {
+  it("slots its children between the view selector and the panel, as jobs.go ordered them", () => {
+    const { container } = render(
+      <JobFilters selection={DEFAULT_SELECTION} onChange={vi.fn()}>
+        <nav className="job-bin-tabs" />
+      </JobFilters>,
+    );
+
+    // FE-28 caught the bins rendering below the panel; Go rendered view selector, bins, filters.
+    expect(Array.from(container.children, (el) => el.classList[0])).toEqual([
+      "applications-view-selector",
+      "job-bin-tabs",
+      "job-filters-panel",
+    ]);
+  });
+
   it("is collapsed by default, so the controls do not push the feed off a phone screen", () => {
     const { container } = renderPanel();
 

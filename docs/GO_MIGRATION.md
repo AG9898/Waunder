@@ -1440,6 +1440,33 @@ WebKit or the Chrome-added home-screen container. The manual on-device check in
 
 ---
 
+## Visual parity gate — done (`FE-28`)
+
+`node client/scripts/parity-gate.cjs` builds `web/` (`make wasm server`) and the root-context Caddy
+image, serves both for real, and fulfils every `/api/*` request in Playwright from one fixture
+table, so both apps render identical data. Service workers stay enabled (no
+`serviceWorkers: 'block'`). It screenshots all nine routes at 390x844 and 1440x1000, compares pixels
+in a browser canvas (channel tolerance 24), and writes `client/parity-report/` (gitignored):
+`index.html` with Go / client / diff side by side, the PNGs, and `summary.json`. A route with any
+differing pixel fails the gate unless the script's `EXPLAINED` table lists it here. The gate also
+asserts that no screen sends a write while rendering.
+
+Result on 2026-09-14: 14 of 18 captures match exactly.
+
+- **Fixed: jobs feed control order.** The React feed rendered the lifecycle bin tabs below the
+  filters panel. Go rendered view selector, bins, filters. `JobFilters` now takes the bins as
+  `children` between its two parts, and `job-filters.test.tsx` pins the order.
+- **Explained: `/profile`** (both widths). This is the sign-out control from `FE-09`/`FE-25`,
+  described in the profile notes above.
+- **Explained: `/jobs/:id/contacts`** (597 px at both widths). This is the collapsed "Add a contact"
+  `<details>` from `FE-21`, described in the contacts notes above. Go had no contact-create form.
+- **Focus rings, checked with a keyboard Tab walk.** The script presses Tab until `.login-submit`
+  and then `.manual-entry-submit` holds `:focus-visible`, waits past the 140ms transition, and
+  compares the computed `box-shadow`. Both apps report identical rings: the two-layer ring on the
+  login button and the 3px sage ring on the manual-entry button.
+
+---
+
 ## Web Push payload — fix a real bug
 
 Rails sends `{title, body, data: {url: "/", count: N}}` (`daily_digest_builder.rb:23-26`).

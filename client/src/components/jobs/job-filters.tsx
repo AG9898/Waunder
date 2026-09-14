@@ -28,6 +28,7 @@
  * faithfully), so that task adds a control over state that already exists rather than widening
  * this contract.
  */
+import type { ReactNode } from "react";
 import {
   SCORE_BAND_OPTIONS,
   SORT_OPTIONS,
@@ -44,9 +45,11 @@ import {
 export interface JobFiltersProps {
   selection: JobFilterSelection;
   onChange: (next: JobFilterSelection) => void;
+  /** Rendered between the view selector and the panel — Go's `renderBinTabs` slot. */
+  children?: ReactNode;
 }
 
-export function JobFilters({ selection, onChange }: JobFiltersProps) {
+export function JobFilters({ selection, onChange, children }: JobFiltersProps) {
   /** Every control goes through here, so no control can forget to reset to page 1. */
   const change = (patch: Partial<JobFilterSelection>) => {
     onChange(changeSelection(selection, patch));
@@ -56,6 +59,7 @@ export function JobFilters({ selection, onChange }: JobFiltersProps) {
   return (
     <>
       <ViewSelector view={selection.view} onSelect={(view) => change({ view })} />
+      {children}
       <details className="job-filters-panel">
         <summary className="job-filters-summary">
           <span className="job-filters-summary-label">Filters &amp; sort</span>

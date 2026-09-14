@@ -200,6 +200,8 @@ figures where possible.
   (new, already tracked, already submitted, or possible match) and link to the returned record.
 - Inputs and textareas use warm surface fill, strong hairline border, 12px radius, and a
   visible sage focus ring.
+  The `FE-28` parity gate checks primary-button rings with a keyboard Tab walk and computed
+  `box-shadow`, not with a screenshot taken right after `focus()`.
 - Error and success messages use soft status pills. Loading uses a gentle opacity pulse.
 - Empty feed/list states (`.digest-empty`, `.job-list-empty`, `.tracker-empty`,
   `.contacts-empty`) render as a

@@ -1523,3 +1523,11 @@ modified later"); a plain `async` function in the component body is the fix, and
 scoped below the chrome (`.draft-body`), not to the whole screen container. A screen that lets the
 owner edit server-owned data should show the server's copy until the first edit rather than seeding
 once, or a focus refetch that completes an in-progress draft never reaches the screen.
+
+### 2026-09-14 — Pixel parity needs no image library; the gate diffs inside the browser
+`client/scripts/parity-gate.cjs` has no `pixelmatch`/`pngjs` to use, so it loads both screenshots as
+data URLs into an `OffscreenCanvas` in a Playwright page and compares `getImageData`. That also
+produces the diff PNG. An exact-match result is only evidence after you view a screenshot: check
+that it shows loaded content, not two identical spinners. The one real defect this found, the
+bins/filters order on `/jobs`, passed every Vitest case, because no test compared sibling order
+across components. Screens assembled from separately ported pieces need a DOM-order assertion.

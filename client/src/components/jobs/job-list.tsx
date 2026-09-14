@@ -100,13 +100,14 @@ export function JobList() {
       </Link>
       <div className="job-feed-workspace">
         <div className="job-feed-controls">
-          <JobFilters selection={selection} onChange={setSelection} />
-          <JobBinTabs
-            bin={selection.bin}
-            onSelect={(bin) => {
-              setSelection((current) => ({ ...current, bin, pageNum: 1 }));
-            }}
-          />
+          <JobFilters selection={selection} onChange={setSelection}>
+            <JobBinTabs
+              bin={selection.bin}
+              onSelect={(bin) => {
+                setSelection((current) => ({ ...current, bin, pageNum: 1 }));
+              }}
+            />
+          </JobFilters>
         </div>
         {isPending ? (
           <Loading />

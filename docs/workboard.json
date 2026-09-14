@@ -2803,7 +2803,7 @@
       "id": "FE-28",
       "title": "Build and pass the visual parity gate against the Go app",
       "description": "Prove the port is a port. Screenshot all nine routes at mobile and desktop widths against both the running Go app and the new container, backed by identical stubbed API responses, and emit a side-by-side diff report. app.css and every markup class are unchanged by design, so any visual difference is a defect until explained. Do not pass serviceWorkers:'block' to Playwright: it bypasses the caching path entirely, so a screenshot can look perfect while real returning browsers see something else. Reuse the Playwright browser already vendored under workers/node_modules.",
-      "status": "todo",
+      "status": "done",
       "priority": "critical",
       "group_id": "FE",
       "depends_on": [
