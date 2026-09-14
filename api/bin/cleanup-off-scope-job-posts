@@ -1,9 +1,10 @@
 #!/usr/bin/env ruby
 
+require_relative "../config/environment"
 require "json"
 require "optparse"
 
-options = { dry_run: true }
+options = { dry_run: true, sample_limit: OffScopeJobPostCleanup::SAMPLE_LIMIT }
 
 OptionParser.new do |parser|
   parser.banner = "Usage: bin/cleanup-off-scope-job-posts [--dry-run | --apply] [--sample-limit N]"
@@ -13,8 +14,6 @@ OptionParser.new do |parser|
     options[:sample_limit] = value.clamp(0, 100)
   end
 end.parse!
-
-require_relative "../config/environment"
 
 report = OffScopeJobPostCleanup.new(**options).call
 puts JSON.pretty_generate(report.to_h)
