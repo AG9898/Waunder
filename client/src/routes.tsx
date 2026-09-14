@@ -28,8 +28,8 @@
  * ## Placeholders
  *
  * Every element below is a placeholder until its screen task lands (`FE-16` … `FE-26`; the
- * task id is on each route — `/`, `/login`, `/jobs`, `/jobs/new`, `/jobs/:id`, `/jobs/:id/contacts`, and `/applications` are
- * ported, so they carry none). A
+ * task id is on each route — `/`, `/login`, `/jobs`, `/jobs/new`, `/jobs/:id`, `/jobs/:id/contacts`, `/applications`, and `/profile`
+ * are ported, so they carry none). A
  * placeholder carries the **real root class** the Go screen renders, because that class is what
  * `public/app.css` styles the page container with and what the parity gate compares.
  * Keeping it here means the route test asserts the same thing before and after each port:
@@ -50,6 +50,7 @@ import { JobDetailScreen } from "./components/job-detail/job-detail";
 import { JobList } from "./components/jobs/job-list";
 import { LoginScreen } from "./components/login";
 import { ManualEntryScreen } from "./components/manual-entry/manual-entry";
+import { ProfileScreen } from "./components/profile/profile";
 import { TrackerScreen } from "./components/tracker/tracker";
 
 /**
@@ -92,6 +93,6 @@ export const routes: RouteObject[] = [
   { path: "/jobs/:id/contacts", element: <ContactsScreen /> },
   { path: "/applications", element: <TrackerScreen /> },
   { path: "/applications/:id", element: placeholder("draft-review", "Draft review", "FE-26") },
-  { path: "/profile", element: placeholder("profile", "Profile", "FE-25") },
+  { path: "/profile", element: <ProfileScreen /> },
   { path: "*", element: notFoundScreen() },
 ];

@@ -37,7 +37,7 @@
  * | `createApplication` | `applications.root()`, `jobs.detail(id)`, `jobs.list()` prefix via `jobs.root()` |
  * | `updateApplicationDraft`, `submitApplication` | `applications.draft(id)`, `jobs.root()` |
  * | `updateJobApplicationStatus` | `jobs.root()`, `applications.root()` |
- * | `updateProfile` | `profile()` |
+ * | `updateProfile` | none — its answer is the refreshed profile, written into `profile()` directly |
  * | `createContact` | `jobs.contacts(jobId)` |
  * | `createJobPost` | `jobs.root()`, `ingestionBatches.root()` |
  *

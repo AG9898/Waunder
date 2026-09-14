@@ -172,6 +172,16 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 > failed) disables or delays the import, because Rails' `EnrichJobPostJob` reads a URL-only import in
 > the background anyway. Nothing is posted on render.
 >
+> The shadow client's profile screen (`client/src/components/profile/`) reads `GET /api/profile` and
+> writes `PATCH /api/profile` with exactly the seven editable text/URL fields — never `email`,
+> `phone`, or `street_address`, which Rails' `profile_params` would accept — so the encrypted contact
+> details stay presence flags in both directions. The save's answer is the refreshed profile and is
+> written straight into the query cache; the form is seeded once and reseeded only from that answer,
+> so a focus refetch, or a failed one, never discards typing. A 422 renders Rails' own validation
+> sentence. The screen embeds the push toggle, mounts the install guide only for the iOS gates where
+> the owner must act outside the app (add to Home Screen, update iOS), and renders the sign-out
+> control. Nothing writes on render.
+>
 > The auth model is unchanged and stays entirely server-side, but the client's half of it is now in
 > one place. Because the session cookie is httponly, being signed out can only be derived from
 > responses, so `client/src/lib/auth.ts` subscribes to both TanStack caches and sends the owner to

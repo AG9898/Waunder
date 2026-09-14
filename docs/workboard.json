@@ -2697,7 +2697,7 @@
       "id": "FE-25",
       "title": "Port the profile screen",
       "description": "Port web/components/profile.go: read and update /api/profile, and render the resume document metadata. Encrypted resume and profile PII is exposed by Rails as presence flags only and must be rendered that way; never render or request a raw encrypted value. The PushToggle from FE-13 embeds here.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FE",
       "depends_on": [

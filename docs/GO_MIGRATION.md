@@ -522,9 +522,11 @@ after a plain render, in both the supported and unsupported browsers. Neither wr
 `useMutation`: writes to Rails are never retried automatically, and there is no cached read to
 invalidate.
 
-Two smaller notes. `type="button"` is added to the three buttons, because the toggle sits inside
-`ProfileView`'s `<form className="profile-form">` where an untyped button defaults to `submit` —
-go-app bound its own click handler and never emitted the attribute, and no CSS rule keys off it.
+Two smaller notes. `type="button"` is added to the three buttons, because an untyped button
+defaults to `submit` in any form it is nested in — go-app bound its own click handler and never
+emitted the attribute, and no CSS rule keys off it. (The profile screen renders the toggle beside
+`<form className="profile-form">`, not inside it, so on that screen the attribute is defensive; see
+`FE-25`.)
 And `readSubscription` rejects a subscription missing its endpoint or encryption keys rather than
 zero-valuing them the way `json.Unmarshal` did: an empty key posted to Rails stores a subscription
 that can never be encrypted to, and the resulting silence is indistinguishable from a working one.
@@ -635,7 +637,7 @@ No Go toolchain, no `go.mod`, no `Makefile`, no `app.wasm`.
 | `web/components/manual_entry.go` | 477 | `src/components/manual-entry/` + `src/lib/manual-entry.ts` |
 | `web/components/contacts.go` | 325 | `src/components/contacts/` + `src/lib/contacts.ts` |
 | `web/components/push.go` + `push_browser.go` | 427 | `src/components/push-toggle.tsx` + `src/lib/push.ts` (244 lines of code; the `FuncOf`/`Release`/promise-to-channel `await` adapter disappears) |
-| `web/components/profile.go` | 266 | `src/components/profile/` |
+| `web/components/profile.go` | 266 | `src/components/profile/` + `src/lib/profile.ts` |
 | `web/components/install_guide.go` + `pwa.go` | 281 | `src/components/install-guide.tsx` + `src/lib/platform.ts` |
 | `web/components/chrome.go` | 134 | `src/components/app-chrome.tsx` |
 | `web/components/login.go` | 113 | `src/components/login.tsx` + `src/lib/auth.ts` (the 401 boundary the Go screens each checked by hand, plus the sign-out Go never had) |
@@ -748,7 +750,8 @@ from `GET /api/push/vapid_public_key` per `FE-13` above.
 
 The guide's component was **unrouted in the Go build**: `main.go` maps `/` to `DigestView`, and
 only the dead `Home` component rendered `InstallGuide`. So this task changes no live screen; the
-guide is mounted by the profile screen (`FE-25`), next to the push toggle it explains, and
+guide is mounted by the profile screen (`FE-25`), after the push toggle it explains — for the two
+iOS gates only, see that section — and
 `src/lib/platform.ts` is available to any screen that needs to know it is running installed.
 
 ## The jobs feed — list, rows, pagination — done (`FE-15`)
@@ -1243,6 +1246,58 @@ Four things this pass settled:
   eight-character steps sends nothing; leaving the field sends exactly one lookup. The network
   failure is MSW's `HttpResponse.error()`, which is why the test's lookup answer is a function rather
   than a status and body.
+
+## The profile screen — done (`FE-25`)
+
+`client/src/components/profile/profile.tsx` is the screen, `resume-meta.tsx` is the resume list, and
+`src/lib/profile.ts` holds the pure half (`editFromProfile`, `presenceLabel`, `resumeFileLabel`,
+`resumeStatusClass`, `saveButtonLabel`, the seven-field table, and `showInstallGuide`);
+`profileSaveErrorMessage` joins `src/lib/messages.ts`. Markup, classes, and copy are Go's: the
+`.profile-body` children are the form, `.profile-contact`, `.profile-resume`, and the push toggle, in
+that order, and the resume list keeps the three items `app.css` styles only through the inherited
+`.profile-resume-meta li` rule.
+
+Six things this pass settled:
+
+- **The write is safe because of what the client never sends.** Rails' `profile_params` permits
+  `email`, `phone`, and `street_address`, so a client that echoed a read back could overwrite the
+  encrypted contact details. The form's state is built by `editFromProfile`, which copies exactly
+  the seven editable keys, there is no input for any sensitive field, and `ProfileSchema` strips any
+  undeclared key on the read side. The test serves a profile carrying raw values and asserts none
+  reaches the screen and that the `PATCH` body is exactly the seven keys, sent untrimmed as Go did.
+- **A save writes its answer into the cache instead of invalidating.** The `PATCH` response is the
+  refreshed profile — Go's `applySaveResult` rendered it directly — so the screen stores it under
+  `profile()` and reseeds the form from it, and no second `GET` follows; `keys.ts`'s table says so.
+  This is not the feed's local splice: nothing is derived, and the cache holds the document Rails
+  sent.
+- **Typing survives a refetch, including a failed one.** The query client refetches on window focus,
+  which Go never did, so the form is seeded once on load and reseeded only from a save's answer.
+  And because TanStack v5 sets `isError` while keeping the last data after a failed *refetch*, the
+  screen shows the load error only when there is no profile at all — checking `isError` first, as
+  the read-only screens do, would swap a half-edited form for an error panel over a focus hiccup.
+  Verified by mutation: rendering the error panel whenever `isError` is set fails the refetch test.
+- **A 422 renders Rails' sentence.** `Profile` validates `full_name` presence, so clearing that field
+  was the one failure the owner could cause, and Go answered it with "Please try again". Rails
+  answers with code `unprocessable`, not `invalid_input`, so `profileSaveErrorMessage` keys on the
+  status; every other failure keeps Go's copy, and a 403 is not read as an expired session.
+- **Sign-out is rendered here (`FE-09`).** A `.profile-session` block after the push toggle holds a
+  `Sign out` button and its error. `app.css` has no rule for either until `UI-01`, so the button
+  borrows `.manual-entry-lookup-button` (the outline button that also styles `:disabled`, which the
+  push toggle's `.push-toggle-disable` does not) and the error borrows `.profile-save-error`, next to
+  `profile-sign-out` / `profile-sign-out-error` hooks of their own. A deliberate `FE-28` difference.
+- **The install guide is mounted for the two iOS gates only.** `FE-14` said it would sit beside the
+  toggle, but mounted unconditionally it contradicts the toggle: the guide reports "Notifications are
+  on" from the browser's *permission* while the toggle reports the *subscription*, so after turning
+  notifications off the two disagree, and in `ready-to-request` the screen would carry two enable
+  buttons. `showInstallGuide` mounts it after the toggle only for `needs-install` and
+  `upgrade-ios`, where the owner's next step is outside the app and the toggle can only say "not
+  available". The platform signals are a `ProfileScreen` prop for tests, defaulting to the live
+  browser. Also a deliberate `FE-28` difference, though the owner's installed iPhone never shows it.
+
+One correction to earlier notes: the push toggle is **not** inside `<form className="profile-form">`.
+`profile.go` renders it as a sibling of the form in `.profile-body`, so `FE-13`'s `type="button"` is
+defensive rather than necessary; the comments in `push-toggle.tsx` and `install-guide.tsx` now say
+so.
 
 ---
 

@@ -183,6 +183,23 @@ export function importErrorMessage(error: unknown): string {
     : IMPORT_INVALID;
 }
 
+/** `applySaveResult`'s message for a failed `PATCH /api/profile` in `profile.go`. */
+const PROFILE_SAVE_FAILED = "Could not save your profile. Please try again.";
+
+/**
+ * A failed profile save. A 422 renders Rails' own sentence ("Full name can't be blank") instead of
+ * Go's generic copy: `Profile` validates `full_name` presence, so clearing that field was the one
+ * failure the owner could cause, and Go told them to "try again" with the field still empty.
+ * Rails answers that 422 with code `unprocessable` rather than `invalid_input`, so the branch keys
+ * on the status, as `importErrorMessage` does. Nothing was written in any branch.
+ */
+export function profileSaveErrorMessage(error: unknown): string {
+  if (isUnauthorized(error)) return SESSION_EXPIRED;
+  if (asAPIError(error)?.status !== 422) return PROFILE_SAVE_FAILED;
+  const railsSentence = apiErrorMessage(error);
+  return railsSentence !== "" ? railsSentence : PROFILE_SAVE_FAILED;
+}
+
 /**
  * A failed `POST /api/job_posts/lookup`. Non-blocking by design — the fields stay editable and
  * the import still works — so the only case worth telling apart is the one the owner must act on.

@@ -1500,3 +1500,16 @@ state of (the URL field's blur, the Look up button), put both in one component t
 fragment (`manual-entry/lookup.tsx`), so the form's children do not change. `fireEvent.click` never
 moves focus, so to reproduce a real "type, then tap Import" in a test, `fireEvent.blur` the field
 first — that is how `lookup.test.tsx` proves a lookup in flight never holds up an import.
+
+### 2026-09-13 — TanStack v5 keeps data on a failed refetch and notifies observers on a timer
+FE-25's profile form surfaced two TanStack Query v5 behaviors any form screen in `client/` must
+respect. After a background *refetch* fails, `isError` is `true` while `data` still holds the last
+value, so the read-only screens' `isPending ? … : isError ? <LoadError/> : …` ladder would swap a
+half-edited form for an error panel over a window-focus hiccup — branch on `data !== undefined`
+first, seed form state once with a lazy `useState`, and reseed only from a save's own answer. In
+tests, `await act(() => client.invalidateQueries(...))` does not yet show the result, because
+observers are notified on a `setTimeout(0)` scheduler: wrap the DOM assertion in `waitFor`, or flush
+with `await act(() => delay(20))` when nothing visible is supposed to change. Separately, never
+mount `InstallGuide` unconditionally beside `PushToggle`: the guide reads notification *permission*
+and the toggle reads the *subscription*, so after an unsubscribe they contradict each other
+(`showInstallGuide` limits the guide to the two iOS gates).

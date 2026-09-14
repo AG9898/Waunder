@@ -141,8 +141,9 @@ export function InstallGuide({ signals, permission, subscriber }: InstallGuidePr
         <div className="install-guide">
           {/*
             `type="button"` is the one addition to the Go markup. go-app bound its own click
-            handler, but in plain HTML an untyped button submits any form it is nested in, and
-            the profile screen that will host this guide is one big form. No stylesheet rule
+            handler, but in plain HTML an untyped button submits any form it is nested in. The
+            profile screen mounts this guide beside its form rather than inside it, and never in
+            this state (`showInstallGuide`), so the attribute is defensive. No stylesheet rule
             keys off the attribute.
           */}
           <button type="button" className="enable-notifications" onClick={onEnable} disabled={busy}>

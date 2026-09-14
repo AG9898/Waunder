@@ -145,10 +145,11 @@ export function PushToggle({ subscriber }: PushToggleProps = {}) {
 /**
  * The control itself, split out of the component so a single state can be rendered on its own.
  *
- * `type="button"` is the one addition to the Go markup: the toggle sits inside `ProfileView`'s
- * `<form className="profile-form">`, where an untyped button defaults to `submit`. go-app bound
- * its own click handler and stopped there; in plain HTML the same markup would also submit the
- * profile form. No stylesheet rule keys off the attribute, so nothing about the rendering changes.
+ * `type="button"` is the one addition to the Go markup. On the profile screen the toggle is a
+ * sibling of `<form className="profile-form">` inside `.profile-body`, not a child of it (`FE-25`
+ * checked `profile.go`), but an untyped button defaults to `submit` in any form an embedder might
+ * nest it in, and go-app bound its own click handler without ever emitting the attribute. No
+ * stylesheet rule keys off it, so nothing about the rendering changes.
  */
 function renderPushControl(
   state: PushUiState,
