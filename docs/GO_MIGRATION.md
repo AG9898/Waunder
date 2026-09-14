@@ -1572,7 +1572,7 @@ What actually differed from the plan:
 - Source comments that cite `web/components/*.go` were left as-is: they name the retired
   implementation each port reproduced, which remains in git history.
 - The docs in the checklist above were rewritten in the same commit.
-- Pending: the owner's iOS home-screen check after deploy (delete-and-re-add fallback documented).
+- Confirmed 2026-09-14: the owner verified the iOS home-screen web app works on the new build after deploy (re-added via Chrome's Share sheet after a Chrome for iOS update moved the option).
 
 ---
 
