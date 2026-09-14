@@ -2959,7 +2959,7 @@
       "id": "UI-02",
       "title": "Initialise shadcn/ui and vendor the base primitives",
       "description": "Vendor shadcn/ui components into the repository rather than adding a runtime dependency, matching the policy this project already follows for the self-hosted font and the brand logo SVGs. Theme them from the existing tokens so they inherit the warm paper and sage palette. Land button, input, select, dialog, and sheet as the primitives later tasks build on. No shipped screen changes appearance yet.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "UI",
       "depends_on": [

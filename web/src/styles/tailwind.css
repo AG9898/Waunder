@@ -13,6 +13,7 @@
    (.table, .hidden, .fixed, .container) that could match class names app.css screens already use.
    Opt files in explicitly as they adopt utilities. */
 @source "../components/tailwind-probe.tsx";
+@source "../components/ui";
 
 @theme {
   --color-*: initial;

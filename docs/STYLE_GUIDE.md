@@ -30,6 +30,13 @@ source of truth; the stylesheet is `web/public/app.css`, linked from `web/index.
 > `@source` line when it adopts utilities, because scanning all of `src/` emits utilities such as
 > `.table` and `.hidden` from ordinary words.
 >
+> **Vendored primitives (`UI-02`).** `web/src/components/ui/` holds shadcn/ui-style `Button`
+> (`primary|secondary|ghost|danger`), `Input`, `Select`, `Dialog`, and `Sheet` (`bottom|right`),
+> copied into the repo with no Radix, `cva`, `clsx`, or `tailwind-merge` runtime dependency — the same
+> self-hosting policy as the font and brand logos. They use only token utilities, so they inherit the
+> paper/sage palette above. `Select` is a native `<select>` (OS picker on phones) and `Dialog`/`Sheet`
+> wrap the native `<dialog>`. No shipped screen renders them yet; `ui.test.tsx` pins the dependency list.
+>
 > The class *suffixes* this file specifies — `.job-score--high|mid|low|pending`,
 > `.job-status--active|backlog|removed`, `.tracker-row--<group>` — plus the brand-logo paths
 > are produced by `web/src/lib/labels.ts`. Renaming a band or a state there

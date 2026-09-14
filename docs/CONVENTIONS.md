@@ -107,6 +107,9 @@ A standalone npm project (no monorepo workspace), exactly like `workers/`. Node 
   only (no Preflight) with `source(none)`. Add an `@source` line for a file before using utilities
   in it, and use only token utilities (`bg-accent-soft`, `rounded-pill`), never arbitrary values
   that bypass `app.css` tokens. See `docs/STYLE_GUIDE.md`.
+- **UI primitives are vendored, never installed.** Build on `src/components/ui/` (Button, Input,
+  Select, Dialog, Sheet) and edit the copied source rather than adding a component-library runtime
+  dependency; `cn` lives in `src/lib/cn.ts` and only joins class names.
 - Rails stays the source of truth for validation, normalization, scoring, route resolution, and
   submit safety. The client does trim-only hints, exactly as the Go client did — porting is not an
   occasion to move logic forward.
