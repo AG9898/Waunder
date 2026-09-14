@@ -415,6 +415,24 @@ export function apiHandlers(): HttpHandler[] {
         })),
       }),
     ),
+    http.post("/api/job_posts/:id/contact_candidates", async ({ params, request }) => {
+      const body = (await request.json()) as { contact_candidate?: Partial<ContactCandidate> };
+      return HttpResponse.json(
+        {
+          contact_candidate: {
+            name: "",
+            title: "",
+            company_name: "",
+            linkedin_url: "",
+            relevance_reason: "",
+            ...body.contact_candidate,
+            id: 8,
+            job_post_id: pathId(params.id),
+          },
+        },
+        { status: 201 },
+      );
+    }),
     http.get("/api/job_posts/:id", ({ params }) =>
       HttpResponse.json({ job_post: { ...jobDetail, id: pathId(params.id) } }),
     ),

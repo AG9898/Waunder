@@ -34,9 +34,15 @@ export interface CopyButtonProps {
   text: string;
   /** The button's label — "Copy cover letter", "Copy message", and so on. */
   label: string;
+  /**
+   * The button's class, `copy-button` unless given. The outreach draft passes
+   * `contact-outreach-copy`, the class `contacts.go` rendered and `app.css` styles as that
+   * screen's secondary action, so the port keeps Go's look there.
+   */
+  buttonClassName?: string;
 }
 
-export function CopyButton({ text, label }: CopyButtonProps) {
+export function CopyButton({ text, label, buttonClassName = "copy-button" }: CopyButtonProps) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -66,7 +72,7 @@ export function CopyButton({ text, label }: CopyButtonProps) {
 
   return (
     <div className="copy-control">
-      <button className="copy-button" type="button" disabled={busy} onClick={onCopy}>
+      <button className={buttonClassName} type="button" disabled={busy} onClick={onCopy}>
         {label}
       </button>
       {/* Always rendered, empty or not: `role="status"` announces a change to its contents, and

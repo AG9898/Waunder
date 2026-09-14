@@ -2568,7 +2568,7 @@
       "id": "FE-21",
       "title": "Port the contacts and outreach draft screen",
       "description": "Port web/components/contacts.go: list and create contact candidates for a job post, and generate an outreach draft per candidate with state keyed by candidate id. Outreach is prefill-for-manual-sending only. There must be no send affordance of any kind, and the screen must never message anyone. Surface the two distinct Rails failures separately so the owner learns whether the LLM was unavailable or the generation failed.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FE",
       "depends_on": [

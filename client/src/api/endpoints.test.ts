@@ -327,7 +327,7 @@ describe("endpoint functions", () => {
     }
   });
 
-  it("exports exactly one function per RailsClient method, plus sign-out", () => {
+  it("exports exactly one function per RailsClient method, plus sign-out and contact creation", () => {
     // Keys are the Go interface's 25 methods; values are the ported names.
     const ported: Record<string, string> = {
       Login: "login",
@@ -361,7 +361,10 @@ describe("endpoint functions", () => {
     // Endpoints with no Go counterpart. `DELETE /api/session` is served by Rails but the Go
     // build never called it: sign-out arrives with the login port (`FE-09`), which owns its
     // method/path assertion in `src/lib/auth.test.tsx`.
-    const added = ["logout"];
+    // `createContact` likewise: Rails has always served
+    // `POST /api/job_posts/:id/contact_candidates`, but the Go contacts screen only listed. It
+    // arrives with the contacts port (`FE-21`), whose `contacts.test.tsx` asserts the body sent.
+    const added = ["logout", "createContact"];
 
     const exported = Object.entries(endpoints)
       .filter(([, value]) => typeof value === "function")

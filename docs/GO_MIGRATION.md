@@ -631,7 +631,7 @@ No Go toolchain, no `go.mod`, no `Makefile`, no `app.wasm`.
 | `web/components/applications.go` | 653 | `src/components/tracker/` |
 | `web/components/draft.go` | 576 | `src/components/draft-review/` |
 | `web/components/manual_entry.go` | 477 | `src/components/manual-entry/` |
-| `web/components/contacts.go` | 325 | `src/components/contacts/` |
+| `web/components/contacts.go` | 325 | `src/components/contacts/` + `src/lib/contacts.ts` |
 | `web/components/push.go` + `push_browser.go` | 427 | `src/components/push-toggle.tsx` + `src/lib/push.ts` (244 lines of code; the `FuncOf`/`Release`/promise-to-channel `await` adapter disappears) |
 | `web/components/profile.go` | 266 | `src/components/profile/` |
 | `web/components/install_guide.go` + `pwa.go` | 281 | `src/components/install-guide.tsx` + `src/lib/platform.ts` |
@@ -1039,6 +1039,60 @@ Five things this pass settled:
 `CopyButton` gains the test Go never had: jsdom exposes no `navigator.clipboard`, so the
 unsupported-browser path ("Select the text and copy it manually.") is exercised for free, and a
 stubbed `navigator` covers the resolved and rejected `writeText` cases.
+
+---
+
+## Contacts and outreach — done (`FE-21`)
+
+`client/src/components/contacts/` is `/jobs/:id/contacts`: `contacts.tsx` (the read, the candidate
+cards, and the create form) and `outreach-draft.tsx` (one candidate's template, generate button, and
+drafted message). `src/lib/contacts.ts` holds `contactRole`, `outreachButtonLabel`,
+`contactsBackHref`, and the create form's `canSaveContact` / `contactInput`. `endpoints.ts` gains
+`createContact` — backed by `ContactCandidateEnvelopeSchema` and the request-side
+`ContactCandidateInputSchema` — and `CopyButton` gains an optional `buttonClassName`.
+
+Five things this pass settled:
+
+- **Manual sending only is asserted over the output and over the network.** Go's
+  `TestContactsNoSendAffordance` grepped lowercased HTML for "send". `contacts.test.tsx` asserts,
+  both before and after a draft exists, that there is no `<form>`, that every `<button>` is typed
+  `button` (an untyped one defaults to `submit`), that no control, link, or class names sending or
+  submitting, that no link is `mailto:`/`sms:`/`tel:` or a messaging URL, and that the only text
+  mentioning "send" is the two sentences saying Waunder does not. It also records every request
+  through MSW's `request:start` event and asserts the whole interaction produced the list read and
+  the one draft `POST` — nothing else left the screen. That is why the create form is deliberately
+  not a `<form>`.
+- **Per-candidate state is keyed by React, not by a map.** Go kept `map[int]*outreachGen` on the
+  screen. Here each candidate mounts its own `OutreachDraftPanel` under `key={contact.id}`, so the
+  typed template and the mutation's draft and error belong to that id. The test proves the keying
+  rather than assuming it: Rails lists newest first, so saving a contact moves every existing card
+  down a slot, and the draft stays with its candidate across that refetch — index-keyed state would
+  hand it to the new contact. The body is also keyed by job id, because a list cached for another
+  posting renders with no pending frame, and neither a half-typed contact nor a draft may carry over.
+- **Rails' three answers stay three messages, in Go's words.** 503 `llm_unavailable` (no
+  `OPENROUTER_API_KEY`) renders `Outreach drafting is not configured right now.`, 502
+  `generation_failed` renders `Could not generate a draft. Please try again.`, and 401 the shared
+  expired-session sentence. Generating invalidates nothing: Rails stores the draft but no read
+  serializes one, so the `keys.ts` table row that had `generateOutreach` invalidating
+  `jobs.contacts` was corrected rather than followed, and `createContact` took that row.
+- **Saving a contact is new, and it is the one deliberate difference from Go on this screen.** Rails
+  has always served `POST /api/job_posts/:id/contact_candidates`; the Go screen only listed. The
+  form sits in a collapsed `<details>` ("Add a contact") under the list, so the default render is
+  one summary line away from the Go build at the `FE-28` gate. Its client hint is trim-only — Save
+  waits for a name and a relevance reason, the two fields `ContactCandidate` validates — blank
+  optional fields are omitted so Rails stores `nil` rather than `""`, a 422 `invalid_input` renders
+  Rails' own sentence, and a success awaits the list refetch rather than splicing the row in.
+  `app.css` is frozen and has no rules for a form Go never rendered, so the fields borrow the profile
+  form's vocabulary (`profile-form`, `profile-field`, `profile-field-label`, `profile-input`,
+  `profile-save`, `profile-save-error`, `profile-save-ok`) next to `contact-create-*` hooks; `UI-01`
+  should give it rules of its own.
+- **Two small hardenings over `contacts.go`.** The LinkedIn link goes through
+  `externalApplicationURL`, so a `javascript:` URL renders no link, and it gains
+  `rel="noopener noreferrer"`, which Go's `target="_blank"` lacked. The copy control is the shared
+  `CopyButton` carrying Go's `.contact-outreach-copy` class, so it keeps that screen's look while
+  gaining the no-clipboard and blocked-write fallbacks Go's bare `writeText` call never had. Both
+  outreach textareas keep the class names `app.css`'s textarea-specific `overflow-wrap` rule
+  targets, and the test parses that rule out of the stylesheet to prove it names them.
 
 ---
 

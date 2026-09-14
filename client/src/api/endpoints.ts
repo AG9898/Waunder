@@ -25,6 +25,7 @@ import { apiGet, apiSend, type ApiRequestOptions } from "./http";
 import {
   ApplicationDraftEnvelopeSchema,
   ApplicationTrackerEnvelopeSchema,
+  ContactCandidateEnvelopeSchema,
   ContactCandidatesEnvelopeSchema,
   CoverLetterDraftEnvelopeSchema,
   CreateApplicationEnvelopeSchema,
@@ -48,6 +49,7 @@ import type {
   ApplicationTracker,
   AutofillPreview,
   ContactCandidate,
+  ContactCandidateInput,
   CoverLetterDraft,
   CreateApplicationResult,
   Digest,
@@ -443,6 +445,29 @@ export async function fetchContacts(
     options,
   );
   return contact_candidates;
+}
+
+/**
+ * `POST /api/job_posts/:id/contact_candidates` — save a person worth reaching out to about a
+ * posting. Rails validates `name` and `relevance_reason` and answers 422 `invalid_input` with its
+ * own sentence otherwise.
+ *
+ * The contacts function with no `RailsClient` counterpart: Rails has always served the route
+ * (`resources :contact_candidates, only: %i[index create]`), but the Go screen only listed. It
+ * creates a row and nothing else — it contacts no one.
+ */
+export async function createContact(
+  jobId: number,
+  input: ContactCandidateInput,
+  options: ApiRequestOptions = {},
+): Promise<ContactCandidate> {
+  const { contact_candidate } = await apiSend(
+    "POST",
+    `/api/job_posts/${segment(jobId)}/contact_candidates`,
+    ContactCandidateEnvelopeSchema,
+    { ...options, json: { contact_candidate: input } },
+  );
+  return contact_candidate;
 }
 
 /**

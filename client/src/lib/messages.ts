@@ -18,7 +18,7 @@
  * after pressing Remove would be wrong in the way that matters: it describes the screen
  * rather than the action that failed, and the owner cannot tell whether the row moved.
  */
-import { isServiceUnavailable, isUnauthorized } from "../api/errors";
+import { asAPIError, isServiceUnavailable, isUnauthorized } from "../api/errors";
 
 /** The expired-session sentence. `load-state.tsx` keys its Sign in link off this exact string. */
 export const SESSION_EXPIRED = "Your session expired. Please sign in again.";
@@ -108,4 +108,39 @@ export function trackerErrorMessage(error: unknown): string {
 export function coverLetterErrorMessage(error: unknown): string {
   if (isUnauthorized(error)) return SESSION_EXPIRED;
   return isServiceUnavailable(error) ? COVER_LETTER_UNAVAILABLE : COVER_LETTER_FAILED;
+}
+
+/**
+ * `applyGenerateResult`'s 503 branch in `contacts.go`, verbatim. Rails answers 503
+ * `llm_unavailable` when `OutreachDraftGenerator` was skipped because no `OPENROUTER_API_KEY` is
+ * configured, so this deliberately does not invite another click.
+ */
+const OUTREACH_UNAVAILABLE = "Outreach drafting is not configured right now.";
+
+/** `applyGenerateResult`'s message for a generator that ran and failed (Rails answers 502). */
+const OUTREACH_FAILED = "Could not generate a draft. Please try again.";
+
+/** A failed contact save that Rails did not explain with a validation sentence. */
+const CONTACT_SAVE_FAILED = "Could not save the contact. Please try again.";
+
+/**
+ * A failed outreach generation, with `applyGenerateResult`'s three-way split: an expired session,
+ * a generator that is not configured (503 `llm_unavailable`), and one that ran and failed (502
+ * `generation_failed`, or anything else). Nothing was sent either way — nothing ever is.
+ */
+export function outreachErrorMessage(error: unknown): string {
+  if (isUnauthorized(error)) return SESSION_EXPIRED;
+  return isServiceUnavailable(error) ? OUTREACH_UNAVAILABLE : OUTREACH_FAILED;
+}
+
+/**
+ * A failed `POST /api/job_posts/:id/contact_candidates`. A 422 `invalid_input` carries Rails' own
+ * validation sentence ("Relevance reason can't be blank"), which is rendered as sent: Rails owns
+ * what a valid contact is, and a paraphrase here would drift from it.
+ */
+export function contactSaveErrorMessage(error: unknown): string {
+  if (isUnauthorized(error)) return SESSION_EXPIRED;
+  const apiError = asAPIError(error);
+  if (apiError?.code === "invalid_input" && apiError.message !== "") return apiError.message;
+  return CONTACT_SAVE_FAILED;
 }

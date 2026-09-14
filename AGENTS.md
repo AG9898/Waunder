@@ -1453,3 +1453,15 @@ panel lands in the aside. Also: a test file that renders a whole ported screen s
 first match, so the specific ones still win, and a newly added fetch inside the screen (the cover
 letter read here) then falls through instead of failing the file with "intercepted a request
 without a matching request handler".
+
+### 2026-09-13 — Missing client deps surface as TS2688; MSW's request log proves "nothing else was sent"
+`client/node_modules` is not guaranteed to exist in a fresh worker checkout, and `npm run typecheck`
+then fails with `TS2688: Cannot find type definition file for 'node'` / `'vite/client'` instead of a
+module-not-found error — run `cd client && npm ci` (the lockfile is committed) before treating a type
+failure as your own. For a screen whose safety rule is "nothing else leaves it" (FE-21's no-send
+contacts screen), register `server.events.on("request:start", …)` in `beforeEach` with
+`server.events.removeAllListeners()` in `afterEach`: it gives an ordered `METHOD /path` log of every
+request the real `fetch` path sent, so the test asserts the exact sequence rather than per-handler
+counts. And `client/src/api/keys.ts`'s mutation → invalidation table is a plan, not a contract: its
+`generateOutreach` row named a read that never carries drafts, so check the Rails serializer before
+wiring an invalidation from it.

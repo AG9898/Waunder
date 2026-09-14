@@ -135,6 +135,16 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 > `llm_unavailable` (no key configured), and 502 `generation_failed`. Generating is disabled until
 > the saved letter is on screen, because the `POST` replaces it.
 >
+> The shadow client's contacts screen (`client/src/components/contacts/`) lists
+> `GET /api/job_posts/:id/contact_candidates` and adds the one write the Go screen never offered:
+> saving a contact through `POST /api/job_posts/:id/contact_candidates`, which Rails has always
+> served. Outreach stays prefilled for manual sending only — each candidate's draft is generated
+> through `POST /api/contact_candidates/:id/outreach_drafts` on an explicit click, shown read-only
+> with a copy control, and never sent. The screen has no form, no submit-typed control, and no
+> messaging link, and its test asserts that nothing leaves the screen beyond the list read, the
+> drafts, and the saves. Rails' 503 `llm_unavailable` and 502 `generation_failed` render as distinct
+> messages, and a saved contact appears by re-reading the list rather than being inserted locally.
+>
 > The auth model is unchanged and stays entirely server-side, but the client's half of it is now in
 > one place. Because the session cookie is httponly, being signed out can only be derived from
 > responses, so `client/src/lib/auth.ts` subscribes to both TanStack caches and sends the owner to

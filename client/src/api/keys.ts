@@ -38,12 +38,14 @@
  * | `updateApplicationDraft`, `submitApplication` | `applications.draft(id)`, `jobs.root()` |
  * | `updateJobApplicationStatus` | `jobs.root()`, `applications.root()` |
  * | `updateProfile` | `profile()` |
- * | `generateOutreach` | `jobs.contacts(jobId)` |
+ * | `createContact` | `jobs.contacts(jobId)` |
  * | `createJobPost` | `jobs.root()`, `ingestionBatches.root()` |
  *
  * `login`, `subscribePush`, `unsubscribePush`, and `lookupPosting` cache nothing: the first two
  * change no read payload, and a lookup persists nothing in Rails, so it is a mutation by shape
- * (a `POST` that must not be replayed from cache) despite reading.
+ * (a `POST` that must not be replayed from cache) despite reading. `generateOutreach` invalidates
+ * nothing either: Rails stores the draft, but no read serializes drafts (there is no list-drafts
+ * endpoint and a candidate row carries none), so the response is the only copy to show.
  */
 import { jobFeedQuery } from "./endpoints";
 import type { JobFeedParams } from "./schemas";

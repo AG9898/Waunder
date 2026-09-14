@@ -511,6 +511,9 @@ export const ApplicationTrackerEnvelopeSchema = z.object({
 });
 export const ProfileEnvelopeSchema = z.object({ profile: goStruct(ProfileSchema) });
 export const VapidPublicKeyEnvelopeSchema = z.object({ vapid_public_key: goString });
+export const ContactCandidateEnvelopeSchema = z.object({
+  contact_candidate: goStruct(ContactCandidateSchema),
+});
 export const ContactCandidatesEnvelopeSchema = z.object({
   contact_candidates: goArray(ContactCandidateSchema),
 });
@@ -536,6 +539,22 @@ export const ManualJobInputSchema = z.object({
   company: z.string(),
 });
 export type ManualJobInput = z.infer<typeof ManualJobInputSchema>;
+
+/**
+ * A contact the owner saves against a posting (`POST /api/job_posts/:id/contact_candidates`).
+ * There is no Go struct for it — the Go build never created contacts — so this mirrors the Rails
+ * controller's permitted params instead. `name` and `relevance_reason` are required by
+ * `ContactCandidate`'s validations; the other three are `.optional()` and omitted when blank, so
+ * Rails stores `nil` rather than `""`. Nothing in it, or anywhere, sends a message to the contact.
+ */
+export const ContactCandidateInputSchema = z.object({
+  name: z.string(),
+  relevance_reason: z.string(),
+  title: z.string().optional(),
+  company_name: z.string().optional(),
+  linkedin_url: z.string().optional(),
+});
+export type ContactCandidateInput = z.infer<typeof ContactCandidateInputSchema>;
 
 /**
  * The editable profile fields. Sensitive contact details and the structured resume
