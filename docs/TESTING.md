@@ -123,6 +123,8 @@ Be honest about the current state — most of the suite is still to be written.
 - **api/** — `spec/services/off_scope_job_post_cleanup_spec.rb`: dry-run reporting, audited
   soft-removal, manual-import exclusion, and application-history preservation for historical
   title-policy cleanup.
+- **api/** — `spec/bin/cleanup_off_scope_job_posts_spec.rb`: subprocess smoke coverage proving the
+  cleanup executable boots through Bundler and emits a parseable, non-writing dry-run report.
 - **api/** — `spec/jobs/parse_inbound_email_job_spec.rb`: job spec wiring the inbound parse job
   to the parser service for both the known-sender and LLM-fallback paths.
 - **api/** — `spec/services/application_route_resolver_spec.rb`: deterministic route-type

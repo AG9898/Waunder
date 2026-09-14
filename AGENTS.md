@@ -1538,3 +1538,9 @@ before `JobPostMaterializer`; rejected titles create no Company, JobPost, route,
 scoring job, while aggregate counts/reasons remain in the inbound email `parse_result`. Manual
 imports bypass the gate, and historical cleanup must begin with
 `api/bin/cleanup-off-scope-job-posts --dry-run`; apply mode soft-removes only owner-untouched rows.
+
+### 2026-09-14 — Standalone Rails executables must boot Bundler before pinned default gems
+When a Gemfile pins a newer version of a Ruby default gem such as `json`, requiring it before
+`config/environment` can activate the image's older default version and make Bundler abort. In
+standalone `api/bin/*` Rails commands, require `config/environment` first, then `json`/other pinned
+default gems; cover the actual executable with a subprocess smoke spec.
