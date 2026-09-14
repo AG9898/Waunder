@@ -21,23 +21,21 @@
  * Rails and Rails' sentence is what the owner reads. jsdom enforces the same validation, which is
  * how `manual-entry.test.tsx` proves the attribute is load-bearing.
  *
- * ## The lookup prefills, and never overwrites
+ * ## The Job URL field and its lookup are `lookup.tsx`
  *
- * Leaving the URL field, or pressing Look up details, posts `POST /api/job_posts/lookup`, which
- * persists nothing. Its answer is folded in with a *functional* state update
- * (`applyLookupResult`), so a field the owner types into while the request is in flight is kept.
- * Go fired it on the native `change` event (blur or Enter). React's `onChange` is the
- * per-keystroke `input` event, so the commit here is `onBlur`, and Enter keeps doing what Enter
- * does in a form: it imports.
+ * `JobUrlLookup` renders the URL field and the Look up details control as the form's first two
+ * children, and owns `POST /api/job_posts/lookup` (`FE-24`). This screen hands it the form state:
+ * the lookup reads the URL and the touched flags and fills fields; the import reads the fields and
+ * nothing about the lookup, so a lookup in flight never disables or delays Import.
  *
- * Neither write is ever retried (`query-client.ts`), and both go through TanStack's mutation
- * cache, so a 401 from either reaches the sign-in redirect in `lib/auth.ts`.
+ * The import is never retried (`query-client.ts`), and it goes through TanStack's mutation cache,
+ * so a 401 reaches the sign-in redirect in `lib/auth.ts`.
  */
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useCallback, useState } from "react";
 import { Link } from "react-router";
 
-import { createJobPost, lookupPosting } from "../../api/endpoints";
+import { createJobPost } from "../../api/endpoints";
 import { queryKeys } from "../../api/keys";
 import type { ManualJobInput } from "../../api/schemas";
 import {
@@ -45,19 +43,15 @@ import {
   IMPORT_HINT,
   type ManualEntryFields,
   type ManualEntryForm,
-  applyLookupFailure,
-  applyLookupResult,
   editField,
   entryButtonLabel,
   importInputPresent,
-  lookupButtonLabel,
-  lookupNoteClass,
-  lookupTarget,
   manualJobInput,
 } from "../../lib/manual-entry";
-import { importErrorMessage, lookupErrorMessage } from "../../lib/messages";
+import { importErrorMessage } from "../../lib/messages";
 import { AppChrome } from "../app-chrome";
 import { ImportResult } from "./import-result";
+import { JobUrlLookup } from "./lookup";
 
 export function ManualEntryScreen() {
   const queryClient = useQueryClient();
@@ -74,37 +68,10 @@ export function ManualEntryScreen() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.ingestionBatches.root() });
     },
   });
-  const lookup = useMutation({ mutationFn: (url: string) => lookupPosting(url) });
 
   const onField = useCallback((field: keyof ManualEntryFields, value: string) => {
     setForm((current) => editField(current, field, value));
   }, []);
-
-  const startLookup = useCallback(
-    (forced: boolean) => {
-      if (lookup.isPending) return;
-      const url = lookupTarget(form, forced);
-      if (url === "") return;
-      setForm((current) => ({ ...current, lookup: null }));
-      lookup.mutate(url, {
-        onSuccess: (result) => {
-          setForm((current) => applyLookupResult(current, url, result));
-        },
-        onError: (error) => {
-          setForm((current) => applyLookupFailure(current, url, lookupErrorMessage(error)));
-        },
-      });
-    },
-    [form, lookup],
-  );
-
-  const onUrlBlur = useCallback(() => {
-    startLookup(false);
-  }, [startLookup]);
-
-  const onLookUp = useCallback(() => {
-    startLookup(true);
-  }, [startLookup]);
 
   const onSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
@@ -137,34 +104,7 @@ export function ManualEntryScreen() {
         an external application link when you have one.
       </p>
       <form className="manual-entry-form" noValidate onSubmit={onSubmit}>
-        <label className="manual-entry-label">
-          <span>Job URL</span>
-          <input
-            className="manual-entry-url"
-            type="url"
-            placeholder="https://…"
-            value={fields.url}
-            onChange={(event) => {
-              onField("url", event.target.value);
-            }}
-            onBlur={onUrlBlur}
-          />
-        </label>
-        <div className="manual-entry-lookup">
-          <button
-            className="manual-entry-lookup-button"
-            type="button"
-            disabled={lookup.isPending || fields.url.trim() === ""}
-            onClick={onLookUp}
-          >
-            {lookupButtonLabel(lookup.isPending)}
-          </button>
-          {form.lookup === null ? null : (
-            <p className={lookupNoteClass(form.lookup.failed)} role="status">
-              {form.lookup.note}
-            </p>
-          )}
-        </div>
+        <JobUrlLookup form={form} setForm={setForm} />
         <label className="manual-entry-label">
           <span>Title</span>
           <input

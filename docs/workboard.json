@@ -2667,7 +2667,7 @@
       "id": "FE-24",
       "title": "Port manual entry posting lookup and prefill",
       "description": "Port the lookup prefill: POST /api/job_posts/lookup when the URL field is committed, filling only fields the owner has not typed into, with the prefilled title and company rendered under the lookup control. A lookup that answers unavailable is never an error and must never block submission, since Rails enriches in the background after import anyway.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FE",
       "depends_on": [

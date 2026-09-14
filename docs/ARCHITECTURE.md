@@ -165,8 +165,12 @@ The full topology and the rationale for the `/api` proxy routing decision live i
 > the URL-or-text hint. The form sets `noValidate`, so the browser's own `type="url"` validation
 > cannot block a value before Rails judges it, and a 422 renders Rails' `invalid_input` sentence as
 > sent. Leaving the URL field (or pressing Look up details) calls `POST /api/job_posts/lookup`, which
-> persists nothing, and its answer fills only fields the owner has not typed into. Nothing is posted
-> on render.
+> persists nothing; typing into the field sends nothing. An `ok` answer fills only fields the owner
+> has not typed into — the title and company land in the Title and Company fields directly under
+> the lookup control, whose note names what was filled. `unsupported`, `unavailable`, and a failed
+> lookup request leave a warning and the fields as they were, and no lookup state (in flight or
+> failed) disables or delays the import, because Rails' `EnrichJobPostJob` reads a URL-only import in
+> the background anyway. Nothing is posted on render.
 >
 > The auth model is unchanged and stays entirely server-side, but the client's half of it is now in
 > one place. Because the session cookie is httponly, being signed out can only be derived from

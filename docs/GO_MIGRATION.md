@@ -1151,8 +1151,9 @@ Five things this pass settled:
 
 ## Manual import — done (`FE-23`)
 
-`client/src/components/manual-entry/` is `/jobs/new`: `manual-entry.tsx` (the form, the posting
-lookup, and the import write) and `import-result.tsx` (Rails' outcome and its link).
+`client/src/components/manual-entry/` is `/jobs/new`: `manual-entry.tsx` (the form and the import
+write), `lookup.tsx` (the Job URL field and the posting lookup, split out in `FE-24` below), and
+`import-result.tsx` (Rails' outcome and its link).
 `src/lib/manual-entry.ts` holds the pure half — the form state and `editField`, the trim-only
 `manualJobInput` and the `importInputPresent` hint, `lookupTarget`, `applyLookupResult` /
 `applyLookupFailure`, `joinFields`, both button labels, and the outcome copy (`importOutcome`,
@@ -1202,6 +1203,46 @@ Five things this pass settled:
   nothing to import replaces the shown result with the hint, because Go's state machine had one slot
   for the outcome. URL trimming is asserted on `manualJobInput` rather than through the DOM, because a
   `type="url"` input strips surrounding whitespace from its own value before any handler sees it.
+
+---
+
+## Posting lookup and prefill — done (`FE-24`)
+
+`client/src/components/manual-entry/lookup.tsx` is `JobUrlLookup`: the Job URL field, the Look up
+details control, and the `POST /api/job_posts/lookup` mutation, split out of `manual-entry.tsx`,
+which `FE-23` had shipped with the lookup already inside it. `lookup.test.tsx` holds the lookup's
+cases, moved out of `manual-entry.test.tsx` and extended. No helper, message, endpoint, or class name
+was added — `lookupTarget`, `applyLookupResult`, `applyLookupFailure`, and `lookupErrorMessage` are
+the `FE-23` ones.
+
+Four things this pass settled:
+
+- **"The prefilled title and company rendered under the lookup control" means Go's fields.** Go's
+  `renderLookup` sat between the URL field and the Title field, so a filled title and company
+  appeared in the Title and Company inputs directly below the control, and the note beside the
+  button named what was filled ("Filled in title and company from the listing."). There was never a
+  separate display of the listing, and adding one would need a class `app.css` does not style — the
+  verbatim-stylesheet rule forbids that before `UI-01`, and the `FE-28` gate would flag it. The test
+  pins Go's layout by sibling order: the URL field directly above `.manual-entry-lookup`, the note
+  inside it, and the filled Title and Company fields directly after it.
+- **The URL field moved with the lookup, and the component returns a fragment.** Committing that
+  field is what starts the request, so leaving the input in the screen would have meant either a
+  child-owned mutation the parent's blur cannot reach, or a parent-owned mutation with a button-only
+  child. `JobUrlLookup` takes the form state and its setter, owns the mutation, and returns the
+  `<label>` plus `.manual-entry-lookup` as a fragment, so the form's children and their order are
+  unchanged and the `FE-23` render test still passes untouched.
+- **"Submittable" is proven by pressing Import after each answer.** The `ok`, `unavailable`,
+  `unsupported`, 500, and network-failure cases each import afterwards and assert the body sent; the
+  401 case asserts Import stays enabled, because in the app `lib/auth.ts` redirects first. One more
+  case holds a lookup open and imports underneath it: the import is neither disabled nor delayed and
+  sends the form as it stood when pressed. That is the common "paste a link, tap Import" flow — a
+  real tap blurs the URL field before the click lands, so it starts both requests — and it is safe
+  because Rails' `EnrichJobPostJob` reads a URL-only import itself. The late lookup answer then
+  fills the still-editable form, as Go's did.
+- **The commit is tested against keystrokes, not only against a missing blur.** A URL typed in
+  eight-character steps sends nothing; leaving the field sends exactly one lookup. The network
+  failure is MSW's `HttpResponse.error()`, which is why the test's lookup answer is a function rather
+  than a status and body.
 
 ---
 

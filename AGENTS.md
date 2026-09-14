@@ -1489,3 +1489,14 @@ validation sentence through `apiErrorMessage(error)`, never `APIError.message`, 
 `api request failed: status N: <body>` and is never empty; and assert URL trimming on a pure helper,
 because `fireEvent.change` cannot observe it — a `type="url"` input strips surrounding whitespace
 from its own value.
+
+### 2026-09-13 — "Rendered under the control" meant Go's fields; a tap blurs before it clicks
+FE-24's criterion "the prefilled title and company render under the lookup control" read like a new
+display, but Go's lookup control sat directly above the Title and Company inputs, so the prefill
+already rendered there beside a note naming the filled fields — a separate display would need a class
+`app.css` does not have and would trip the `FE-28` gate, so resolve placement wording against the Go
+layout before adding markup. When one element's event starts a request another element shows the
+state of (the URL field's blur, the Look up button), put both in one component that returns a
+fragment (`manual-entry/lookup.tsx`), so the form's children do not change. `fireEvent.click` never
+moves focus, so to reproduce a real "type, then tap Import" in a test, `fireEvent.blur` the field
+first — that is how `lookup.test.tsx` proves a lookup in flight never holds up an import.

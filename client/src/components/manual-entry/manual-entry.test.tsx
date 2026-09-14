@@ -4,11 +4,9 @@
  * Transcribed from `TestManualEntryRendersForm`, `TestManualEntrySubmitPostsInputAndSurfacesJob`,
  * `TestManualEntryRejectsEmptyInputWithoutCalling`, `TestManualEntryApplyCreateResultErrors`,
  * `TestImportMessageAndLinkLabel`, `TestManualEntryRendersAllImportResults`,
- * `TestManualEntryNeverImportsOnRender`, `TestEntryButtonLabel`,
- * `TestManualEntryLookupPrefillsEmptyFields`, `TestManualEntryLookupNeverOverwritesOwnerInput`,
- * `TestManualEntryUnreadablePostingLeavesFormUsable`, `TestManualEntryLookupSurfacesExpiredSession`,
- * `TestManualEntryNeverLooksUpOnRender`, and `TestManualEntryLookupSkipsRepeatOfSameURL` in
- * `web/components/manual_entry_test.go`. Go drove `doSubmit` / `doLookup` directly and rendered a
+ * `TestManualEntryNeverImportsOnRender`, `TestEntryButtonLabel`, and
+ * `TestManualEntryNeverLooksUpOnRender` in `web/components/manual_entry_test.go`; the posting
+ * lookup's own cases are in `lookup.test.tsx` (`FE-24`). Go drove `doSubmit` directly and rendered a
  * component whose `state: entryDone` was set by hand, so it never showed that a press reached the
  * network or that the result on screen was the one Rails sent. Here every case presses the real
  * control, and the fake Rails records every request that arrived.
@@ -23,23 +21,18 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { queryKeys } from "../../api/keys";
 import { createQueryClient } from "../../api/query-client";
-import type { ManualJobResult, PostingLookup } from "../../api/schemas";
+import type { ManualJobResult } from "../../api/schemas";
 import {
   EMPTY_MANUAL_ENTRY_FORM,
   IMPORT_HINT,
-  applyLookupResult,
-  editField,
   entryButtonLabel,
   importInputPresent,
   importLinkLabel,
   importMessage,
   importOutcome,
-  joinFields,
-  lookupButtonLabel,
-  lookupTarget,
   manualJobInput,
 } from "../../lib/manual-entry";
-import { POSTING_UNREADABLE, SESSION_EXPIRED } from "../../lib/messages";
+import { SESSION_EXPIRED } from "../../lib/messages";
 import { HttpResponse, http, installMockApi, type JsonBodyType } from "../../test/msw";
 import { ManualEntryScreen } from "./manual-entry";
 
@@ -66,35 +59,14 @@ function importResult(
   };
 }
 
-const LISTING: PostingLookup = {
-  status: "ok",
-  provider: "linked_in",
-  error: "",
-  title: "MCP/AI Developer",
-  company: "Autodesk",
-  location: "Canada",
-  compensation: "",
-  description: "Build the agentic platform.",
-};
-
-const LINKEDIN_URL = "https://www.linkedin.com/jobs/view/4435267449";
-
 /** Every request the screen sent, as `METHOD /path`, in order. */
 let requests: string[] = [];
 let createBodies: unknown[] = [];
-let lookupBodies: unknown[] = [];
 let createReply: { status: number; body: JsonBodyType } = { status: 201, body: {} };
-let lookupReply: { status: number; body: JsonBodyType } = { status: 200, body: {} };
 /** Held open so an in-flight request lasts long enough for `waitFor` to observe it. */
 let createDelayMs = 0;
-let lookupDelayMs = 0;
 
 const server = installMockApi(
-  http.post("/api/job_posts/lookup", async ({ request }) => {
-    lookupBodies.push(await request.json());
-    if (lookupDelayMs > 0) await delay(lookupDelayMs);
-    return HttpResponse.json(lookupReply.body, { status: lookupReply.status });
-  }),
   http.post("/api/job_posts", async ({ request }) => {
     createBodies.push(await request.json());
     if (createDelayMs > 0) await delay(createDelayMs);
@@ -105,11 +77,8 @@ const server = installMockApi(
 beforeEach(() => {
   requests = [];
   createBodies = [];
-  lookupBodies = [];
   createReply = { status: 201, body: importResult() };
-  lookupReply = { status: 200, body: { lookup: LISTING } };
   createDelayMs = 0;
-  lookupDelayMs = 0;
   server.events.on("request:start", ({ request }) => {
     requests.push(`${request.method} ${new URL(request.url).pathname}`);
   });
@@ -156,33 +125,11 @@ function pressImport(container: HTMLElement) {
   fireEvent.click(requireElement(container, ".manual-entry-submit"));
 }
 
-/** Leaves the URL field, which is what commits it and starts a lookup. */
-function commitUrl(container: HTMLElement) {
-  fireEvent.blur(requireElement(container, ".manual-entry-url"));
-}
-
 async function importedResult(container: HTMLElement): Promise<HTMLElement> {
   await waitFor(() => {
     expect(container.querySelector(".manual-entry-result")).not.toBeNull();
   });
   return requireElement<HTMLElement>(container, ".manual-entry-result");
-}
-
-/** Waits for a lookup to settle into its note, and returns the note. */
-async function lookupNote(container: HTMLElement): Promise<HTMLElement> {
-  await waitFor(() => {
-    expect(
-      container.querySelector(".manual-entry-lookup-note, .manual-entry-lookup-warning"),
-    ).not.toBeNull();
-  });
-  return requireElement<HTMLElement>(
-    container,
-    ".manual-entry-lookup-note, .manual-entry-lookup-warning",
-  );
-}
-
-function lookupButton(container: HTMLElement): HTMLButtonElement {
-  return requireElement<HTMLButtonElement>(container, ".manual-entry-lookup-button");
 }
 
 /* -------------------------------------------------------------------------- */
@@ -256,21 +203,10 @@ describe("manual entry helpers", () => {
     expect(new Set(results.map(importLinkLabel)).size).toBe(4);
   });
 
-  it.each([
-    [[], ""],
-    [["title"], "title"],
-    [["title", "company"], "title and company"],
-    [["title", "company", "posting text"], "title, company, and posting text"],
-  ])("joinFields(%j) is %j", (fields, expected) => {
-    expect(joinFields(fields)).toBe(expected);
-  });
-
-  // TestEntryButtonLabel.
-  it("labels both buttons for their in-flight state", () => {
+  // TestEntryButtonLabel. The lookup button's labels are in `lookup.test.tsx`.
+  it("labels the import button for its in-flight state", () => {
     expect(entryButtonLabel(true)).toBe("Importing…");
     expect(entryButtonLabel(false)).toBe("Import job");
-    expect(lookupButtonLabel(true)).toBe("Reading posting…");
-    expect(lookupButtonLabel(false)).toBe("Look up details");
   });
 
   it("trims all five fields, URLs included, and sends every key even when blank", () => {
@@ -302,44 +238,6 @@ describe("manual entry helpers", () => {
     [{ text: "Build platforms." }, true],
   ])("importInputPresent(%j) is %s", (partial, expected) => {
     expect(importInputPresent({ ...EMPTY_MANUAL_ENTRY_FORM.fields, ...partial })).toBe(expected);
-  });
-
-  it("looks up only a URL that is present and, unless forced, not the one already read", () => {
-    const blank = EMPTY_MANUAL_ENTRY_FORM;
-    const typed = editField(blank, "url", `  ${LINKEDIN_URL} `);
-    expect(lookupTarget(blank, true)).toBe("");
-    expect(lookupTarget(typed, false)).toBe(LINKEDIN_URL);
-
-    const read = { ...typed, lookedUpUrl: LINKEDIN_URL };
-    expect(lookupTarget(read, false)).toBe("");
-    expect(lookupTarget(read, true)).toBe(LINKEDIN_URL);
-  });
-
-  it("marks only the three prefillable fields as touched", () => {
-    let form = editField(EMPTY_MANUAL_ENTRY_FORM, "url", LINKEDIN_URL);
-    form = editField(form, "application_url", "https://careers.acme.com");
-    expect([form.titleTouched, form.companyTouched, form.textTouched]).toEqual([
-      false,
-      false,
-      false,
-    ]);
-    form = editField(editField(editField(form, "title", "a"), "company", "b"), "text", "c");
-    expect([form.titleTouched, form.companyTouched, form.textTouched]).toEqual([true, true, true]);
-  });
-
-  it("lets a second lookup replace a title the first filled, but never a description", () => {
-    const first = applyLookupResult(EMPTY_MANUAL_ENTRY_FORM, LINKEDIN_URL, LISTING);
-    const second = applyLookupResult(first, LINKEDIN_URL, {
-      ...LISTING,
-      title: "Senior MCP/AI Developer",
-      description: "A different description.",
-    });
-    expect(second.fields.title).toBe("Senior MCP/AI Developer");
-    expect(second.fields.text).toBe(LISTING.description);
-    expect(second.lookup).toEqual({
-      failed: false,
-      note: "Filled in title and company from the listing.",
-    });
   });
 });
 
@@ -400,9 +298,10 @@ describe("manual entry form", () => {
       expect(field.getAttribute("placeholder")).toBe(placeholder);
     }
 
-    expect(lookupButton(form)).toHaveAttribute("type", "button");
-    expect(lookupButton(form)).toBeDisabled();
-    expect(lookupButton(form)).toHaveTextContent("Look up details");
+    const lookUp = requireElement<HTMLButtonElement>(form, ".manual-entry-lookup-button");
+    expect(lookUp).toHaveAttribute("type", "button");
+    expect(lookUp).toBeDisabled();
+    expect(lookUp).toHaveTextContent("Look up details");
     const submit = requireElement<HTMLButtonElement>(form, ".manual-entry-submit");
     expect(submit).toHaveAttribute("type", "submit");
     expect(submit).toBeEnabled();
@@ -690,161 +589,5 @@ describe("manual entry form", () => {
     const text = requireElement<HTMLTextAreaElement>(container, ".manual-entry-text");
     expect(text.tagName).toBe("TEXTAREA");
     expect(text.value).toBe(token);
-  });
-});
-
-/* -------------------------------------------------------------------------- */
-/* Posting lookup                                                              */
-/* -------------------------------------------------------------------------- */
-
-describe("posting lookup", () => {
-  // TestManualEntryLookupPrefillsEmptyFields.
-  it("reads the posting when the URL field is left, and fills the empty fields", async () => {
-    const { container } = renderEntry();
-    fill(container, ".manual-entry-url", LINKEDIN_URL);
-    commitUrl(container);
-
-    const note = await lookupNote(container);
-    expect(lookupBodies).toEqual([{ url: LINKEDIN_URL }]);
-    expect(valueOf(container, ".manual-entry-title")).toBe("MCP/AI Developer");
-    expect(valueOf(container, ".manual-entry-company")).toBe("Autodesk");
-    expect(valueOf(container, ".manual-entry-text")).toBe("Build the agentic platform.");
-    expect(note).toHaveClass("manual-entry-lookup-note");
-    expect(note.textContent).toBe("Filled in title, company, and posting text from the listing.");
-    // A lookup persists nothing and imports nothing.
-    expect(requests).toEqual(["POST /api/job_posts/lookup"]);
-    expect(lookupButton(container)).toHaveTextContent("Look up details");
-  });
-
-  // TestManualEntryLookupNeverOverwritesOwnerInput.
-  it("never overwrites a field the owner typed into", async () => {
-    const { container } = renderEntry();
-    fill(container, ".manual-entry-title", "My title");
-    fill(container, ".manual-entry-company", "My company");
-    fill(container, ".manual-entry-text", "My notes");
-    fill(container, ".manual-entry-url", LINKEDIN_URL);
-    commitUrl(container);
-
-    const note = await lookupNote(container);
-    expect(note.textContent).toBe("Read the listing; your entries were kept.");
-    expect(valueOf(container, ".manual-entry-title")).toBe("My title");
-    expect(valueOf(container, ".manual-entry-company")).toBe("My company");
-    expect(valueOf(container, ".manual-entry-text")).toBe("My notes");
-  });
-
-  it("keeps a field the owner types into while the lookup is still in flight", async () => {
-    lookupDelayMs = 200;
-    const { container } = renderEntry();
-    fill(container, ".manual-entry-url", LINKEDIN_URL);
-    commitUrl(container);
-
-    await waitFor(() => {
-      expect(lookupButton(container)).toBeDisabled();
-    });
-    expect(lookupButton(container)).toHaveTextContent("Reading posting…");
-    fill(container, ".manual-entry-title", "My own title");
-
-    const note = await lookupNote(container);
-    expect(valueOf(container, ".manual-entry-title")).toBe("My own title");
-    expect(valueOf(container, ".manual-entry-company")).toBe("Autodesk");
-    expect(note.textContent).toBe("Filled in company and posting text from the listing.");
-  });
-
-  // TestManualEntryUnreadablePostingLeavesFormUsable.
-  it.each(["unavailable", "unsupported"])(
-    "leaves the form empty and importable when Rails reports the posting %s",
-    async (status) => {
-      lookupReply = {
-        status: 200,
-        body: { lookup: { status, error: "Could not read the posting" } },
-      };
-      const { container } = renderEntry();
-      fill(container, ".manual-entry-url", "https://careers.example.com/roles/9");
-      commitUrl(container);
-
-      const note = await lookupNote(container);
-      expect(note).toHaveClass("manual-entry-lookup-warning");
-      expect(note.textContent).toBe(POSTING_UNREADABLE);
-      expect(valueOf(container, ".manual-entry-title")).toBe("");
-      expect(valueOf(container, ".manual-entry-company")).toBe("");
-
-      pressImport(container);
-      await importedResult(container);
-      expect(createBodies).toEqual([
-        {
-          job_post: {
-            url: "https://careers.example.com/roles/9",
-            application_url: "",
-            text: "",
-            title: "",
-            company: "",
-          },
-        },
-      ]);
-    },
-  );
-
-  // TestManualEntryLookupSurfacesExpiredSession, plus the non-401 failure.
-  it.each([
-    [401, "unauthorized", SESSION_EXPIRED],
-    [500, "internal_error", POSTING_UNREADABLE],
-  ])(
-    "reports a %i lookup once as a warning, and leaves import enabled",
-    async (status, code, expected) => {
-      lookupReply = { status, body: { error: { code, message: "failed" } } };
-      const { container } = renderEntry();
-      fill(container, ".manual-entry-url", LINKEDIN_URL);
-      commitUrl(container);
-
-      const note = await lookupNote(container);
-      expect(note).toHaveClass("manual-entry-lookup-warning");
-      expect(note.textContent).toBe(expected);
-      await delay(50);
-      expect(lookupBodies).toHaveLength(1);
-      expect(requireElement(container, ".manual-entry-submit")).toBeEnabled();
-      expect(container.querySelector(".manual-entry-error")).toBeNull();
-    },
-  );
-
-  // TestManualEntryLookupSkipsRepeatOfSameURL — Go could only check the recorded URL, because the
-  // skip lived in `startLookup`, which its test could not reach.
-  it("does not reread a URL it already read unless Look up details is pressed", async () => {
-    const { container } = renderEntry();
-    fill(container, ".manual-entry-url", LINKEDIN_URL);
-    commitUrl(container);
-    await lookupNote(container);
-
-    commitUrl(container);
-    await delay(50);
-    expect(lookupBodies).toHaveLength(1);
-
-    fireEvent.click(lookupButton(container));
-    await waitFor(() => {
-      expect(lookupBodies).toHaveLength(2);
-    });
-    await waitFor(() => {
-      expect(lookupButton(container)).toBeEnabled();
-    });
-
-    fill(container, ".manual-entry-url", "https://www.linkedin.com/jobs/view/1");
-    commitUrl(container);
-    await waitFor(() => {
-      expect(lookupBodies).toEqual([
-        { url: LINKEDIN_URL },
-        { url: LINKEDIN_URL },
-        { url: "https://www.linkedin.com/jobs/view/1" },
-      ]);
-    });
-  });
-
-  it("never looks up without a URL", async () => {
-    const { container } = renderEntry();
-    expect(lookupButton(container)).toBeDisabled();
-    commitUrl(container);
-    await delay(50);
-    expect(requests).toEqual([]);
-
-    fill(container, ".manual-entry-url", LINKEDIN_URL);
-    expect(lookupButton(container)).toBeEnabled();
   });
 });
