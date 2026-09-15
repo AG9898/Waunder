@@ -29,7 +29,7 @@
  */
 import { useEffect, useState } from "react";
 import type { ChangeEvent } from "react";
-import { Plus } from "lucide-react";
+import { BriefcaseBusiness, ClipboardList, Inbox, Plus, UserRound } from "lucide-react";
 import { Link, useLocation } from "react-router";
 
 import {
@@ -46,12 +46,12 @@ import { UpdateBanner } from "./update-banner";
 /** Shown when the layout choice was applied but could not be persisted. */
 const STORAGE_ERROR = "Layout changed. This browser could not save the preference.";
 
-/** The four sections, in `chrome.go`'s order, with its labels and paths. */
+/** The four sections, in `chrome.go`'s order, with labels, paths, and mobile icons. */
 const NAV_TABS = [
-  { tab: "digest", href: "/", label: "Intake" },
-  { tab: "jobs", href: "/jobs", label: "Jobs" },
-  { tab: "applications", href: "/applications", label: "Applications" },
-  { tab: "profile", href: "/profile", label: "Profile" },
+  { tab: "digest", href: "/", label: "Intake", Icon: Inbox },
+  { tab: "jobs", href: "/jobs", label: "Jobs", Icon: BriefcaseBusiness },
+  { tab: "applications", href: "/applications", label: "Applications", Icon: ClipboardList },
+  { tab: "profile", href: "/profile", label: "Profile", Icon: UserRound },
 ] as const;
 
 type NavTab = (typeof NAV_TABS)[number]["tab"];
@@ -105,9 +105,9 @@ export function AppChrome() {
         <Link className="app-brand" to="/">
           Waunder
         </Link>
-        <Link className="app-add-job" to="/jobs/new">
+        <Link className="app-add-job" to="/jobs/new" aria-label="Import job">
           <Plus className="app-add-job-icon" aria-hidden="true" color="currentColor" size={14} />
-          Import job
+          <span className="app-add-job-label">Import job</span>
         </Link>
         <label className="layout-control">
           <span>Layout</span>
@@ -121,14 +121,17 @@ export function AppChrome() {
         </label>
       </div>
       <nav className="app-tabs" aria-label="Main navigation">
-        {NAV_TABS.map(({ tab, href, label }) => (
+        {NAV_TABS.map(({ tab, href, label, Icon }) => (
           <Link
             key={tab}
             className={tab === active ? "app-tab app-tab-active" : "app-tab"}
             to={href}
             aria-current={tab === active ? "page" : undefined}
           >
-            {label}
+            <span className="app-tab-icon-wrap">
+              <Icon className="app-tab-icon" aria-hidden="true" color="currentColor" size={20} />
+            </span>
+            <span className="app-tab-label">{label}</span>
           </Link>
         ))}
       </nav>

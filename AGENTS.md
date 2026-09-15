@@ -1558,3 +1558,6 @@ for required declarations, compare capture group 1 (`[, name]`), not the full-ma
 
 ### 2026-09-15 — shadcn generation must preserve the native Dialog seam
 The current shadcn CLI registry makes `command` pull in the Dialog primitive and prompts to overwrite the existing native `dialog.tsx`; generate with that file temporarily out of the target path, then restore it so UI-02 screens keep their native-dialog contract. The CLI also emitted a `cn` package because this repo's local `cn` helper is not resolved from the registry alias, so replace generated `cn` imports with `../../lib/cn` and remove that accidental dependency before pinning the intended Radix/cmdk packages.
+
+### 2026-09-15 — Mobile chrome rules must account for the later tab selector
+The generic `.app-chrome .app-tab` rule appears after the base `.app-tab` rule and overrides its padding, so mobile icon-nav changes must be checked against that more-specific selector. When mobile base flex or label rules change, duplicate desktop root overrides must restore the UI-12 text-nav geometry while leaving the fixed bar and `--screen-bottom` variables untouched.

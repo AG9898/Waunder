@@ -352,10 +352,10 @@ Menus that list statuses group them under these four group labels, in this order
 - Desktop: a 56px surface top bar with a bottom hairline. It holds an 18px/700 wordmark, text nav
   items (13px/600, `--radius-control`, active = sage-soft fill + sage-strong text), and, on the
   right, the compact layout select plus the sage-filled **Import job** action (the Surface v2 Add
-  job control) with a 14px Lucide plus icon. This is the existing `/jobs/new` entry point; the
-  mobile chrome remains unchanged until UI-13.
+  job control) with a 14px Lucide plus icon. This is the existing `/jobs/new` entry point.
 - Mobile: a 60px header with the wordmark and a 44px sage add button; bottom nav of four items, each a
   20px lucide icon over an 11px label, active item sage-strong with a sage-soft pill behind the icon;
+  the add control is the same accessible `/jobs/new` entry point with its label reduced to the icon;
   safe-area padding unchanged.
 
 ### Re-skin checklist (screens without their own artboard)

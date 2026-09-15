@@ -3315,7 +3315,7 @@
       "id": "UI-13",
       "title": "Re-skin the mobile app chrome with an icon bottom nav",
       "description": "Restyle AppChrome for mobile layouts to the STYLE_GUIDE.md 'Surface v2 > Shell > Mobile' spec: a 60px header with the wordmark and a 44px sage add button, and a bottom nav where each of the four items is a 20px lucide icon over an 11px label with a sage-soft pill behind the active icon. Keep the fixed-position bar, --screen-bottom reservation, and safe-area padding exactly as they work today. Desktop rendering from UI-12 must not change.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "UI",
       "depends_on": [

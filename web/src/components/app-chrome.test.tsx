@@ -1,5 +1,5 @@
 /**
- * App chrome and layout-preference parity (`FE-08`, `UI-12`).
+ * App chrome and layout-preference parity (`FE-08`, `UI-12`, `UI-13`).
  *
  * Three kinds of assertion live here, because the chrome's behavior is split across three
  * places:
@@ -103,10 +103,29 @@ describe("navigation", () => {
     const action = screen.getByRole("link", { name: "Import job" });
     const icon = action.querySelector("svg");
 
+    expect(action).toHaveAttribute("aria-label", "Import job");
     expect(icon).toHaveAttribute("aria-hidden", "true");
     expect(icon).toHaveAttribute("stroke", "currentColor");
     expect(icon).toHaveAttribute("width", "14");
     expect(icon).toHaveAttribute("height", "14");
+  });
+
+  it("renders a 20px currentColor Lucide icon over each mobile tab label", () => {
+    renderAt("/jobs");
+
+    const tabs = Array.from(
+      screen.getByRole("navigation", { name: "Main navigation" }).querySelectorAll(".app-tab"),
+    );
+
+    expect(tabs).toHaveLength(4);
+    for (const tab of tabs) {
+      const icon = tab.querySelector(".app-tab-icon");
+      expect(icon).toHaveAttribute("aria-hidden", "true");
+      expect(icon).toHaveAttribute("stroke", "currentColor");
+      expect(icon).toHaveAttribute("width", "20");
+      expect(icon).toHaveAttribute("height", "20");
+      expect(tab.querySelector(".app-tab-label")).toBeTruthy();
+    }
   });
 
   it.each(ACTIVE_TAB)("marks $label current at $path", ({ path, label }) => {
@@ -326,22 +345,50 @@ describe("Surface v2 desktop shell", () => {
       "font-weight": "700",
     });
     expect(desktopRule(".app-chrome .app-tab")).toMatchObject({
+      flex: "0 0 auto",
+      "flex-direction": "row",
       "min-height": "var(--control-h-desktop)",
       "border-radius": "var(--radius-control)",
       "font-size": "var(--text-sm)",
       "font-weight": "600",
     });
+    expect(desktopRule(".app-tab-icon-wrap")).toMatchObject({ display: "none" });
+    expect(desktopRule(".app-tab-label")).toMatchObject({
+      "font-size": "var(--text-sm)",
+      "font-weight": "600",
+    });
     expect(desktopRule(".app-add-job")).toMatchObject({
       display: "inline-flex",
+      width: "auto",
+      height: "auto",
       "min-height": "var(--control-h-desktop)",
+      border: "0",
       "border-radius": "var(--radius-control)",
       background: "var(--color-accent)",
     });
+    expect(desktopRule(".app-add-job-label")).toMatchObject({ display: "inline" });
     expect(desktopRule(".app-add-job-icon")).toMatchObject({ display: "block" });
   });
 
-  it("keeps the mobile fixed bar contract and hides the desktop-only icon", () => {
-    expect(declarations(".app-add-job-icon")["display"]).toBe("none");
+  it("uses the mobile header and icon-nav dimensions without changing the fixed bar", () => {
+    expect(declarations(".app-toolbar")).toMatchObject({ "min-height": "60px", "flex-wrap": "nowrap" });
+    expect(declarations(".app-add-job")).toMatchObject({
+      width: "44px",
+      height: "44px",
+      "min-height": "var(--control-h-touch)",
+      background: "var(--color-accent)",
+    });
+    expect(declarations(".app-add-job-label")["display"]).toBe("none");
+    expect(declarations(".app-tab")).toMatchObject({
+      "min-height": "var(--control-h-touch)",
+      "flex-direction": "column",
+    });
+    expect(declarations(".app-tab-icon")).toMatchObject({ width: "20px", height: "20px" });
+    expect(declarations(".app-tab-label")).toMatchObject({ "font-size": "11px" });
+    expect(declarations(".app-tab-active")["background"]).toBe("transparent");
+    expect(declarations(".app-tab-active .app-tab-icon-wrap")).toMatchObject({
+      background: "var(--color-accent-soft)",
+    });
     expect(declarations(".app-chrome .app-tabs")["position"]).toBe("var(--nav-position)");
     expect(declarations(".app-chrome .app-tabs")["padding"]).toContain("var(--nav-safe-bottom)");
   });
