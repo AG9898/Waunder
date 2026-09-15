@@ -3452,7 +3452,7 @@
       "id": "UI-16",
       "title": "Add the tracker's read-only Score, Stage, Applied, Follow-up, and Note columns",
       "description": "Add applied_at to the client ApplicationTracker schema and extend the tracker columns to the full Surface v2 order: source logo in the Job cell, Score as the match-score band pill, Stage as plain text, Applied from applied_at, Follow-up with the past/today/future tones, and Note as single-line ellipsis text, each with a faint dash when empty. All are display-only in this task, sortable over the loaded page, and hideable from the Columns control. Dates render exactly as Rails sent them with no timezone conversion.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "UI",
       "depends_on": [

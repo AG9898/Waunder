@@ -49,11 +49,13 @@ Phase 1 delivers the full plan scenario: forward a job-alert email → Resend in
   Rows are grouped by tracker state (All / Not applied / Applied / In progress / Closed, each tab
   carrying its count), default to the open bins (active + backlog, removed behind its own
   filter), sort by newest intake / recent activity / highest match, and page at 30. Each row
-  shows the job, company, its status, when it was intaked, and when its status last moved, and
-  the status is editable **inline on the row** — creating the tracked application on first use,
-  without ever generating a draft or submitting. A header stats cluster shows how many jobs have
-  been applied to out of the total tracked. Untracking is deliberately unsupported, since it
-  would destroy an application's draft and audit history.
+  shows the job, company, source, match score, status, stage, applied date, intake date, last status
+  update, follow-up date, and note. Status is editable **inline on the row** — creating the tracked
+  application on first use, without ever generating a draft or submitting. The other Surface v2
+  values are currently read-only, sortable, and hideable over the loaded page; dates use Rails'
+  literal calendar values without browser timezone conversion. A header stats cluster shows how many
+  jobs have been applied to out of the total tracked. Untracking is deliberately unsupported, since
+  it would destroy an application's draft and audit history.
 - **Manual job import and duplicate awareness**: a persistent, clearly labelled **Import job**
   action in the shared header and Jobs screen (including its empty state) lets the owner record a
   job-board listing URL, an optional external application URL, and/or pasted posting text. Before

@@ -71,6 +71,7 @@ const feedTracker: ApplicationTracker = {
   pipeline_stage: "waiting",
   pipeline_note: "Referred by a former colleague.",
   last_status_change_at: "2026-09-08T17:20:00Z",
+  applied_at: "2026-09-08T17:20:00Z",
   next_follow_up_on: "2026-09-15",
   approved_at: "",
   submitted_at: "",

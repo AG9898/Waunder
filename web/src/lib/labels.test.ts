@@ -258,6 +258,7 @@ function tracker(pipelineStatus: string): ApplicationTracker {
     pipeline_stage: "",
     pipeline_note: "",
     last_status_change_at: "",
+    applied_at: "",
     next_follow_up_on: "",
     approved_at: "",
     submitted_at: "",

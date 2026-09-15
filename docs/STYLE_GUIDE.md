@@ -64,16 +64,18 @@ source of truth; the stylesheet is `web/public/app.css`, linked from `web/index.
 > `<table class="tracker-table">` inside `.tracker-grid-scroll`, a row-number rail, and
 > `.tracker-cell-job` as the TanStack-pinned leading data cell. `tracker-row tracker-row--<group>`
 > from `trackerRowClass` remains the group-tint hook; the company is also rendered as a quiet second
-> line inside the pinned Job cell on mobile. The current structural slice keeps the existing Job,
-> Company, Status, Intaked, and Updated columns; Status is an editable `StatusChip` command popover.
+> line inside the pinned Job cell on mobile. The full structural slice contains Job, Company, Score,
+> Status, Stage, Applied, Intaked, Updated, Follow-up, and Note; Status is an editable `StatusChip`
+> command popover, while the other Surface v2 cells are currently read-only until their editor tasks
+> land.
 > `tracker.test.tsx` parses `app.css` to pin the grid dimensions, gridlines, sticky columns, mobile
 > scroll fade, desktop/mobile row heights, and explicit virtualization spacer display, so
 > restyling the tracker means updating that test deliberately. A pipeline stage with no label renders
 > no `.tracker-stage` pill rather than an empty one.
 >
 > **RESOLVED-26 replaces the former card/table contract.** The tracker is a horizontally scrolling
-> Surface v2 grid at every width; the later Surface v2 tasks add the remaining columns, toolbar,
-> footer, and editors without changing this structural grid foundation.
+> Surface v2 grid at every width; later Surface v2 tasks add the remaining editors without changing
+> this structural grid foundation.
 
 ---
 
@@ -200,11 +202,11 @@ figures where possible.
   applied / Applied / In progress / Closed, each with a Rails count; the strip scrolls horizontally
   so five tabs stay reachable on a phone. Lifecycle bin and sort remain server-driven native
   selects under `.tracker-toolbar-controls`, next to the compact `.tracker-columns` dropdown.
-- The tracker grid runs on TanStack Table (UI-04/UI-14): a header click sorts only the loaded page
+- The tracker grid runs on TanStack Table (UI-04/UI-14/UI-16): a header click sorts only the loaded page
   (direction in `aria-sort` and the `.tracker-sort[data-sort]` arrow), while the sunken header uses
   Lucide column icons and a sorted-column state. The row-number rail and Job column are pinned,
   column widths come from TanStack sizing, and the remaining columns scroll inside the panel. A
-  `.tracker-columns` dropdown hides Company/Status/dates (never Job), pages over 60 rows are
+  `.tracker-columns` dropdown hides every non-Job column (never Job), pages over 60 rows are
   window-virtualized with measured rows, and `.tracker-spacer` rows stay explicit table rows.
   `.tracker-footer` remains inside the grid panel and carries the inclusive row range plus
   Previous / Page X of Y / Next controls.
@@ -334,17 +336,18 @@ Menus that list statuses group them under these four group labels, in this order
 
 - One grid at every width inside a surface panel (`--radius-panel`, hairline border, `--shadow-sm`).
   Header strip 36px (34px mobile), rows 40px desktop / 56px mobile, 13px body text.
-- **UI-14/UI-17 structural slice:** the shipped grid currently contains row number, Job, Company,
-  Status, Intaked, and Updated. Job keeps its existing link and Status is an editable grouped
-  `StatusChip` popover; later tasks add the
-  Score, Stage, Applied, Follow-up, and Note cells without changing the pinned/scrolling frame.
+- **UI-14/UI-16 structural slice:** the shipped grid contains row number, Job, Company, Score, Status,
+  Stage, Applied, Intaked, Updated, Follow-up, and Note. Job keeps its existing link and source logo;
+  Score keeps the match-score band pill; Status is an editable grouped `StatusChip` popover; and
+  Stage, Applied, Follow-up, and Note are read-only cells until their editor tasks land.
 - Column order: row number (48px desktop / 34px mobile, centered, faint tabular digits), Job (pinned;
   source logo 14px + title 600, ellipsis; on mobile the company sits under the title as a 12px faint
   second line), Company, Score (match-score band pill), Status (`StatusChip`), Stage (plain text,
   faint `—` when empty), Applied, Updated, Follow-up, Note (ink-soft, single-line ellipsis). Dates
   are tabular; an empty date is a faint `—`.
 - Follow-up tone: a past date is danger ink 600 with a 6px danger dot; today reads "Today" in sage
-  strong 600; future dates are ink-soft.
+  strong 600; future dates are ink-soft. Applied and follow-up dates use the literal Rails calendar
+  values without browser timezone conversion.
 - Header cells are 12px/600 uppercase faint text with a 13px lucide icon; the sorted column uses
   `--color-header-sorted`, sage-strong text, and an arrow icon for direction.
 - The grid scrolls horizontally inside its panel with the Job column pinned; on mobile a 28px fade on

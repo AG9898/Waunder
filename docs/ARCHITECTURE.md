@@ -151,7 +151,10 @@ triage-deferred postings the owner may still have applied to — plus the chosen
 (`application`), bin, sort, and page. The group tab totals and the header's "Applied to" / "Jobs
 tracked" figures come from Rails' `application_counts`, never from counting rows. One real `<table>`
 renders at every width inside the horizontal scroll panel, so it follows the selected layout rather
-than the viewport. A row's grouped StatusChip popover writes
+than the viewport. Its full row contains the source-marked Job, Company, Score, Status, Stage,
+Applied, Intaked, Updated, Follow-up, and Note columns; the read-only cells sort only the loaded page
+and hide their header/cell pair together. Applied and follow-up dates use Rails' literal calendar
+values without timezone conversion. A row's grouped StatusChip popover writes
 `PATCH /api/job_posts/:id/application_status` with a blank stage and no note or follow-up date,
 reaches no draft or submit endpoint, and then invalidates and refetches the feed, because a status
 change can move the row out of the active tab and changes every tab's total. The shared editor

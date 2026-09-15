@@ -23,12 +23,15 @@ import { Link } from "react-router";
 import type { JobSummary } from "../../api/schemas";
 import type { TrackerColumnId } from "../../lib/tracker-columns";
 import {
+  trackerAppliedLabel,
   trackerDate,
+  trackerFollowUpState,
   trackerRowClass,
   trackerStageLabel,
   trackerStatusValue,
   trackerUpdatedLabel,
 } from "../../lib/tracker";
+import { ScorePill, SourceMarker } from "../jobs/job-row";
 import { StatusCell } from "./status-cell";
 
 export interface TrackerRowProps {
@@ -60,6 +63,9 @@ export function TrackerRow({
 }: TrackerRowProps) {
   const status = trackerStatusValue(job.application);
   const stage = trackerStageLabel(job.application);
+  const applied = trackerAppliedLabel(job);
+  const followUp = trackerFollowUpState(job.application);
+  const note = job.application?.pipeline_note ?? "";
   const [editingCell, setEditingCell] = useState<"status" | null>(null);
 
   const onChange = useCallback(
@@ -94,7 +100,10 @@ export function TrackerRow({
         style={columnStyle("job")}
       >
         <Link className="tracker-job-link" to={`/jobs/${job.id}`} aria-label={job.title}>
-          <span className="tracker-job-title">{job.title}</span>
+          <span className="tracker-job-heading">
+            <SourceMarker source={job.source} />
+            <span className="tracker-job-title">{job.title}</span>
+          </span>
           {columns.includes("company") ? (
             <span className="tracker-job-company-mobile" aria-hidden="true">
               {job.company}
@@ -109,6 +118,15 @@ export function TrackerRow({
           style={columnStyle("company")}
         >
           {job.company}
+        </td>
+      )}
+      {!columns.includes("score") ? null : (
+        <td
+          className="tracker-cell tracker-cell-score"
+          data-column="score"
+          style={columnStyle("score")}
+        >
+          <ScorePill score={job.match_score} scoringStatus={job.scoring_status} />
         </td>
       )}
       {!columns.includes("status") ? null : (
@@ -127,13 +145,34 @@ export function TrackerRow({
               onOpenChange={onStatusOpenChange}
               onStatusChange={onChange}
             />
-            {stage === "" ? null : <span className="tracker-stage">{stage}</span>}
             {saving ? (
               <span className="tracker-saving" role="status">
                 Saving…
               </span>
             ) : null}
           </div>
+        </td>
+      )}
+      {!columns.includes("stage") ? null : (
+        <td
+          className="tracker-cell tracker-cell-stage"
+          data-column="stage"
+          style={columnStyle("stage")}
+        >
+          {stage === "" ? (
+            <span className="tracker-cell-empty">—</span>
+          ) : (
+            <span className="tracker-stage">{stage}</span>
+          )}
+        </td>
+      )}
+      {!columns.includes("applied") ? null : (
+        <td
+          className="tracker-cell tracker-cell-date tracker-cell-applied"
+          data-column="applied"
+          style={columnStyle("applied")}
+        >
+          {applied === "—" ? <span className="tracker-cell-empty">—</span> : applied}
         </td>
       )}
       {!columns.includes("intaked") ? null : (
@@ -152,6 +191,32 @@ export function TrackerRow({
           style={columnStyle("updated")}
         >
           {trackerUpdatedLabel(job)}
+        </td>
+      )}
+      {!columns.includes("follow_up") ? null : (
+        <td
+          className="tracker-cell tracker-cell-follow-up"
+          data-column="follow_up"
+          style={columnStyle("follow_up")}
+        >
+          {followUp.tone === null ? (
+            <span className="tracker-cell-empty">{followUp.label}</span>
+          ) : (
+            <span className={`tracker-follow-up tracker-follow-up--${followUp.tone}`}>
+              {followUp.label}
+            </span>
+          )}
+        </td>
+      )}
+      {!columns.includes("note") ? null : (
+        <td
+          className="tracker-cell tracker-cell-note"
+          data-column="note"
+          style={columnStyle("note")}
+        >
+          <span className={`tracker-note${note === "" ? " tracker-cell-empty" : ""}`} title={note}>
+            {note === "" ? "—" : note}
+          </span>
         </td>
       )}
     </tr>

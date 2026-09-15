@@ -292,6 +292,70 @@ export function trackerDate(value: string): string {
   return `${day} ${monthName} ${String(year).padStart(4, "0")}`;
 }
 
+interface ParsedDateOnly {
+  key: string;
+  label: string;
+}
+
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/** A Rails `date` value formatted from its literal calendar components. */
+function parseDateOnly(value: string): ParsedDateOnly | null {
+  const match = DATE_ONLY.exec(value.replace(GO_TRIM, ""));
+  if (match === null) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const monthName = MONTHS[month - 1];
+  if (monthName === undefined || day < 1 || day > daysIn(year, month)) return null;
+
+  return {
+    key: `${match[1]}-${match[2]}-${match[3]}`,
+    label: `${day} ${monthName} ${String(year).padStart(4, "0")}`,
+  };
+}
+
+/** A Rails `date` value, or an em dash when the application has no value. */
+export function trackerDateOnly(value: string): string {
+  return parseDateOnly(value)?.label ?? NO_DATE;
+}
+
+export type TrackerFollowUpTone = "overdue" | "today" | "future";
+
+export interface TrackerFollowUpState {
+  label: string;
+  tone: TrackerFollowUpTone | null;
+}
+
+/**
+ * The follow-up display state. The stored date and today's date are compared as calendar strings,
+ * never as timestamps, so a Rails date cannot move across a timezone boundary in the browser.
+ */
+export function trackerFollowUpState(
+  application: ApplicationTracker | null,
+  today = localDateKey(),
+): TrackerFollowUpState {
+  const parsed = parseDateOnly(application?.next_follow_up_on ?? "");
+  if (parsed === null) return { label: NO_DATE, tone: null };
+
+  const todayKey = parseDateOnly(today)?.key ?? localDateKey();
+  const tone: TrackerFollowUpTone =
+    parsed.key < todayKey ? "overdue" : parsed.key === todayKey ? "today" : "future";
+  return { label: tone === "today" ? "Today" : parsed.label, tone };
+}
+
+/** The immutable applied timestamp, formatted from the offset written by Rails. */
+export function trackerAppliedLabel(job: JobSummary): string {
+  return trackerDate(job.application?.applied_at ?? "");
+}
+
+function localDateKey(date = new Date()): string {
+  return [date.getFullYear(), date.getMonth() + 1, date.getDate()]
+    .map((part) => String(part).padStart(2, "0"))
+    .join("-");
+}
+
 /**
  * `trackerUpdatedLabel`: when the tracker state last moved. A job with no tracked application has
  * never moved, so it renders as an em dash.

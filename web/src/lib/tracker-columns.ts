@@ -7,9 +7,19 @@ import { BriefcaseBusiness, Building2, CalendarDays, CircleDot, Clock } from "lu
 import type { LucideIcon } from "lucide-react";
 
 import type { JobSummary } from "../api/schemas";
-import { trackerStatusValue } from "./tracker";
+import { trackerStageLabel, trackerStatusValue } from "./tracker";
 
-export type TrackerColumnId = "job" | "company" | "status" | "intaked" | "updated";
+export type TrackerColumnId =
+  | "job"
+  | "company"
+  | "score"
+  | "status"
+  | "stage"
+  | "applied"
+  | "intaked"
+  | "updated"
+  | "follow_up"
+  | "note";
 
 export interface TrackerColumn {
   id: TrackerColumnId;
@@ -44,6 +54,16 @@ export const TRACKER_COLUMNS: readonly TrackerColumn[] = [
     value: (j) => j.company,
   },
   {
+    id: "score",
+    label: "Score",
+    icon: CircleDot,
+    className: "tracker-col-score",
+    hideable: true,
+    size: 105,
+    minSize: 95,
+    value: (j) => (j.match_score === null ? "" : String(j.match_score).padStart(3, "0")),
+  },
+  {
     id: "status",
     label: "Status",
     icon: CircleDot,
@@ -52,6 +72,26 @@ export const TRACKER_COLUMNS: readonly TrackerColumn[] = [
     size: 220,
     minSize: 190,
     value: (j) => trackerStatusValue(j.application),
+  },
+  {
+    id: "stage",
+    label: "Stage",
+    icon: CircleDot,
+    className: "tracker-col-stage",
+    hideable: true,
+    size: 150,
+    minSize: 120,
+    value: (j) => trackerStageLabel(j.application),
+  },
+  {
+    id: "applied",
+    label: "Applied",
+    icon: CalendarDays,
+    className: "tracker-col-date",
+    hideable: true,
+    size: 130,
+    minSize: 120,
+    value: (j) => j.application?.applied_at ?? "",
   },
   {
     id: "intaked",
@@ -72,6 +112,26 @@ export const TRACKER_COLUMNS: readonly TrackerColumn[] = [
     size: 130,
     minSize: 120,
     value: (j) => j.application?.last_status_change_at ?? "",
+  },
+  {
+    id: "follow_up",
+    label: "Follow-up",
+    icon: CalendarDays,
+    className: "tracker-col-date",
+    hideable: true,
+    size: 150,
+    minSize: 130,
+    value: (j) => j.application?.next_follow_up_on ?? "",
+  },
+  {
+    id: "note",
+    label: "Note",
+    icon: Clock,
+    className: "tracker-col-note",
+    hideable: true,
+    size: 240,
+    minSize: 160,
+    value: (j) => j.application?.pipeline_note ?? "",
   },
 ];
 

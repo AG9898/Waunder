@@ -155,6 +155,7 @@ export const ApplicationTrackerSchema = z.object({
   pipeline_stage: goString,
   pipeline_note: goString,
   last_status_change_at: goString,
+  applied_at: goString,
   next_follow_up_on: goString,
   approved_at: goString,
   submitted_at: goString,

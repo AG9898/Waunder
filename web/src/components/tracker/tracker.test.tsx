@@ -25,13 +25,14 @@ import { MemoryRouter } from "react-router";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createQueryClient } from "../../api/query-client";
-import type {
-  ApplicationCounts,
-  ApplicationStatusUpdate,
-  ApplicationTracker,
-  JobPage,
-  JobSummary,
-  PageMeta,
+import {
+  ApplicationTrackerSchema,
+  type ApplicationCounts,
+  type ApplicationStatusUpdate,
+  type ApplicationTracker,
+  type JobPage,
+  type JobSummary,
+  type PageMeta,
 } from "../../api/schemas";
 import { SESSION_EXPIRED } from "../../lib/messages";
 import {
@@ -45,8 +46,11 @@ import {
   selectTrackerBin,
   selectTrackerGroup,
   selectTrackerSort,
+  trackerAppliedLabel,
   trackerDate,
+  trackerDateOnly,
   trackerEmptyMessage,
+  trackerFollowUpState,
   trackerParams,
   trackerStageLabel,
   trackerStatusValue,
@@ -205,8 +209,15 @@ function tracker(
   pipeline_status: string,
   pipeline_stage = "",
   last_status_change_at = "2026-09-05T09:30:00Z",
+  next_follow_up_on = fixtures.feedTracker.next_follow_up_on,
 ): ApplicationTracker {
-  return { ...fixtures.feedTracker, pipeline_status, pipeline_stage, last_status_change_at };
+  return {
+    ...fixtures.feedTracker,
+    pipeline_status,
+    pipeline_stage,
+    last_status_change_at,
+    next_follow_up_on,
+  };
 }
 
 /** `trackerJobs()` from the Go test: one applied-and-waiting row, one untracked row. */
@@ -221,7 +232,12 @@ function trackerJobs(): JobSummary[] {
       match_score: 82,
       scoring_status: "scored",
       created_at: "2026-09-01T10:00:00Z",
-      application: { ...tracker("applied", "waiting"), application_id: 7, job_post_id: 42 },
+      application: {
+        ...tracker("applied", "waiting"),
+        application_id: 7,
+        job_post_id: 42,
+        next_follow_up_on: "2099-09-15",
+      },
     },
     {
       ...fixtures.unscoredJob,
@@ -386,6 +402,38 @@ describe("tracker helpers", () => {
     const [applied, untracked] = trackerJobs();
     expect(trackerUpdatedLabel(untracked as JobSummary)).toBe("—");
     expect(trackerUpdatedLabel(applied as JobSummary)).toBe("5 Sep 2026");
+  });
+
+  it("zero-fills a missing applied timestamp like the other tracker fields", () => {
+    expect(ApplicationTrackerSchema.parse({}).applied_at).toBe("");
+    expect(ApplicationTrackerSchema.parse({ applied_at: null }).applied_at).toBe("");
+  });
+
+  it("formats applied and follow-up dates from their Rails calendar values", () => {
+    const [applied] = trackerJobs();
+    expect(trackerAppliedLabel(applied as JobSummary)).toBe("8 Sep 2026");
+    expect(trackerDateOnly("2026-09-15")).toBe("15 Sep 2026");
+    expect(trackerDateOnly("")).toBe("—");
+  });
+
+  it.each([
+    ["2026-09-14", "14 Sep 2026", "overdue"],
+    ["2026-09-15", "Today", "today"],
+    ["2026-09-16", "16 Sep 2026", "future"],
+  ] as const)("assigns the %s follow-up tone", (value, label, tone) => {
+    expect(
+      trackerFollowUpState(
+        tracker("applied", "waiting", "2026-09-05T09:30:00Z", value),
+        "2026-09-15",
+      ),
+    ).toEqual({
+      label,
+      tone,
+    });
+  });
+
+  it("renders an empty follow-up as an em dash without a tone", () => {
+    expect(trackerFollowUpState(null, "2026-09-15")).toEqual({ label: "—", tone: null });
   });
 
   // TestApplicationsViewEmptyStatesExplainTheActiveTab.
@@ -603,7 +651,18 @@ describe("tracker rendering", () => {
     expect(staff.querySelector(".tracker-stage")?.textContent).toBe("Waiting");
     expect(
       Array.from(staff.querySelectorAll(".tracker-cell-date")).map((cell) => cell.textContent),
-    ).toEqual(["1 Sep 2026", "5 Sep 2026"]);
+    ).toEqual(["8 Sep 2026", "1 Sep 2026", "5 Sep 2026"]);
+    expect(staff.querySelector(".tracker-cell-score .job-score")).toHaveClass("job-score--high");
+    expect(staff.querySelector(".tracker-cell-score .job-score")).toHaveTextContent("82%");
+    expect(staff.querySelector(".tracker-cell-stage .tracker-stage")).toHaveTextContent("Waiting");
+    expect(staff.querySelector(".tracker-cell-follow-up")?.textContent).toBe("15 Sep 2099");
+    expect(staff.querySelector(".tracker-cell-note")?.textContent).toBe(
+      "Referred by a former colleague.",
+    );
+    expect(staff.querySelector(".tracker-job-heading .job-source-logo")).toHaveAttribute(
+      "src",
+      "/icons/linkedin.svg",
+    );
 
     const principal = rowFor("Principal Engineer");
     expect(within(principal).getByRole("link", { name: "Principal Engineer" })).toHaveAttribute(
@@ -614,7 +673,13 @@ describe("tracker rendering", () => {
     expect(principal.querySelector(".tracker-stage")).toBeNull();
     expect(
       Array.from(principal.querySelectorAll(".tracker-cell-date")).map((cell) => cell.textContent),
-    ).toEqual(["3 Sep 2026", "—"]);
+    ).toEqual(["—", "3 Sep 2026", "—"]);
+    expect(principal.querySelector(".tracker-cell-score .job-score")).toHaveTextContent(
+      "Queued later",
+    );
+    expect(principal.querySelector(".tracker-cell-stage")?.textContent).toBe("—");
+    expect(principal.querySelector(".tracker-cell-follow-up")?.textContent).toBe("—");
+    expect(principal.querySelector(".tracker-cell-note")?.textContent).toBe("—");
   });
 
   it("offers the Not applied placeholder only while a job is untracked", async () => {
@@ -919,15 +984,32 @@ describe("Surface v2 tracker grid", () => {
     const headers = Array.from(container.querySelectorAll("thead th")).map(
       (th) => th.querySelector(".tracker-header-label")?.textContent ?? th.textContent,
     );
-    expect(headers).toEqual(["#", "Job", "Company", "Status", "Intaked", "Updated"]);
-    expect(container.querySelectorAll("thead th .tracker-column-icon")).toHaveLength(6);
+    expect(headers).toEqual([
+      "#",
+      "Job",
+      "Company",
+      "Score",
+      "Status",
+      "Stage",
+      "Applied",
+      "Intaked",
+      "Updated",
+      "Follow-up",
+      "Note",
+    ]);
+    expect(container.querySelectorAll("thead th .tracker-column-icon")).toHaveLength(11);
     expect(Array.from(container.querySelectorAll("thead th")).map((th) => th.className)).toEqual([
       "tracker-row-number-header",
       "tracker-col-job",
       "tracker-col-company",
+      "tracker-col-score",
       "tracker-col-status",
+      "tracker-col-stage",
       "tracker-col-date",
       "tracker-col-date",
+      "tracker-col-date",
+      "tracker-col-date",
+      "tracker-col-note",
     ]);
 
     const bodyRows = Array.from(container.querySelectorAll<HTMLTableRowElement>("tbody tr"));
@@ -945,9 +1027,14 @@ describe("Surface v2 tracker grid", () => {
         "row-number",
         "job",
         "company",
+        "score",
         "status",
+        "stage",
+        "applied",
         "intaked",
         "updated",
+        "follow_up",
+        "note",
       ]);
       for (const cell of cells) expect(cell).toHaveClass("tracker-cell");
       const numberCell = cells[0];
@@ -994,6 +1081,18 @@ describe("Surface v2 tracker grid", () => {
     expect(declared(mobile, ".tracker-cell-status:focus-within", "box-shadow")).toBe(
       "inset 0 0 0 2px var(--color-accent)",
     );
+    expect(declared(mobile, ".tracker-cell-score .job-score", "border-radius")).toBe(
+      "var(--radius-pill)",
+    );
+    expect(declared(mobile, ".tracker-follow-up--overdue", "font-weight")).toBe("600");
+    expect(declared(mobile, ".tracker-follow-up--overdue::before", "width")).toBe("6px");
+    expect(declared(mobile, ".tracker-follow-up--today", "color")).toBe(
+      "var(--color-accent-strong)",
+    );
+    expect(declared(mobile, ".tracker-follow-up--future", "color")).toBe("var(--color-ink-soft)");
+    expect(declared(mobile, ".tracker-note", "text-overflow")).toBe("ellipsis");
+    expect(declared(mobile, ".tracker-note", "white-space")).toBe("nowrap");
+    expect(declared(mobile, ".tracker-note", "overflow")).toBe("hidden");
     expect(declared(mobile, ".status-cell-trigger", "min-height")).toBe("var(--control-h-touch)");
     expect(unconditional(stylesheet())).not.toContain("data-label");
   });
@@ -1056,6 +1155,27 @@ describe("Surface v2 tracker grid", () => {
         `inset 3px 0 0 ${color}`,
       );
     }
+  });
+
+  it("keeps a long note in its fixed, single-line cell", async () => {
+    const longNote = "follow-up-".repeat(40);
+    rows = [
+      {
+        ...fixtures.scoredJob,
+        id: 77,
+        title: "Long note",
+        application: { ...fixtures.applicationTracker, job_post_id: 77, pipeline_note: longNote },
+      },
+    ];
+    const { container } = await loadedTracker();
+    const row = rowFor("Long note");
+    const note = row.querySelector(".tracker-note");
+    const noteCell = row.querySelector<HTMLElement>('[data-column="note"]');
+
+    expect(note).toHaveTextContent(longNote);
+    expect(note).toHaveClass("tracker-note");
+    expect(noteCell?.style.width).toBe("240px");
+    expect(container.querySelector(".tracker-cell-note")).toBe(noteCell);
   });
 });
 
@@ -1241,6 +1361,69 @@ describe("tracker table behaviour", () => {
     expect(requests.length).toBe(before);
   });
 
+  it("sorts every read-only column over the loaded page", async () => {
+    rows = [
+      {
+        ...fixtures.scoredJob,
+        id: 1,
+        title: "One",
+        match_score: 82,
+        application: {
+          ...fixtures.applicationTracker,
+          job_post_id: 1,
+          pipeline_stage: "waiting",
+          applied_at: "2026-09-03T10:00:00Z",
+          next_follow_up_on: "2026-09-16",
+          pipeline_note: "Z note",
+        },
+      },
+      {
+        ...fixtures.scoredJob,
+        id: 2,
+        title: "Two",
+        match_score: 41,
+        application: {
+          ...fixtures.applicationTracker,
+          job_post_id: 2,
+          pipeline_stage: "technical",
+          applied_at: "2026-09-01T10:00:00Z",
+          next_follow_up_on: "2026-09-14",
+          pipeline_note: "A note",
+        },
+      },
+      {
+        ...fixtures.scoredJob,
+        id: 3,
+        title: "Three",
+        match_score: 65,
+        application: {
+          ...fixtures.applicationTracker,
+          job_post_id: 3,
+          pipeline_stage: "onsite",
+          applied_at: "2026-09-02T10:00:00Z",
+          next_follow_up_on: "2026-09-15",
+          pipeline_note: "M note",
+        },
+      },
+    ];
+    const { container } = await loadedTracker();
+    const before = requests.length;
+
+    for (const [id, label] of [
+      ["score", "Score"],
+      ["stage", "Stage"],
+      ["applied", "Applied"],
+      ["follow_up", "Follow-up"],
+      ["note", "Note"],
+    ] as const) {
+      const header = container.querySelector<HTMLElement>(`th[data-column="${id}"]`);
+      if (header === null) throw new Error(`no ${id} header`);
+      fireEvent.click(within(header).getByRole("button", { name: label }));
+      expect(header).toHaveAttribute("aria-sort", "ascending");
+    }
+    expect(requests).toHaveLength(before);
+  });
+
   it("hides a column's header and cells together, and never offers to hide Job", async () => {
     const { container } = await loadedTracker();
     fireEvent.pointerDown(screen.getByRole("button", { name: "Columns" }));
@@ -1248,9 +1431,14 @@ describe("tracker table behaviour", () => {
     const toggles = within(menu).getAllByRole("menuitemcheckbox");
     expect(toggles.map((toggle) => toggle.textContent)).toEqual([
       "Company",
+      "Score",
       "Status",
+      "Stage",
+      "Applied",
       "Intaked",
       "Updated",
+      "Follow-up",
+      "Note",
     ]);
     expect(within(menu).queryByRole("menuitemcheckbox", { name: "Job" })).toBeNull();
     const companyToggle = within(menu).getByRole("menuitemcheckbox", { name: "Company" });
@@ -1262,14 +1450,30 @@ describe("tracker table behaviour", () => {
     const headers = Array.from(container.querySelectorAll("thead th")).map(
       (th) => th.querySelector(".tracker-header-label")?.textContent ?? th.textContent,
     );
-    expect(headers).toEqual(["#", "Job", "Status", "Intaked", "Updated"]);
+    expect(headers).toEqual([
+      "#",
+      "Job",
+      "Score",
+      "Status",
+      "Stage",
+      "Applied",
+      "Intaked",
+      "Updated",
+      "Follow-up",
+      "Note",
+    ]);
     for (const row of Array.from(container.querySelectorAll<HTMLTableRowElement>("tbody tr"))) {
       expect(Array.from(row.cells).map((cell) => cell.dataset.column)).toEqual([
         "row-number",
         "job",
+        "score",
         "status",
+        "stage",
+        "applied",
         "intaked",
         "updated",
+        "follow_up",
+        "note",
       ]);
       expect(row.cells[0]).toHaveClass("tracker-cell-number");
       expect(row.cells[1]).toHaveClass("tracker-cell-job");
