@@ -274,12 +274,17 @@ Be honest about the current state — most of the suite is still to be written.
   requested page, detail handlers use the id from the URL, the intake toggle reflects the posted
   value — so pagination and navigation need no per-test handler.
 
-- **web/** — `src/lib/labels.test.ts` (`FE-06`): the display helpers, tested as *transcriptions*
+- **web/** — `src/components/ui/status-chip.test.tsx` (`UI-11`): renders all nine pipeline statuses
+  plus the tracker's "Not applied" placeholder, checks the documented fill/ink/dot/border values
+  and desktop/touch heights from `app.css`, and verifies unknown statuses use the Interested tone.
+
+- **web/** — `src/lib/labels.test.ts` (`FE-06`/`UI-11`): the display helpers, tested as *transcriptions*
   of the Go case tables (`TestMatchScoreLabel`, `TestMatchScoreBand`, `TestSourceLabel`,
   `TestSourceIconPath`, `TestSourceEmoji`, `TestTrackerGroupMapsPipelineStatus`) rather than as
   freshly reasoned expectations, because every returned string is consumed by `app.css` and by the
   `FE-28` screenshot gate — the test's job is to reject a rewording. `lifecycleLabel` had no Go
-  test, so its table is derived from `client.go` and the pill states `app.css` styles.
+  test, so its table is derived from `client.go` and the pill states `app.css` styles. `statusTone`
+  is checked against Rails' `APPLICATION_GROUPS` in the same source-parsing test as `trackerGroup`.
 
   Two assertions go past what a transcribed table can see. The brand-logo paths are resolved
   against `web/public/icons/` **on disk**, because the migration-wide `/web/` prefix drop 404s

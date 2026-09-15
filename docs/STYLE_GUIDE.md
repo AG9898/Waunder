@@ -298,7 +298,10 @@ The pinned Job column's right edge uses `--color-border-strong`; other column ed
 ### Status chips
 
 One `StatusChip` renders any `pipeline_status`: a 22px (24px on touch) pill, 12px/600 label, a 6px
-dot, fill and ink from this table. The "Not applied" tracker placeholder uses the Interested tone.
+dot, fill and ink from this table. Its pure tone/group metadata lives in `web/src/lib/labels.ts`;
+unknown values use the Interested tone and label, while the "Not applied" tracker placeholder uses
+that tone with its own label. This is a foundational primitive and is not adopted by shipped screens
+until the later Surface v2 screen tasks.
 
 | Group | Status | Fill | Ink | Dot | Border |
 |---|---|---|---|---|---|

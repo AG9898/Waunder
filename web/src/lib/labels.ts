@@ -10,8 +10,8 @@
  *
  * The returned strings are a **contract with `client/public/app.css`**, not free text:
  * `matchScoreBand` and `lifecycleLabel` feed `.job-score--<band>` and
- * `.job-status--<state>`, `trackerGroup` feeds `.tracker-row--<group>`, and
- * `sourceIconPath` resolves a file that must exist under `public/icons/`. The screenshot
+ * `.job-status--<state>`, `statusTone` feeds `.status-chip--<tone>`, `trackerGroup` feeds
+ * `.tracker-row--<group>`, and `sourceIconPath` resolves a file that must exist under `public/icons/`. The screenshot
  * parity gate (`FE-28`) compares the ported screens against the go-app build, so a
  * "tidier" label or a renamed band reads as a regression there rather than as a choice.
  *
@@ -213,6 +213,59 @@ export function lifecycleLabel(state: string): string {
  */
 export type TrackerGroupName = NonNullable<JobFeedParams["application"]>;
 
+/* -------------------------------------------------------------------------- */
+/* Pipeline status                                                             */
+/* -------------------------------------------------------------------------- */
+
+/** The owner-facing pipeline statuses Rails stores on an Application. */
+export type PipelineStatusName =
+  | "interested"
+  | "drafting"
+  | "applied"
+  | "interviewing"
+  | "offer"
+  | "rejected"
+  | "withdrawn"
+  | "archived"
+  | "needs_review";
+
+/** The status values a StatusChip can display, including the untracked-row placeholder. */
+export type StatusChipStatus = PipelineStatusName | "not_applied";
+
+/** Tone names are CSS class suffixes, while group names are Rails tracker groups. */
+export type StatusToneName = PipelineStatusName;
+
+export interface StatusTone {
+  label: string;
+  tone: StatusToneName;
+  group: TrackerGroupName;
+}
+
+/**
+ * Static metadata for the pipeline menu and StatusChip. `not_applied` is not a Rails pipeline
+ * status; it is the inert tracker placeholder and deliberately borrows the Interested tone.
+ */
+const STATUS_TONES: Record<StatusChipStatus, StatusTone> = {
+  interested: { label: "Interested", tone: "interested", group: "not_applied" },
+  drafting: { label: "Drafting", tone: "drafting", group: "not_applied" },
+  applied: { label: "Applied", tone: "applied", group: "applied" },
+  interviewing: { label: "Interviewing", tone: "interviewing", group: "in_progress" },
+  offer: { label: "Offer", tone: "offer", group: "in_progress" },
+  rejected: { label: "Rejected", tone: "rejected", group: "closed" },
+  withdrawn: { label: "Withdrawn", tone: "withdrawn", group: "closed" },
+  archived: { label: "Archived", tone: "archived", group: "closed" },
+  needs_review: { label: "Needs review", tone: "needs_review", group: "not_applied" },
+  not_applied: { label: "Not applied", tone: "interested", group: "not_applied" },
+};
+
+/**
+ * Returns the label, CSS tone, and Rails tracker group for a pipeline status.
+ * Unknown values use Interested so a new server value never produces an unstyled chip.
+ */
+export function statusTone(status: string): StatusTone {
+  return STATUS_TONES[status as StatusChipStatus] ?? STATUS_TONES.interested;
+}
+
 /**
  * Classifies a job's tracked application into its tracker group, mirroring the Rails
  * `Api::JobPostsController::APPLICATION_GROUPS` constant:
@@ -238,17 +291,5 @@ export function trackerGroup(application: ApplicationTracker | null): TrackerGro
   if (application === null) {
     return "not_applied";
   }
-  switch (application.pipeline_status) {
-    case "applied":
-      return "applied";
-    case "interviewing":
-    case "offer":
-      return "in_progress";
-    case "rejected":
-    case "withdrawn":
-    case "archived":
-      return "closed";
-    default:
-      return "not_applied";
-  }
+  return statusTone(application.pipeline_status).group;
 }

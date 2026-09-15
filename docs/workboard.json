@@ -3249,7 +3249,7 @@
       "id": "UI-11",
       "title": "Build the StatusChip component and status tone mapping",
       "description": "Add a StatusChip component that renders any pipeline_status (plus the tracker's Not applied placeholder) with the fill, ink, dot, and border from the STYLE_GUIDE.md 'Status chips' table, and a pure tone/group mapping in web/src/lib/labels.ts whose groups are asserted against Rails' APPLICATION_GROUPS the same way trackerGroup already is. Provide a size prop for desktop (22px) and touch (24px). Do not adopt it in any screen yet.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "UI",
       "depends_on": [

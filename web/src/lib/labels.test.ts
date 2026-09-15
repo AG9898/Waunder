@@ -1,5 +1,5 @@
 /**
- * Display-helper parity (`FE-06`).
+ * Display-helper parity (`FE-06`) plus the Surface v2 status-tone contract (`UI-11`).
  *
  * Every case table below is the corresponding Go test's table, transcribed rather than
  * rewritten: `TestMatchScoreLabel`, `TestMatchScoreBand`, `TestSourceLabel`,
@@ -17,7 +17,7 @@
  * - The brand logos are checked to **exist on disk** under `public/icons/`. The `/web/`
  *   prefix drop is a migration-wide edit (docs/GO_MIGRATION.md), and a stale or misspelled
  *   path 404s silently, removing only the logo from an origin pill.
- * - `trackerGroup` is checked against the **Rails source**, parsed out of
+ * - `trackerGroup` and `statusTone` are checked against the **Rails source**, parsed out of
  *   `Api::JobPostsController::APPLICATION_GROUPS`. Rails owns group membership; this copy
  *   only tints a row, so it has to follow rather than merely have been correct once.
  */
@@ -34,6 +34,7 @@ import {
   sourceIcon,
   sourceIconPath,
   sourceLabel,
+  statusTone,
   trackerGroup,
 } from "./labels";
 
@@ -170,6 +171,41 @@ describe("lifecycleLabel", () => {
     { state: "weird", want: "weird" },
   ])("$state → $want", ({ state, want }) => {
     expect(lifecycleLabel(state)).toBe(want);
+  });
+});
+
+describe("statusTone", () => {
+  it.each([
+    { status: "interested", label: "Interested", tone: "interested", group: "not_applied" },
+    { status: "drafting", label: "Drafting", tone: "drafting", group: "not_applied" },
+    { status: "needs_review", label: "Needs review", tone: "needs_review", group: "not_applied" },
+    { status: "applied", label: "Applied", tone: "applied", group: "applied" },
+    { status: "interviewing", label: "Interviewing", tone: "interviewing", group: "in_progress" },
+    { status: "offer", label: "Offer", tone: "offer", group: "in_progress" },
+    { status: "rejected", label: "Rejected", tone: "rejected", group: "closed" },
+    { status: "withdrawn", label: "Withdrawn", tone: "withdrawn", group: "closed" },
+    { status: "archived", label: "Archived", tone: "archived", group: "closed" },
+    { status: "not_applied", label: "Not applied", tone: "interested", group: "not_applied" },
+  ])("$status → $label", ({ status, label, tone, group }) => {
+    expect(statusTone(status)).toEqual({ label, tone, group });
+  });
+
+  it("uses the Interested tone for unknown statuses", () => {
+    expect(statusTone("future_status")).toEqual({
+      label: "Interested",
+      tone: "interested",
+      group: "not_applied",
+    });
+  });
+
+  it("maps pipeline statuses to the Rails APPLICATION_GROUPS constant", () => {
+    const groups = railsApplicationGroups();
+
+    for (const [group, statuses] of Object.entries(groups)) {
+      for (const status of statuses) {
+        expect(statusTone(status).group).toBe(group);
+      }
+    }
   });
 });
 
