@@ -193,19 +193,21 @@ figures where possible.
   without a brand logo (manual entry, generic email alert) use a lucide marker in `currentColor`
   instead. The logo/icon sits inline before the source label via `flex` + `gap` on the pill.
 - The Applications screen is one unified tracker (TRACK-01), not a two-view toggle: every
-  intaked job post gets a row, and its application status is set inline on that row. Its title
-  pairs with a stats cluster in the top-right (`.applications-header` / `.applications-stats` —
-  a value + small uppercase caption per stat: applied-to and jobs-tracked). Below it, group tabs
-  (`.tracker-tabs` / `.tracker-tab`, sharing the segmented `.view-selector-option-active` idiom
-  with the Jobs bin tabs) select All / Not applied / Applied / In progress / Closed, each with a
-  count badge; the strip scrolls horizontally so five tabs stay reachable on a phone. Lifecycle
-  bin and sort sit under them as plain labelled selects (`.tracker-controls`).
+  intaked job post gets a row, and its application status is set inline on that row. Its toolbar
+  (`.tracker-toolbar`) pairs the title with one Rails-owned stats sentence (`.applications-summary`:
+  `N applied to · N jobs tracked`). Below it, group tabs (`.tracker-tabs` / `.tracker-tab`, sharing
+  the segmented `.view-selector-option-active` idiom with the Jobs bin tabs) select All / Not
+  applied / Applied / In progress / Closed, each with a Rails count; the strip scrolls horizontally
+  so five tabs stay reachable on a phone. Lifecycle bin and sort remain server-driven native
+  selects under `.tracker-toolbar-controls`, next to the compact `.tracker-columns` dropdown.
 - The tracker grid runs on TanStack Table (UI-04/UI-14): a header click sorts only the loaded page
   (direction in `aria-sort` and the `.tracker-sort[data-sort]` arrow), while the sunken header uses
   Lucide column icons and a sorted-column state. The row-number rail and Job column are pinned,
   column widths come from TanStack sizing, and the remaining columns scroll inside the panel. A
-  collapsed `.tracker-columns` control hides Company/Status/dates (never Job), pages over 60 rows
-  are window-virtualized with measured rows, and `.tracker-spacer` rows stay explicit table rows.
+  `.tracker-columns` dropdown hides Company/Status/dates (never Job), pages over 60 rows are
+  window-virtualized with measured rows, and `.tracker-spacer` rows stay explicit table rows.
+  `.tracker-footer` remains inside the grid panel and carries the inclusive row range plus
+  Previous / Page X of Y / Next controls.
   The server Sort select still orders the feed.
 - The tracker uses one real table at every width, with gridlines, a 34px mobile / 36px desktop
   header strip, 56px mobile / 40px desktop rows, and a 28px mobile right-edge scroll fade. The

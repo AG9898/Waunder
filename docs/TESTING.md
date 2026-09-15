@@ -490,16 +490,17 @@ Be honest about the current state — most of the suite is still to be written.
   hanging write is held open by a promise the handler awaits and `afterEach` releases, so the
   in-flight assertions are deterministic rather than timing-dependent.
 
-- **web/** — `src/components/tracker/tracker.test.tsx` (`FE-22`/`UI-04`/`UI-14`/`UI-17`): the
-  tracker request, sorting, visibility, virtualization, status-cell popover, and status-write
-  contract. In addition to Rails' query and refetch assertions, it pins the Surface v2 grid markup
-  (row numbers, Lucide header icons, sorted direction, pinned Job cell, mobile company subline),
-  grouped status options, click/Enter opening, current-status and dismissal no-ops, and parses
-  `app.css` for the horizontal scroll panel, sticky columns, gridlines, mobile fade, responsive
-  row/header heights, editing tint, and table spacer display. The old `data-label` responsive-card
-  assertions are intentionally absent: UI-14 uses one table grid at every width. Failed writes are
-  asserted as one toast with no retry, and status writes are asserted to avoid draft and submit
-  endpoints.
+- **web/** — `src/components/tracker/tracker.test.tsx` (`FE-22`/`UI-04`/`UI-14`/`UI-15`/`UI-17`):
+  the tracker request, toolbar counts/tabs, server-driven bin and sort, DropdownMenu column
+  visibility, virtualization, status-cell popover, pagination footer, and status-write contract.
+  In addition to Rails' query and refetch assertions, it pins the Surface v2 grid markup (row
+  numbers, Lucide header icons, sorted direction, pinned Job cell, mobile company subline), grouped
+  status options, click/Enter opening, current-status and dismissal no-ops, and parses `app.css` for
+  the horizontal scroll panel, sticky columns, gridlines, mobile fade, responsive row/header
+  heights, editing tint, explicit virtualization spacer display, and compact toolbar/footer controls.
+  The old `data-label` responsive-card assertions are intentionally absent: UI-14 uses one table
+  grid at every width. Failed writes are asserted as one toast with no retry, and status writes are
+  asserted to avoid draft and submit endpoints.
 
 ### Planned (from the plan's Testing Plan)
 

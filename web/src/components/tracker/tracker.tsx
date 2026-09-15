@@ -44,6 +44,7 @@
  */
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SortingState, VisibilityState } from "@tanstack/react-table";
+import { ChevronDown, Columns3 } from "lucide-react";
 import { type ChangeEvent, useCallback, useState } from "react";
 
 import { fetchJobs, updateJobApplicationStatus } from "../../api/endpoints";
@@ -73,6 +74,13 @@ import {
 } from "../../lib/tracker";
 import { AppChrome } from "../app-chrome";
 import { LoadError, Loading } from "../load-state";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import { HIDEABLE_TRACKER_COLUMNS } from "../../lib/tracker-columns";
 import { TrackerTable } from "./tracker-table";
 
@@ -99,10 +107,14 @@ export function TrackerScreen() {
   return (
     <div className="applications">
       <AppChrome />
-      <TrackerHeader counts={counts} />
-      <TrackerGroupTabs group={selection.group} counts={counts} onSelect={onSelectGroup} />
-      <TrackerControls selection={selection} onChange={setSelection} />
-      <TrackerColumns visibility={columnVisibility} onChange={setColumnVisibility} />
+      <div className="tracker-toolbar">
+        <TrackerHeader counts={counts} />
+        <TrackerGroupTabs group={selection.group} counts={counts} onSelect={onSelectGroup} />
+        <div className="tracker-toolbar-controls">
+          <TrackerControls selection={selection} onChange={setSelection} />
+          <TrackerColumns visibility={columnVisibility} onChange={setColumnVisibility} />
+        </div>
+      </div>
       {isPending || isPlaceholderData ? (
         <Loading />
       ) : isError ? (
@@ -195,19 +207,9 @@ function TrackerHeader({ counts }: { counts: ApplicationCounts }) {
   return (
     <div className="applications-header">
       <h1>Applications</h1>
-      <div className="applications-stats">
-        <TrackerStat value={appliedToCount(counts)} caption="Applied to" />
-        <TrackerStat value={counts.all} caption="Jobs tracked" />
-      </div>
-    </div>
-  );
-}
-
-function TrackerStat({ value, caption }: { value: number; caption: string }) {
-  return (
-    <div className="applications-stat">
-      <span className="applications-stat-value">{value}</span>
-      <span className="applications-stat-label">{caption}</span>
+      <p className="applications-summary">
+        {appliedToCount(counts)} applied to · {counts.all} jobs tracked
+      </p>
     </div>
   );
 }
@@ -310,31 +312,52 @@ function TrackerColumns({
   onChange: (update: (current: VisibilityState) => VisibilityState) => void;
 }) {
   return (
-    <details className="tracker-columns">
-      <summary>Columns</summary>
-      <div className="tracker-columns-list">
-        {HIDEABLE_TRACKER_COLUMNS.map((column) => (
-          <label key={column.id} className="tracker-column-toggle">
-            <input
-              type="checkbox"
+    <div className="tracker-columns">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="tracker-columns-trigger" type="button">
+            <Columns3 aria-hidden="true" size={14} />
+            <span>Columns</span>
+            <ChevronDown aria-hidden="true" size={14} />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="tracker-columns-menu">
+          <DropdownMenuLabel>Visible columns</DropdownMenuLabel>
+          {HIDEABLE_TRACKER_COLUMNS.map((column) => (
+            <DropdownMenuCheckboxItem
+              key={column.id}
+              className="tracker-column-toggle"
               checked={visibility[column.id] !== false}
-              onChange={(event) => {
-                const checked = event.target.checked;
-                onChange((current) => ({ ...current, [column.id]: checked }));
+              onSelect={(event) => {
+                event.preventDefault();
               }}
-            />
-            {column.label}
-          </label>
-        ))}
-      </div>
-    </details>
+              onCheckedChange={(checked) => {
+                onChange((current) => ({
+                  ...current,
+                  [column.id]: checked === true,
+                }));
+              }}
+            >
+              {column.label}
+            </DropdownMenuCheckboxItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }
 
-/**
- * Prev/Next plus the position indicator, driven by the response envelope. It carries both the
- * tracker's own button classes and the feed's `.job-pagination` layout class, as Go's did.
- */
+/** The inclusive row range Rails returned for the current page. */
+function trackerRowRange(page: PageMeta): string {
+  if (page.total <= 0 || page.size <= 0) return `Rows 0–0 of ${Math.max(page.total, 0)}`;
+
+  const number = Math.max(page.number, 1);
+  const start = Math.min((number - 1) * page.size + 1, page.total);
+  const end = Math.min(number * page.size, page.total);
+  return `Rows ${start}–${end} of ${page.total}`;
+}
+
+/** Prev/Next plus the row range and position indicator, driven by Rails' response envelope. */
 function TrackerPagination({
   page,
   onPrevious,
@@ -345,24 +368,27 @@ function TrackerPagination({
   onNext: () => void;
 }) {
   return (
-    <div className="tracker-pagination job-pagination">
-      <button
-        className="tracker-page-prev"
-        type="button"
-        disabled={page.number <= 1}
-        onClick={onPrevious}
-      >
-        Previous
-      </button>
-      <span className="tracker-page-indicator">{pageIndicatorLabel(page)}</span>
-      <button
-        className="tracker-page-next"
-        type="button"
-        disabled={!page.has_next}
-        onClick={onNext}
-      >
-        Next
-      </button>
-    </div>
+    <footer className="tracker-footer">
+      <span className="tracker-row-range">{trackerRowRange(page)}</span>
+      <nav className="tracker-pagination job-pagination" aria-label="Tracker pagination">
+        <button
+          className="tracker-page-prev"
+          type="button"
+          disabled={page.number <= 1}
+          onClick={onPrevious}
+        >
+          Previous
+        </button>
+        <span className="tracker-page-indicator">{pageIndicatorLabel(page)}</span>
+        <button
+          className="tracker-page-next"
+          type="button"
+          disabled={!page.has_next}
+          onClick={onNext}
+        >
+          Next
+        </button>
+      </nav>
+    </footer>
   );
 }

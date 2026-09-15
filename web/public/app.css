@@ -1105,41 +1105,27 @@ button { font-family: inherit; }
   color: var(--color-ink-faint);
 }
 
-/* Applications header — title left, stats cluster top-right */
-.applications-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-  margin: 0 0 var(--space-4);
-}
-.applications-header h1 { margin: 0; }
-.applications-stats {
-  display: flex;
-  gap: var(--space-3);
-  flex: none;
-}
-.applications-stat {
+/* Applications tracker toolbar — title, Rails totals, group tabs, and controls. */
+.tracker-toolbar {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  padding: 6px 12px;
-  background: var(--color-surface-sunken);
-  border-radius: var(--radius-md);
+  gap: var(--space-4);
+  margin: 0 0 var(--space-5);
 }
-.applications-stat-value {
-  font-size: var(--text-lg);
-  font-weight: 700;
-  line-height: 1.1;
-  color: var(--color-ink);
+.applications-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin: 0;
+}
+.applications-header h1 { margin: 0; }
+.applications-summary {
+  margin: 0;
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
-}
-.applications-stat-label {
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--color-ink-faint);
 }
 
 /* Application tracker — group tabs (All / Not applied / Applied / …).
@@ -1147,7 +1133,7 @@ button { font-family: inherit; }
 .tracker-tabs {
   display: flex;
   gap: 2px;
-  margin: 0 0 var(--space-4);
+  margin: 0;
   padding: 3px;
   overflow-x: auto;
   background: var(--color-surface-sunken);
@@ -1195,17 +1181,25 @@ button { font-family: inherit; }
   color: var(--color-accent-strong);
 }
 
-/* Tracker secondary controls — lifecycle bin and row order */
+/* Tracker secondary controls — lifecycle bin, row order, and visible columns. */
+.tracker-toolbar-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
 .tracker-controls {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-3);
-  margin: 0 0 var(--space-4);
+  align-items: center;
+  gap: var(--space-4);
+  margin: 0;
 }
 .tracker-control {
   display: flex;
-  flex-direction: column;
-  gap: 5px;
+  align-items: center;
+  gap: var(--space-2);
   font-size: var(--text-xs);
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -1214,11 +1208,11 @@ button { font-family: inherit; }
 }
 .tracker-bin-select,
 .tracker-sort-select {
-  min-height: 44px;
-  padding: 9px 12px;
+  min-height: var(--control-h-touch);
+  padding: 0 28px 0 10px;
   background: var(--color-surface);
   border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-control);
   color: var(--color-ink);
   font-family: inherit;
   font-size: var(--text-sm);
@@ -1231,6 +1225,35 @@ button { font-family: inherit; }
   outline: none;
   border-color: var(--color-accent);
   box-shadow: var(--focus-ring);
+}
+
+.tracker-columns { margin: 0; }
+.tracker-columns-trigger {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--control-h-touch);
+  padding: 0 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.tracker-columns-trigger:hover { background: var(--color-surface-sunken); }
+.tracker-columns-trigger:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.tracker-columns-menu { min-width: 180px; }
+.tracker-column-toggle {
+  min-height: var(--control-h-touch);
+  cursor: pointer;
 }
 
 /* Jobs feed — lifecycle bin tabs (Active / Backlog / Removed) */
@@ -1478,6 +1501,34 @@ button { font-family: inherit; }
   font-size: var(--text-sm);
   font-weight: 600;
   color: var(--color-ink-soft);
+}
+
+.tracker-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-grid-line);
+  background: var(--color-surface);
+}
+.tracker-row-range {
+  color: var(--color-ink-faint);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.tracker-footer .tracker-pagination {
+  margin: 0;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+.tracker-footer .tracker-page-prev,
+.tracker-footer .tracker-page-next {
+  min-height: var(--control-h-touch);
+  padding: 0 12px;
+  border-radius: var(--radius-control);
 }
 
 /* Application tracker grid (UI-14).
@@ -2723,6 +2774,9 @@ html { scroll-padding-bottom: var(--screen-bottom); }
   .tracker-grid-scroll::after { display: none; }
   .tracker-table th,
   .tracker-sort { height: 36px; min-height: 36px; }
+  .tracker-bin-select,
+  .tracker-sort-select,
+  .tracker-columns-trigger { min-height: var(--control-h-desktop); }
   .tracker-row,
   .tracker-cell { height: 40px; }
   .tracker-cell { padding-left: var(--space-4); padding-right: var(--space-4); }
@@ -2731,6 +2785,8 @@ html { scroll-padding-bottom: var(--screen-bottom); }
   .tracker-job-company-mobile { display: none; }
   .tracker-spacer { display: table-row; }
   .tracker-spacer td { display: table-cell; }
+  .tracker-footer .tracker-page-prev,
+  .tracker-footer .tracker-page-next { min-height: var(--control-h-desktop); }
   .draft-materials { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 40px; align-items: start; }
   .draft-resume-emphasis { grid-column: 1 / -1; }
   .profile-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }

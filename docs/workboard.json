@@ -3418,7 +3418,7 @@
       "id": "UI-15",
       "title": "Re-skin the tracker toolbar and move pagination into a grid footer",
       "description": "Restyle everything around the tracker grid per STYLE_GUIDE.md 'Surface v2 > Tracker grid' toolbar and footer bullets: the title with a one-line stats sentence replacing the stat boxes, segmented group tabs with count pills, Show and Sort as compact labelled controls (still native selects, still server-driven), the Columns control as the DropdownMenu primitive with checkbox items, and a footer inside the grid panel with the row range and Previous / Page X of Y / Next. Rows and cells are out of scope. Counts, tab behavior, bin/sort params, and pagination logic must not change.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "UI",
       "depends_on": [

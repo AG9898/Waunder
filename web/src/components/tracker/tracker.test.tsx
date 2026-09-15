@@ -314,12 +314,8 @@ function tabCount(label: string): string | null | undefined {
   return tab(label).querySelector(".tracker-tab-count")?.textContent;
 }
 
-function stat(caption: string): string | null | undefined {
-  const stats = Array.from(document.querySelectorAll(".applications-stat"));
-  const found = stats.find(
-    (candidate) => candidate.querySelector(".applications-stat-label")?.textContent === caption,
-  );
-  return found?.querySelector(".applications-stat-value")?.textContent;
+function summary(): string | null | undefined {
+  return document.querySelector(".applications-summary")?.textContent;
 }
 
 /** Lets any request a click would have started actually start. */
@@ -570,7 +566,7 @@ describe("tracker request", () => {
     });
     expect(container.querySelector(".tracker-table")).toBeNull();
     expect(tabCount("All")).toBe("12");
-    expect(stat("Applied to")).toBe("5");
+    expect(summary()).toBe("5 applied to · 12 jobs tracked");
 
     await waitFor(() => {
       expect(container.querySelector(".tracker-empty")?.textContent).toBe(
@@ -696,8 +692,8 @@ describe("tracker rendering", () => {
     // Two rows on the page, twelve in Rails' tally: the totals are never counted client-side.
     expect(document.querySelectorAll(".tracker-row")).toHaveLength(2);
     expect(tab("All")).toHaveAttribute("aria-selected", "true");
-    expect(stat("Applied to")).toBe("5");
-    expect(stat("Jobs tracked")).toBe("12");
+    expect(summary()).toBe("5 applied to · 12 jobs tracked");
+    expect(document.querySelector(".applications-stats")).toBeNull();
   });
 
   // TestApplicationsViewRendersControls.
@@ -726,21 +722,38 @@ describe("tracker rendering", () => {
     pageFor = (number) => ({ number, size: 30, total: 75, has_next: number < 3 });
     const { container } = await loadedTracker();
 
+    expect(container.querySelector(".tracker-footer")).not.toBeNull();
     expect(container.querySelector(".tracker-pagination")).toHaveClass("job-pagination");
+    expect(container.querySelector(".tracker-row-range")?.textContent).toBe("Rows 1–30 of 75");
     expect(container.querySelector(".tracker-page-indicator")?.textContent).toBe("Page 1 of 3");
     expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Next" })).toBeEnabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     await waitFor(() => {
       expect(container.querySelector(".tracker-page-indicator")?.textContent).toBe("Page 2 of 3");
     });
+    expect(container.querySelector(".tracker-row-range")?.textContent).toBe("Rows 31–60 of 75");
     expect(requests.at(-1)?.get("page")).toBe("2");
     expect(screen.getByRole("button", { name: "Previous" })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => {
+      expect(container.querySelector(".tracker-page-indicator")?.textContent).toBe("Page 3 of 3");
+    });
+    expect(container.querySelector(".tracker-row-range")?.textContent).toBe("Rows 61–75 of 75");
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Previous" }));
+    await waitFor(() => {
+      expect(container.querySelector(".tracker-page-indicator")?.textContent).toBe("Page 2 of 3");
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Previous" }));
     await waitFor(() => {
       expect(container.querySelector(".tracker-page-indicator")?.textContent).toBe("Page 1 of 3");
     });
+    expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
   });
 
   // TestApplicationsViewEmptyStatesExplainTheActiveTab, through the tabs themselves.
@@ -860,6 +873,26 @@ function declared(rules: Map<string, string>, selector: string, property: string
 }
 
 describe("Surface v2 tracker grid", () => {
+  it("styles the tracker toolbar and footer as compact surface controls", () => {
+    const css = stylesheet();
+    const mobile = rulesOf(unconditional(css));
+    const desktop = rulesOf(atRuleBody(css, "@container (min-width: 800px)"));
+
+    expect(declared(mobile, ".tracker-toolbar", "display")).toBe("flex");
+    expect(declared(mobile, ".tracker-columns-trigger", "min-height")).toBe(
+      "var(--control-h-touch)",
+    );
+    expect(declared(mobile, ".tracker-footer", "border-top")).toBe(
+      "1px solid var(--color-grid-line)",
+    );
+    expect(declared(desktop, ".tracker-columns-trigger", "min-height")).toBe(
+      "var(--control-h-desktop)",
+    );
+    expect(declared(desktop, ".tracker-footer .tracker-page-prev", "min-height")).toBe(
+      "var(--control-h-desktop)",
+    );
+  });
+
   it("renders one grid with row numbers, icons, pinned Job, and mobile company text", async () => {
     rows = [
       { ...fixtures.unscoredJob, id: 1, title: "Untracked", application: null },
@@ -1090,7 +1123,7 @@ describe("tracker writes", () => {
     });
     expect(tabCount("Not applied")).toBe("0");
     expect(tabCount("Applied")).toBe("2");
-    expect(stat("Applied to")).toBe("2");
+    expect(summary()).toBe("2 applied to · 2 jobs tracked");
   });
 
   it("disables every status editor while a write is in flight and marks only its own row", async () => {
@@ -1210,15 +1243,21 @@ describe("tracker table behaviour", () => {
 
   it("hides a column's header and cells together, and never offers to hide Job", async () => {
     const { container } = await loadedTracker();
-    const toggles = container.querySelectorAll(".tracker-column-toggle");
-    expect(Array.from(toggles).map((t) => t.textContent)).toEqual([
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Columns" }));
+    const menu = await screen.findByRole("menu");
+    const toggles = within(menu).getAllByRole("menuitemcheckbox");
+    expect(toggles.map((toggle) => toggle.textContent)).toEqual([
       "Company",
       "Status",
       "Intaked",
       "Updated",
     ]);
+    expect(within(menu).queryByRole("menuitemcheckbox", { name: "Job" })).toBeNull();
+    const companyToggle = within(menu).getByRole("menuitemcheckbox", { name: "Company" });
+    expect(companyToggle).toHaveAttribute("aria-checked", "true");
 
-    fireEvent.click(screen.getByRole("checkbox", { name: "Company" }));
+    fireEvent.click(companyToggle);
+    expect(companyToggle).toHaveAttribute("aria-checked", "false");
 
     const headers = Array.from(container.querySelectorAll("thead th")).map(
       (th) => th.querySelector(".tracker-header-label")?.textContent ?? th.textContent,
