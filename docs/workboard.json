@@ -3117,7 +3117,7 @@
       "id": "UI-07",
       "title": "Generate shadcn Popover, Command, and DropdownMenu primitives",
       "description": "Use the shadcn CLI to generate Popover and DropdownMenu (Radix) and Command (cmdk) into web/src/components/ui/, then edit the generated source to use app.css tokens (--radius-panel, surface fill, hairline border, --shadow-md, sage focus ring) through token utilities only. Do not adopt them in any screen yet. Add a smoke test per primitive covering open, keyboard navigation, Escape to close, and focus return, and update the ui.test.tsx dependency pin.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "UI",
       "depends_on": [

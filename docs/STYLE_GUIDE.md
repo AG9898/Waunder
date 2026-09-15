@@ -41,6 +41,9 @@ source of truth; the stylesheet is `web/public/app.css`, linked from `web/index.
 > **RESOLVED-25 (2026-09-15) retires the "no runtime dependency" clause:** new primitives are generated
 > with the shadcn CLI over Radix / `cmdk` / `vaul` / `react-day-picker`, icons come from `lucide-react`,
 > and the native `Dialog`/`Sheet` above stay in place. Brand logos and the font stay self-hosted.
+> **UI-07** adds Popover, Command, and DropdownMenu as owned primitives. Their generated surfaces use
+> only Waunder token utilities (`rounded-panel`, `bg-surface`, `border-border`, `shadow-md`, and the
+> sage focus-ring utilities); they are foundational only until a later UI task adopts one in a screen.
 >
 > The class *suffixes* this file specifies — `.job-score--high|mid|low|pending`,
 > `.job-status--active|backlog|removed`, `.tracker-row--<group>` — plus the brand-logo paths

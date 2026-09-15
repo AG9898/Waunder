@@ -205,6 +205,11 @@ Be honest about the current state — most of the suite is still to be written.
 - **web/** — `src/components/ui/ui.test.tsx` (`UI-02`): renders the vendored Button, Input, Select,
   Dialog, and Sheet primitives, asserts their token utilities, prop-driven open/close and
   Escape-to-`onClose`, the `@source` opt-in, and that `package.json` gained no runtime UI dependency.
+- **web/** — `src/components/ui/ui.test.tsx` (`UI-07`): smoke-tests the generated Popover,
+  Command, and DropdownMenu primitives. Each open/close path is driven through its public trigger;
+  the menu and command cases assert ArrowDown selection, Escape dismissal, and focus returning to
+  the trigger, while the source/dependency checks pin the Radix/cmdk versions and reject generated
+  default-color or arbitrary-value utilities.
 
 - **web/** — `src/api/schemas.test.ts` (`FE-03`): the API boundary contract. Fixtures are copied
   from what the Rails serializers actually emit, **including the keys they leave out** — the

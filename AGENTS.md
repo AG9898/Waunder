@@ -1555,3 +1555,6 @@ specific metadata; branded source logos remain self-hosted image assets.
 The Tailwind probe's value regex must include the custom `--control-h-*` namespace; otherwise the
 desktop/touch control-height tokens can drift without being checked. When checking `matchAll` results
 for required declarations, compare capture group 1 (`[, name]`), not the full-match element at index 0.
+
+### 2026-09-15 — shadcn generation must preserve the native Dialog seam
+The current shadcn CLI registry makes `command` pull in the Dialog primitive and prompts to overwrite the existing native `dialog.tsx`; generate with that file temporarily out of the target path, then restore it so UI-02 screens keep their native-dialog contract. The CLI also emitted a `cn` package because this repo's local `cn` helper is not resolved from the registry alias, so replace generated `cn` imports with `../../lib/cn` and remove that accidental dependency before pinning the intended Radix/cmdk packages.
