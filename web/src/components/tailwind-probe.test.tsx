@@ -24,11 +24,25 @@ describe("Tailwind setup", () => {
     );
     const theme = read("src", "styles", "tailwind.css").split("@theme {")[1] ?? "";
     const defined = [
-      ...theme.matchAll(/(--(?:color|text|radius|shadow|font)-[a-z-]+):\s*([^;]+);/g),
+      ...theme.matchAll(/(--(?:color|text|radius|shadow|font|control-h)-[a-z-]+):\s*([^;]+);/g),
     ];
     expect(defined.length).toBeGreaterThan(30);
     for (const [, name, value] of defined) {
       expect(tokens.get(name!), name).toBe((value ?? "").replace(/\s+/g, "").replace(/0\./g, "."));
+    }
+
+    for (const name of [
+      "--radius-control",
+      "--radius-panel",
+      "--color-grid-header",
+      "--color-grid-line",
+      "--color-row-hover",
+      "--color-row-active",
+      "--color-header-sorted",
+      "--control-h-desktop",
+      "--control-h-touch",
+    ]) {
+      expect(defined.some(([, definedName]) => definedName === name), name).toBe(true);
     }
   });
 

@@ -3220,7 +3220,7 @@
       "id": "UI-10",
       "title": "Add Surface v2 design tokens to app.css and the Tailwind theme",
       "description": "Add the tokens listed in STYLE_GUIDE.md 'Surface v2 > Tokens added' (--radius-control, --radius-panel, --color-grid-header, --color-grid-line, --color-row-hover, --color-row-active, --color-header-sorted, --control-h-desktop, --control-h-touch) to the :root block of web/public/app.css and restate them value for value in web/src/styles/tailwind.css @theme. Tokens only: do not change any existing token value or any existing rule, so no screen changes appearance.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "UI",
       "depends_on": [],

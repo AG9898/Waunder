@@ -30,6 +30,11 @@
   --color-ink-faint: #8c8579;
   --color-border: #e4dccd;
   --color-border-strong: #d4c9b6;
+  --color-grid-header: #f1ebe3;
+  --color-grid-line: #ebe4d8;
+  --color-row-hover: #f6f1e9;
+  --color-row-active: #eef2ec;
+  --color-header-sorted: #e9ece3;
   --color-accent: #5e7d6a;
   --color-accent-strong: #4c6a58;
   --color-accent-soft: #e7ede7;
@@ -62,6 +67,11 @@
   --radius-lg: 16px;
   --radius-xl: 22px;
   --radius-pill: 999px;
+  --radius-control: 8px;
+  --radius-panel: 10px;
+
+  --control-h-desktop: 32px;
+  --control-h-touch: 44px;
 
   --shadow-sm: 0 1px 2px rgba(45, 44, 44, 0.04), 0 1px 3px rgba(45, 44, 44, 0.05);
   --shadow-md: 0 2px 6px rgba(45, 44, 44, 0.05), 0 10px 28px rgba(45, 44, 44, 0.06);

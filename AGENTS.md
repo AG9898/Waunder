@@ -1550,3 +1550,8 @@ default gems; cover the actual executable with a subprocess smoke spec.
 add the `data-lucide` attribute used by the framework's DOM helpers. Keep source identity in the pure
 `sourceIcon` mapping and test the rendered marker's SVG/currentColor contract rather than library-
 specific metadata; branded source logos remain self-hosted image assets.
+
+### 2026-09-15 — Surface v2 custom tokens need explicit Tailwind parity coverage
+The Tailwind probe's value regex must include the custom `--control-h-*` namespace; otherwise the
+desktop/touch control-height tokens can drift without being checked. When checking `matchAll` results
+for required declarations, compare capture group 1 (`[, name]`), not the full-match element at index 0.
