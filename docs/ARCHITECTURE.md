@@ -282,7 +282,8 @@ the original browser `Host` header.
   default `state`, so backlog/removed are opt-in views.
 - **Application-tracker query surface (TRACK-01).** The feed doubles as the application tracker,
   so each row carries `created_at` and `application` (the job's most recent tracked `Application`,
-  or `null`), and the response adds `application_counts`. A `LEFT JOIN LATERAL` attaches exactly
+  or `null`), and the response adds `application_counts`. The embedded application includes the
+  Rails-owned `applied_at` stamp. A `LEFT JOIN LATERAL` attaches exactly
   one latest Application per job post, so filtering, sorting, and counting by tracker state all
   happen in one exact query. `application` groups over `Application#pipeline_status`
   (`Api::JobPostsController::APPLICATION_GROUPS`): `not_applied` (`interested`, `drafting`,
@@ -339,7 +340,7 @@ the original browser `Host` header.
   Greenhouse/Lever/Ashby, plus LinkedIn Easy Apply when `LINKEDIN_EASY_APPLY_ENABLED` is true;
   every other route stays manual via the external "Open application" link. Rails now serves `GET /api/applications/:id`:
   session-guarded, read-only, returning `{application: {application_id, job_title, company,
-  status, pipeline_status, pipeline_stage, pipeline_note, last_status_change_at,
+  status, pipeline_status, pipeline_stage, pipeline_note, last_status_change_at, applied_at,
   next_follow_up_on, resume_emphasis_notes, cover_letter, draft_ready, failure_reason,
   structured_answers, autofill_payload, autofill_warnings, worker_report}}` where
   `autofill_payload` is the

@@ -32,4 +32,20 @@ RSpec.describe Application, type: :model do
     expect(application.application_draft).to eq(draft)
     expect(application.audit_events).to contain_exactly(audit_event)
   end
+
+  it "stamps applied_at on the first applied transition and preserves it" do
+    company = Company.create!(name: "Example Co")
+    job_post = company.job_posts.create!(title: "Product Engineer")
+    application = described_class.create!(job_post:)
+
+    application.apply_pipeline_status!(status: "applied")
+    applied_at = application.applied_at
+
+    expect(applied_at).to be_present
+
+    application.apply_pipeline_status!(status: "interviewing")
+    application.apply_pipeline_status!(status: "applied")
+
+    expect(application.reload.applied_at).to eq(applied_at)
+  end
 end

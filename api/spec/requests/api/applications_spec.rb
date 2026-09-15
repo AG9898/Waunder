@@ -63,12 +63,8 @@ RSpec.describe "Api applications", type: :request do
     it "returns the application tracker list with job context and pipeline state" do
       sign_in!
       app = build_application(status: "submitted", approved_at: 1.hour.ago)
-      app.update!(
-        pipeline_status: "applied",
-        pipeline_stage: "waiting",
-        last_status_change_at: Time.current,
-        submitted_at: Time.current
-      )
+      app.update!(submitted_at: Time.current)
+      app.apply_pipeline_status!(status: "applied", stage: "waiting")
 
       get "/api/applications"
 
@@ -84,6 +80,7 @@ RSpec.describe "Api applications", type: :request do
         "pipeline_stage" => "waiting"
       )
       expect(application["submitted_at"]).to be_present
+      expect(application["applied_at"]).to be_present
     end
 
     it "requires authentication" do
@@ -261,6 +258,25 @@ RSpec.describe "Api applications", type: :request do
         "next_follow_up_on" => "2026-06-30"
       )
       expect(app.reload.status).to eq("approved")
+    end
+
+    it "stamps applied_at server-side and ignores a client-supplied value" do
+      sign_in!
+      app = build_application
+      client_applied_at = 1.year.ago
+
+      patch "/api/applications/#{app.id}/status", params: {
+        application: {
+          pipeline_status: "applied",
+          applied_at: client_applied_at.iso8601
+        }
+      }
+
+      expect(response).to have_http_status(:ok)
+      app.reload
+      expect(app.applied_at).to be_present
+      expect(app.applied_at).not_to eq(client_applied_at)
+      expect(JSON.parse(response.body).dig("application", "applied_at")).to be_present
     end
 
     it "rejects unknown pipeline statuses" do

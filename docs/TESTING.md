@@ -63,8 +63,9 @@ Be honest about the current state — most of the suite is still to be written.
   /api/applications/:id/draft`, covering draft + job context, editable worker-shaped autofill
   preview, safety warnings, read-only GET behavior (no audit/enqueue), unknown-id not-found JSON
   shape, malformed edit rejection, and auth gating; plus `GET /api/applications` and
-  `PATCH /api/applications/:id/status`, covering tracker list/update behavior and
-  automation-vs-pipeline status separation.
+  `PATCH /api/applications/:id/status`, covering tracker list/update behavior, Rails-owned
+  `applied_at` serialization and stamping, client-field rejection, and automation-vs-pipeline
+  status separation.
 - **api/** — `spec/requests/api/job_posts_spec.rb`: request specs for authenticated manual
   `POST /api/job_posts`, covering deterministic JobPost creation, optional external-application
   route resolution, exact-match `new`/`already_tracked`/`already_submitted` response shapes,
@@ -75,7 +76,7 @@ Be honest about the current state — most of the suite is still to be written.
   `GET /api/job_posts/:id` (scored detail, resolved route, current tracker state, auth gating),
   plus `POST /api/job_posts/:id/score` for explicit score requests and
   `PATCH /api/job_posts/:id/application_status` for tracker application create/reuse and status
-  updates.
+  updates, including the Rails-owned `applied_at` field and client-field rejection.
 - **api/** — `spec/requests/api/digest_spec.rb`: request specs for `GET /api/digest`, covering the
   latest digest of recently scored JobPosts (no scoring/LLM on read), the empty-jobs case, and 401
   auth gating.
@@ -99,7 +100,7 @@ Be honest about the current state — most of the suite is still to be written.
   model and database levels.
 - **api/** — `spec/models/application_spec.rb`, `spec/models/application_draft_spec.rb`, and
   `spec/models/audit_event_spec.rb`: model specs for the application lifecycle, draft JSON
-  payload shape, audit payload shape, and associations.
+  payload shape, one-time `applied_at` stamping, audit payload shape, and associations.
 - **api/** — `spec/models/profile_spec.rb` and `spec/models/resume_document_spec.rb`: model specs
   for the encrypted-at-rest profile/resume fields. They assert the underlying column holds
   ciphertext (raw SQL select) while the accessor returns plaintext, and that deterministic email

@@ -498,6 +498,7 @@ module Api
         pipeline_stage: application.pipeline_stage,
         pipeline_note: application.pipeline_note,
         last_status_change_at: application.last_status_change_at,
+        applied_at: application.applied_at,
         next_follow_up_on: application.next_follow_up_on,
         submitted_at: application.submitted_at,
         failure_reason: application.failure_reason

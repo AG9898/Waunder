@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_09_160000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_15_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "pg_catalog.plpgsql"
@@ -73,6 +73,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_160000) do
   end
 
   create_table "applications", force: :cascade do |t|
+    t.datetime "applied_at"
     t.datetime "approved_at"
     t.datetime "created_at", null: false
     t.text "failure_reason"

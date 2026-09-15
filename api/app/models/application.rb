@@ -39,10 +39,13 @@ class Application < ApplicationRecord
   end
 
   def assign_pipeline_status(status:, stage: nil, note: nil, next_follow_up_on: nil)
+    previous_pipeline_status = pipeline_status
     self.pipeline_status = status
     self.pipeline_stage = stage.presence || DEFAULT_PIPELINE_STAGE_BY_STATUS[status.to_s]
     self.pipeline_note = note unless note.nil?
     self.next_follow_up_on = next_follow_up_on unless next_follow_up_on.nil?
+    self.applied_at = Time.current if status.to_s.strip.downcase == "applied" &&
+      previous_pipeline_status.to_s.strip.downcase != "applied" && applied_at.nil?
     self.last_status_change_at = Time.current
   end
 

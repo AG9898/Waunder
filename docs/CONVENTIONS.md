@@ -476,7 +476,9 @@ dispatch.
   being edited, and omit every untouched optional field, so a note edit never clears the follow-up
   date and a follow-up edit never clears the note. Clearing a value is an explicit empty value for
   that one field. `applications.applied_at` is stamped by `Application` the first time the pipeline
-  status becomes `applied` and is never sent by the client or moved by later status changes.
+  status becomes `applied` and is never sent by the client or moved by later status changes. The
+  migration backfills it from `submitted_at`, then `last_status_change_at`, for existing applied,
+  interviewing, and offer rows.
 
 ---
 

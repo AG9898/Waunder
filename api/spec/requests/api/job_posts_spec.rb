@@ -298,8 +298,8 @@ RSpec.describe "Api job posts", type: :request do
           lifecycle_state: "removed")
 
         Application.create!(job_post: interested, status: "draft", pipeline_status: "interested")
-        Application.create!(job_post: applied, status: "draft", pipeline_status: "applied",
-          pipeline_stage: "waiting", last_status_change_at: Time.current)
+        applied_application = Application.create!(job_post: applied, status: "draft")
+        applied_application.apply_pipeline_status!(status: "applied", stage: "waiting")
 
         { untouched: untouched, interested: interested, applied: applied,
           backlogged: backlogged, removed: removed }
@@ -336,7 +336,8 @@ RSpec.describe "Api job posts", type: :request do
         expect(rows[jobs[:untouched].id]["application"]).to be_nil
         expect(rows[jobs[:applied].id]["application"]).to include(
           "pipeline_status" => "applied",
-          "pipeline_stage" => "waiting"
+          "pipeline_stage" => "waiting",
+          "applied_at" => be_present
         )
         expect(rows[jobs[:untouched].id]["created_at"]).to be_present
       end
@@ -672,10 +673,14 @@ RSpec.describe "Api job posts", type: :request do
       sign_in!
       company = Company.create!(name: "Acme")
       job_post = JobPost.create!(company: company, title: "Staff Engineer")
+      client_applied_at = 1.year.ago
 
       expect do
         patch "/api/job_posts/#{job_post.id}/application_status", params: {
-          application: { pipeline_status: "applied" }
+          application: {
+            pipeline_status: "applied",
+            applied_at: client_applied_at.iso8601
+          }
         }
       end.to change(Application, :count).by(1)
         .and change(AuditEvent, :count).by(1)
@@ -693,6 +698,8 @@ RSpec.describe "Api job posts", type: :request do
       expect(app.status).to eq("draft")
       expect(app.pipeline_status).to eq("applied")
       expect(app.pipeline_stage).to eq("waiting")
+      expect(app.applied_at).to be_present
+      expect(app.applied_at).not_to eq(client_applied_at)
     end
 
     it "reuses the latest application for manual status changes" do

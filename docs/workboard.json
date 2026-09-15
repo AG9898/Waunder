@@ -3347,7 +3347,7 @@
       "id": "TRACK-02",
       "title": "Add a Rails-owned applications.applied_at stamp",
       "description": "Rails side of RESOLVED-26. Add a nullable applications.applied_at datetime by migration, stamp it in Application#assign_pipeline_status the first time pipeline_status becomes applied (never moved by later changes, never cleared, never accepted from params), and backfill existing rows from submitted_at, else last_status_change_at, for applications whose pipeline_status is applied, interviewing, or offer. Expose applied_at in the job-post feed's serialize_application and the applications serializer. No web/ changes in this task.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "TRACK",
       "depends_on": [],
