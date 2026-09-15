@@ -3187,7 +3187,7 @@
       "id": "UI-09",
       "title": "Generate the shadcn Calendar primitive",
       "description": "Use the shadcn CLI to generate Calendar (react-day-picker) into web/src/components/ui/calendar.tsx, themed from app.css tokens (sage selected day, sage-soft today, faint outside days, 44px touch cells on mobile layouts). It must produce and accept plain YYYY-MM-DD strings with no timezone conversion, matching how Rails stores next_follow_up_on. Do not adopt it in any screen. Add tests and update the dependency pin.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "UI",
       "depends_on": [

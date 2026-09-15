@@ -5,6 +5,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { Button } from "./button";
+import { Calendar } from "./calendar";
 import { CommandDialog, CommandGroup, CommandInput, CommandItem, CommandList } from "./command";
 import { Dialog } from "./dialog";
 import {
@@ -60,15 +61,17 @@ describe("vendored UI primitives", () => {
       dependencies: Record<string, string>;
     };
     expect(Object.keys(pkg.dependencies).sort()).toEqual(
-      // UI-06 adds lucide-react; UI-07 adds command/Radix and UI-08 adds the pinned vaul runtime.
+      // UI-06 adds lucide-react; UI-07 adds command/Radix, UI-08 adds vaul, and UI-09 adds Calendar.
       [
         "@tanstack/react-query",
         "@tanstack/react-table",
         "@tanstack/react-virtual",
         "cmdk",
+        "date-fns",
         "lucide-react",
         "radix-ui",
         "react",
+        "react-day-picker",
         "react-dom",
         "react-router",
         "vaul",
@@ -79,6 +82,8 @@ describe("vendored UI primitives", () => {
     expect(pkg.dependencies.cmdk).toBe("1.1.1");
     expect(pkg.dependencies["radix-ui"]).toBe("1.6.7");
     expect(pkg.dependencies.vaul).toBe("1.1.2");
+    expect(pkg.dependencies["date-fns"]).toBe("4.4.0");
+    expect(pkg.dependencies["react-day-picker"]).toBe("10.0.1");
   });
 
   it("keeps generated primitives on Waunder token utilities", () => {
@@ -108,6 +113,17 @@ describe("vendored UI primitives", () => {
     expect(drawerSource).toContain("rounded-t-[18px]");
     expect(drawerSource).toContain("h-1 w-9 shrink-0 rounded-pill bg-border-strong");
     expect(drawerSource).toContain("fixed inset-0 z-40 bg-ink/30");
+
+    const calendarSource = readFileSync(
+      join(root, "src", "components", "ui", "calendar.tsx"),
+      "utf8",
+    );
+    expect(calendarSource).toContain('from "react-day-picker"');
+    expect(calendarSource).toContain("bg-accent-soft");
+    expect(calendarSource).toContain("size-11");
+    expect(calendarSource).not.toContain("bg-background");
+    expect(calendarSource).not.toContain("text-muted-foreground");
+    expect(calendarSource).not.toContain("toISOString");
   });
 
   it("opts the ui directory into Tailwind utilities", () => {
@@ -316,5 +332,60 @@ describe("vendored UI primitives", () => {
     fireEvent.keyDown(input, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(document.activeElement).toBe(trigger);
+  });
+
+  it("selects a date-only value without timezone conversion", () => {
+    const onChange = vi.fn();
+    const { container } = render(
+      <Calendar
+        value="2026-09-15"
+        onChange={onChange}
+        defaultMonth={new Date(2026, 8, 1)}
+        today={new Date(2026, 8, 20)}
+      />,
+    );
+
+    const selected = container.querySelector('button[data-day="2026-09-15"]');
+    expect(selected).toHaveClass("bg-accent", "text-surface", "size-11");
+    expect(selected).toHaveAttribute("data-day", "2026-09-15");
+    expect(container.querySelector('button[data-day="2026-08-30"]')).toHaveClass(
+      "text-ink-faint",
+      "opacity-60",
+    );
+
+    fireEvent.click(container.querySelector('button[data-day="2026-09-16"]')!);
+    expect(onChange).toHaveBeenCalledWith("2026-09-16");
+  });
+
+  it("moves focus to the next day with the keyboard", async () => {
+    const { container } = render(
+      <Calendar
+        value="2026-09-15"
+        defaultMonth={new Date(2026, 8, 1)}
+        today={new Date(2026, 8, 20)}
+      />,
+    );
+    const current = container.querySelector('button[data-day="2026-09-15"]') as HTMLButtonElement;
+    act(() => current.focus());
+
+    act(() => fireEvent.keyDown(current, { key: "ArrowRight" }));
+
+    await waitFor(() =>
+      expect(container.querySelector('button[data-day="2026-09-16"]')).toHaveFocus(),
+    );
+  });
+
+  it("marks today with the sage-soft treatment", () => {
+    const { container } = render(
+      <Calendar
+        value="2026-09-16"
+        defaultMonth={new Date(2026, 8, 1)}
+        today={new Date(2026, 8, 15)}
+      />,
+    );
+
+    const today = container.querySelector('button[data-day="2026-09-15"]');
+    expect(today).toHaveAttribute("data-today", "true");
+    expect(today).toHaveClass("bg-accent-soft", "text-accent-ink");
   });
 });

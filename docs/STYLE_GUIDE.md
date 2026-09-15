@@ -49,6 +49,11 @@ source of truth; the stylesheet is `web/public/app.css`, linked from `web/index.
 > `bg-border-strong` handle, a warm `bg-ink` scrim, and bottom padding for
 > `env(safe-area-inset-bottom)`; `DrawerTitle` remains visible for assistive technology. It is not
 > adopted by a shipped screen yet.
+> **UI-09** adds the owned Calendar primitive on pinned `react-day-picker` `10.0.1`. Selected days
+> use sage, today uses sage-soft, outside days use faint ink, and day/navigation controls are at
+> least 44px for touch layouts. Its public boundary is a Rails-compatible `YYYY-MM-DD` string;
+> parsing and formatting use local calendar components rather than UTC conversion. It is not
+> adopted by a shipped screen yet.
 >
 > The class *suffixes* this file specifies — `.job-score--high|mid|low|pending`,
 > `.job-status--active|backlog|removed`, `.tracker-row--<group>` — plus the brand-logo paths

@@ -218,6 +218,11 @@ Be honest about the current state — most of the suite is still to be written.
   asserting focus returns to the trigger. The source/dependency checks pin `vaul` and ensure the
   existing native Sheet remains the separate primitive.
 
+- **web/** — `src/components/ui/ui.test.tsx` (`UI-09`): smoke-tests the generated Calendar primitive,
+  pins `react-day-picker` and `date-fns`, verifies token-themed selected/today/outside states and
+  44px controls, exercises ArrowRight keyboard navigation, and asserts the string boundary remains
+  `YYYY-MM-DD` without UTC conversion. Run the file under a non-UTC `TZ` when changing date handling.
+
 - **web/** — `src/api/schemas.test.ts` (`FE-03`): the API boundary contract. Fixtures are copied
   from what the Rails serializers actually emit, **including the keys they leave out** — the
   digest's six-key row, the job feed's abbreviated tracker, an `unavailable` posting lookup that
