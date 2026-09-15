@@ -29,6 +29,7 @@
  */
 import { useEffect, useState } from "react";
 import type { ChangeEvent } from "react";
+import { Plus } from "lucide-react";
 import { Link, useLocation } from "react-router";
 
 import {
@@ -105,6 +106,7 @@ export function AppChrome() {
           Waunder
         </Link>
         <Link className="app-add-job" to="/jobs/new">
+          <Plus className="app-add-job-icon" aria-hidden="true" color="currentColor" size={14} />
           Import job
         </Link>
         <label className="layout-control">

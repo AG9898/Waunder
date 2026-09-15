@@ -2201,6 +2201,7 @@ html { scroll-padding-bottom: var(--screen-bottom); }
 .app-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .app-brand { margin-right: auto; font-size: 21px; font-weight: 700; color: var(--color-ink); }
 .app-add-job { font-size: var(--text-sm); font-weight: 600; padding: 12px 0; }
+.app-add-job-icon { display: none; }
 .layout-control { display: flex; align-items: center; gap: 6px; font-size: var(--text-sm); color: var(--color-ink-soft); }
 .layout-select {
   min-height: 44px;
@@ -2263,6 +2264,178 @@ html { scroll-padding-bottom: var(--screen-bottom); }
 .layout-select:focus-visible, .app-add-job:focus-visible, .app-tab:focus-visible {
   outline: 2px solid var(--color-accent-strong);
   outline-offset: 3px;
+}
+
+/* Surface v2 desktop shell. The toolbar remains a separate wrapper so the mobile markup and
+   fixed bottom navigation stay unchanged; desktop promotes its children into one top-bar grid. */
+:root[data-layout="desktop"] .app-chrome {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-rows: 56px auto;
+  align-items: center;
+  column-gap: var(--space-4);
+  row-gap: var(--space-3);
+  min-height: 56px;
+  margin: calc(-1 * var(--page-pad)) calc(-1 * var(--page-pad)) var(--space-6);
+  padding: 0 var(--page-pad);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+:root[data-layout="desktop"] .app-toolbar { display: contents; }
+:root[data-layout="desktop"] .app-brand {
+  grid-column: 1;
+  grid-row: 1;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+}
+:root[data-layout="desktop"] .app-chrome .app-tabs {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: stretch;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+  border: 0;
+}
+:root[data-layout="desktop"] .app-chrome .app-tab {
+  min-height: var(--control-h-desktop);
+  padding: 0 10px;
+  border-radius: var(--radius-control);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+:root[data-layout="desktop"] .layout-control {
+  grid-column: 3;
+  grid-row: 1;
+  font-size: var(--text-xs);
+}
+:root[data-layout="desktop"] .layout-select {
+  min-height: var(--control-h-desktop);
+  padding: 0 8px;
+  border-radius: var(--radius-control);
+  font-size: var(--text-sm);
+}
+:root[data-layout="desktop"] .app-add-job {
+  display: inline-flex;
+  grid-column: 4;
+  grid-row: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--control-h-desktop);
+  padding: 0 12px;
+  border-radius: var(--radius-control);
+  background: var(--color-accent);
+  color: #fff;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+:root[data-layout="desktop"] .app-add-job:hover {
+  background: var(--color-accent-strong);
+  color: #fff;
+}
+:root[data-layout="desktop"] .app-add-job-icon {
+  display: block;
+  flex: none;
+}
+:root[data-layout="desktop"] .app-add-job:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring-strong);
+}
+:root[data-layout="desktop"] .app-update,
+:root[data-layout="desktop"] .layout-error {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 960px) {
+  :root:not([data-layout="mobile"]) .app-chrome {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-rows: 56px auto;
+    align-items: center;
+    column-gap: var(--space-4);
+    row-gap: var(--space-3);
+    min-height: 56px;
+    margin: calc(-1 * var(--page-pad)) calc(-1 * var(--page-pad)) var(--space-6);
+    padding: 0 var(--page-pad);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+  }
+  :root:not([data-layout="mobile"]) .app-toolbar { display: contents; }
+  :root:not([data-layout="mobile"]) .app-brand {
+    grid-column: 1;
+    grid-row: 1;
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  :root:not([data-layout="mobile"]) .app-chrome .app-tabs {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: stretch;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    overflow-x: auto;
+    border: 0;
+  }
+  :root:not([data-layout="mobile"]) .app-chrome .app-tab {
+    min-height: var(--control-h-desktop);
+    padding: 0 10px;
+    border-radius: var(--radius-control);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  :root:not([data-layout="mobile"]) .layout-control {
+    grid-column: 3;
+    grid-row: 1;
+    font-size: var(--text-xs);
+  }
+  :root:not([data-layout="mobile"]) .layout-select {
+    min-height: var(--control-h-desktop);
+    padding: 0 8px;
+    border-radius: var(--radius-control);
+    font-size: var(--text-sm);
+  }
+  :root:not([data-layout="mobile"]) .app-add-job {
+    display: inline-flex;
+    grid-column: 4;
+    grid-row: 1;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: var(--control-h-desktop);
+    padding: 0 12px;
+    border-radius: var(--radius-control);
+    background: var(--color-accent);
+    color: #fff;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  :root:not([data-layout="mobile"]) .app-add-job:hover {
+    background: var(--color-accent-strong);
+    color: #fff;
+  }
+  :root:not([data-layout="mobile"]) .app-add-job-icon {
+    display: block;
+    flex: none;
+  }
+  :root:not([data-layout="mobile"]) .app-add-job:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring-strong);
+  }
+  :root:not([data-layout="mobile"]) .app-update,
+  :root:not([data-layout="mobile"]) .layout-error {
+    grid-column: 1 / -1;
+  }
 }
 
 /* iOS must not zoom when focusing a form control. */

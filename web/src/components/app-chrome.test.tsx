@@ -1,5 +1,5 @@
 /**
- * App chrome and layout-preference parity (`FE-08`).
+ * App chrome and layout-preference parity (`FE-08`, `UI-12`).
  *
  * Three kinds of assertion live here, because the chrome's behavior is split across three
  * places:
@@ -15,9 +15,10 @@
  *   devices, so a "tidier" unquoted value would silently reset the preference.
  * - **`public/app.css`** — the parts of this feature that are pure CSS are asserted against
  *   the stylesheet itself: Auto's 960px breakpoint must declare *identical* overrides to
- *   explicit Desktop, and the bottom bar must reserve the iPhone safe area. Neither is
- *   observable from the DOM in jsdom, and both fail invisibly (Auto and Desktop drifting
- *   apart on a resize; the last feed row sitting under the nav bar on a notched phone).
+ *   explicit Desktop, the desktop shell must keep its 56px top-bar contract, and the bottom
+ *   bar must reserve the iPhone safe area. Neither is observable from the DOM in jsdom, and
+ *   each fails invisibly (Auto and Desktop drifting apart on a resize; the top-bar controls
+ *   falling out of alignment; the last feed row sitting under the nav bar on a notched phone).
  */
 import { fireEvent, render, screen } from "@testing-library/react";
 import { readFileSync } from "node:fs";
@@ -94,6 +95,18 @@ describe("navigation", () => {
     ]);
     expect(screen.getByRole("link", { name: "Waunder" })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: "Import job" })).toHaveAttribute("href", "/jobs/new");
+  });
+
+  it("marks the import action with a currentColor Lucide plus icon", () => {
+    renderAt("/jobs");
+
+    const action = screen.getByRole("link", { name: "Import job" });
+    const icon = action.querySelector("svg");
+
+    expect(icon).toHaveAttribute("aria-hidden", "true");
+    expect(icon).toHaveAttribute("stroke", "currentColor");
+    expect(icon).toHaveAttribute("width", "14");
+    expect(icon).toHaveAttribute("height", "14");
   });
 
   it.each(ACTIVE_TAB)("marks $label current at $path", ({ path, label }) => {
@@ -286,5 +299,50 @@ describe("app.css layout contract", () => {
       ":is(.digest, .job-list, .applications, .job-detail, .draft-review, .profile, .manual-entry, .contacts-view)",
     );
     expect(screens["padding-bottom"]).toBe("var(--screen-bottom)");
+  });
+});
+
+describe("Surface v2 desktop shell", () => {
+  const wideScreen = css.indexOf("@media (min-width: 960px)");
+
+  function desktopRule(selector: string): Record<string, string> {
+    const explicit = declarations(`:root[data-layout="desktop"] ${selector}`);
+    const automatic = declarations(`:root:not([data-layout="mobile"]) ${selector}`, wideScreen);
+
+    expect(automatic).toEqual(explicit);
+    return explicit;
+  }
+
+  it("uses a 56px surface top bar with compact controls", () => {
+    expect(desktopRule(".app-chrome")).toMatchObject({
+      display: "grid",
+      "grid-template-rows": "56px auto",
+      "min-height": "56px",
+      background: "var(--color-surface)",
+      "border-bottom": "1px solid var(--color-border)",
+    });
+    expect(desktopRule(".app-brand")).toMatchObject({
+      "font-size": "18px",
+      "font-weight": "700",
+    });
+    expect(desktopRule(".app-chrome .app-tab")).toMatchObject({
+      "min-height": "var(--control-h-desktop)",
+      "border-radius": "var(--radius-control)",
+      "font-size": "var(--text-sm)",
+      "font-weight": "600",
+    });
+    expect(desktopRule(".app-add-job")).toMatchObject({
+      display: "inline-flex",
+      "min-height": "var(--control-h-desktop)",
+      "border-radius": "var(--radius-control)",
+      background: "var(--color-accent)",
+    });
+    expect(desktopRule(".app-add-job-icon")).toMatchObject({ display: "block" });
+  });
+
+  it("keeps the mobile fixed bar contract and hides the desktop-only icon", () => {
+    expect(declarations(".app-add-job-icon")["display"]).toBe("none");
+    expect(declarations(".app-chrome .app-tabs")["position"]).toBe("var(--nav-position)");
+    expect(declarations(".app-chrome .app-tabs")["padding"]).toContain("var(--nav-safe-bottom)");
   });
 });

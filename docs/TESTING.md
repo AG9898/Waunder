@@ -319,6 +319,10 @@ Be honest about the current state — most of the suite is still to be written.
   `renderAppTabs("…")` call sites, so `/jobs/new`, `/jobs/:id`, and `/jobs/:id/contacts` are each
   asserted to light up Jobs.
 
+  `UI-12` also pins the desktop Surface v2 shell in CSS: explicit Desktop and Auto at the 960px
+  breakpoint must expose identical 56px top-bar rules, compact control heights, and the Lucide
+  plus marker, while the mobile fixed-nav and safe-area declarations remain the existing ones.
+
   The layout preference is pinned to the **exact stored bytes**: a seeded `"desktop"` (JSON-quoted,
   as go-app's `json.Marshal` left it) loads and selects Desktop, and choosing Mobile writes
   `"mobile"` back. Unavailable storage is covered from both ends — `readLayout`/`writeLayout`

@@ -3282,7 +3282,7 @@
       "id": "UI-12",
       "title": "Re-skin the desktop app chrome as the Surface v2 top bar",
       "description": "Restyle AppChrome for desktop layouts (explicit Desktop and Auto at 960px and wider) to the STYLE_GUIDE.md 'Surface v2 > Shell > Desktop' spec: a 56px surface top bar with a bottom hairline holding the wordmark, text nav items with a sage-soft active state, and on the right the compact layout select and a sage filled Add job button with a lucide plus icon. Mobile layout rendering must not change in this task. Keep the update banner, toaster, active-tab derivation, and the rule that the chrome renders as each screen's first child.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "UI",
       "depends_on": [
