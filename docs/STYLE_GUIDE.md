@@ -38,6 +38,9 @@ source of truth; the stylesheet is `web/public/app.css`, linked from `web/index.
 > wrap the native `<dialog>`. The jobs feed's filter drawer (`UI-03`) is the first screen using `Dialog`: a trigger with the
 > active-filter count opens a native modal `.job-filters-drawer`, bottom-anchored on narrow layouts and
 > right-anchored inside the 800px container query; `ui.test.tsx` pins the dependency list.
+> **RESOLVED-25 (2026-09-15) retires the "no runtime dependency" clause:** new primitives are generated
+> with the shadcn CLI over Radix / `cmdk` / `vaul` / `react-day-picker`, icons come from `lucide-react`,
+> and the native `Dialog`/`Sheet` above stay in place. Brand logos and the font stay self-hosted.
 >
 > The class *suffixes* this file specifies — `.job-score--high|mid|low|pending`,
 > `.job-status--active|backlog|removed`, `.tracker-row--<group>` — plus the brand-logo paths
@@ -53,6 +56,10 @@ source of truth; the stylesheet is `web/public/app.css`, linked from `web/index.
 > display values inside the 800px container query, and the inset box-shadow tint — so restyling the
 > tracker means updating that test deliberately. A pipeline stage with no label renders no
 > `.tracker-stage` pill rather than an empty one.
+>
+> **RESOLVED-26 retires this card-layout contract.** It describes the shipped tracker until `UI-14`
+> lands the Surface v2 grid (see "Surface v2" below), which replaces the `data-label` cards with a
+> horizontally scrolling grid at every width and rewrites `tracker.test.tsx`'s CSS assertions.
 
 ---
 
@@ -93,7 +100,9 @@ The reference palette is warm paper plus sage, anchored by the existing PWA ink 
 | Warning | `#b07d35` / `#f5ecd9` / `#8a601f` | Mid match band |
 | Success | `#4c6a58` / `#e3ece4` / `#36513f` | Success states, high match band |
 
-Do not introduce blue/purple accent systems. Match-score pills are color-coded by band so the
+Do not introduce blue/purple accent systems. The one exception is the Surface v2 status-chip
+tones for Drafting (plum) and Interviewing (slate), which are chip fills only, never accents,
+links, or buttons. Match-score pills are color-coded by band so the
 score reads at a glance: high (≥75) success-soft/green, mid (50–74) warning-soft/amber, low
 (<50) danger-soft/red, and pending (not yet scored) a neutral sunken pill. The band class
 (`.job-score--high|mid|low|pending`) carries the color in both the feed/digest rows and the job
@@ -256,6 +265,108 @@ columns, a compact title, hairline sections, and one primary action where possib
 
 ---
 
+## Surface v2 (RESOLVED-26, in progress)
+
+The approved design is the canvas at https://claude.ai/artifact/EejxLR8rLjxT3UzbnPbvVa (artboards:
+desktop tracker grid, mobile tracker grid, mobile edit-status sheet, chips and cell states). It is a
+reference for values and anatomy only; React components stay the markup source of truth. Tasks
+UI-06…UI-30 and TRACK-02 implement it. Until a task lands, the sections above describe what ships;
+each task rewrites the bullet it replaces in the same commit.
+
+### Tokens added
+
+Add these alongside the existing `:root` tokens (and restate them in `tailwind.css` `@theme`):
+
+| Token | Value | Usage |
+|---|---|---|
+| `--radius-control` | 8px | Buttons, selects, inputs, nav items in the re-skinned surface |
+| `--radius-panel` | 10px | Grid containers, popovers, panels |
+| `--color-grid-header` | `#f1ebe3` | Grid/table header strip |
+| `--color-grid-line` | `#ebe4d8` | Cell and row hairlines inside a grid |
+| `--color-row-hover` | `#f6f1e9` | Row hover |
+| `--color-row-active` | `#eef2ec` | Row being edited / selected |
+| `--color-header-sorted` | `#e9ece3` | Sorted column header cell |
+| `--control-h-desktop` | 32px | Compact desktop controls |
+| `--control-h-touch` | 44px | Minimum touch target on mobile layouts |
+
+The pinned Job column's right edge uses `--color-border-strong`; other column edges use
+`--color-grid-line`.
+
+### Status chips
+
+One `StatusChip` renders any `pipeline_status`: a 22px (24px on touch) pill, 12px/600 label, a 6px
+dot, fill and ink from this table. The "Not applied" tracker placeholder uses the Interested tone.
+
+| Group | Status | Fill | Ink | Dot | Border |
+|---|---|---|---|---|---|
+| Not applied | Interested | `#ece5da` | `#5d584f` | `#8c8579` | none |
+| Not applied | Drafting | `#eee6ee` | `#6a4a6a` | `#8f6690` | none |
+| Not applied | Needs review | `#f5ecd9` | `#8a601f` | `#b07d35` | none |
+| Applied | Applied | `#e7ede7` | `#3a5446` | `#5e7d6a` | none |
+| In progress | Interviewing | `#e5ebf1` | `#3f566f` | `#5b7896` | none |
+| In progress | Offer | `#d7e5d9` | `#2f4a38` | `#4c6a58` | none |
+| Closed | Rejected | `#f4e3dc` | `#843d2c` | `#a8533f` | none |
+| Closed | Withdrawn | transparent | `#8c8579` | `#b3aa9c` | `#d4c9b6` |
+| Closed | Archived | transparent | `#8c8579` | `#b3aa9c` | `#d4c9b6` |
+
+Menus that list statuses group them under these four group labels, in this order, mirroring Rails'
+`APPLICATION_GROUPS`.
+
+### Tracker grid
+
+- One grid at every width inside a surface panel (`--radius-panel`, hairline border, `--shadow-sm`).
+  Header strip 36px (34px mobile), rows 40px desktop / 56px mobile, 13px body text.
+- Column order: row number (48px desktop / 34px mobile, centered, faint tabular digits), Job (pinned;
+  source logo 14px + title 600, ellipsis; on mobile the company sits under the title as a 12px faint
+  second line), Company, Score (match-score band pill), Status (`StatusChip`), Stage (plain text,
+  faint `—` when empty), Applied, Updated, Follow-up, Note (ink-soft, single-line ellipsis). Dates
+  are tabular; an empty date is a faint `—`.
+- Follow-up tone: a past date is danger ink 600 with a 6px danger dot; today reads "Today" in sage
+  strong 600; future dates are ink-soft.
+- Header cells are 12px/600 uppercase faint text with a 13px lucide icon; the sorted column uses
+  `--color-header-sorted`, sage-strong text, and an arrow icon for direction.
+- The grid scrolls horizontally inside its panel with the Job column pinned; on mobile a 28px fade on
+  the panel's right edge signals more columns.
+- Toolbar above the grid: title plus a one-line stats sentence ("N applied to · N jobs tracked");
+  segmented group tabs with counts (active tab: surface fill, sage-strong text, sage-soft count pill);
+  Show and Sort as compact labelled controls; Columns as a dropdown menu. Footer inside the panel:
+  row range on the left, Previous / "Page X of Y" / Next on the right.
+- Cell states: default; hover row `--color-row-hover`; focused cell inset 2px sage ring; editing row
+  `--color-row-active` with sage-strong row number and the editor anchored to the cell; saving shows
+  "Saving…" in faint text inside the cell and disables other cell editors, matching today's one-write
+  -at-a-time rule.
+- Editors: Status is a popover command list grouped by tracker group with a check on the current
+  status; Stage is a popover list of stages including "No stage"; Follow-up is a calendar popover with
+  a Clear action; Note is a popover textarea with explicit Save and Cancel. On a mobile layout, tapping
+  a status opens a bottom drawer: job title and company, status tiles in a two-column grid under group
+  labels (current tile sage border + check), and the stage select; a tile tap writes immediately.
+
+### Shell
+
+- Desktop: a 56px surface top bar with a bottom hairline — wordmark (18px/700), text nav items
+  (13px/600, `--radius-control`, active = sage-soft fill + sage-strong text), and on the right the
+  compact layout select and a sage filled "Add job" button with a plus icon.
+- Mobile: a 60px header with the wordmark and a 44px sage add button; bottom nav of four items, each a
+  20px lucide icon over an 11px label, active item sage-strong with a sage-soft pill behind the icon;
+  safe-area padding unchanged.
+
+### Re-skin checklist (screens without their own artboard)
+
+Apply exactly these and nothing else; a task that needs a layout, copy, or behaviour change stops and
+asks.
+
+1. Controls use `--radius-control` and `--control-h-desktop` on desktop layouts, never below
+   `--control-h-touch` on mobile layouts; panels and cards use `--radius-panel`.
+2. Replace card-inside-card stacks with one panel plus `--color-grid-line` hairlines where a screen
+   nests surfaces.
+3. Section labels stay 12px/600 uppercase faint; lists of repeated fields use the grid header strip
+   treatment when they are tabular.
+4. Any pipeline status renders as `StatusChip`; match scores keep the band pills.
+5. Icons are lucide at 13–20px in `currentColor`; no emoji markers.
+6. Keep every existing class, safety behaviour, and test; update `app.css` rules in place.
+
+---
+
 ### Toasts And Motion (UI-05)
 
 - Transient mutation feedback uses toasts (`web/src/lib/toast.ts` store, `web/src/components/ui/toast.tsx`
@@ -277,8 +388,8 @@ columns, a compact title, hairline sections, and one primary action where possib
   `reference/` are review references only.
 - Keep the PWA manifest in `web/vite.config.ts` (`vite-plugin-pwa`) and the service worker in
   `web/src/sw.ts`; `/app-worker.js` is the permanent legacy-worker kill switch.
-- Any markup adjustments should be narrow compatibility fixes for existing states/classes,
-  not product redesigns.
+- Markup changes follow an approved design (currently Surface v2, RESOLVED-26) or its re-skin
+  checklist; anything beyond that needs a new mock and plan.
 - Preserve existing safety tests and behavior: submits, profile saves, manual job creation,
   push subscribe/unsubscribe, and outreach generation must remain explicit user actions.
 
@@ -289,8 +400,10 @@ columns, a compact title, hairline sections, and one primary action where possib
 Frontend styling tasks should run:
 
 ```bash
-cd web && go test ./...
-cd web && go vet ./...
+cd web && npm run typecheck
+cd web && npm run lint
+cd web && npm test
+cd web && npm run build
 ```
 
 When a task changes visible UI, also run the PWA locally and inspect representative mobile

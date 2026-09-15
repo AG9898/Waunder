@@ -474,3 +474,80 @@ makes a visual regression indistinguishable from a deliberate design change.
 [`STYLE_GUIDE.md`](STYLE_GUIDE.md), [`PRODUCTION_SETUP.md`](PRODUCTION_SETUP.md), `README.md`,
 `CLAUDE.md`. Rails and the worker are unaffected. See also RESOLVED-04 (Web Push), RESOLVED-11
 (monorepo), RESOLVED-14 (session cookie auth), FE-01…FE-30, UI-01…UI-05.
+
+---
+
+### RESOLVED-25 — Installed UI libraries replace the vendored-only primitive policy
+
+**Resolved:** 2026-09-15
+
+**Decision:** `web/` may install UI runtime dependencies. shadcn/ui components are generated with its
+CLI into `web/src/components/ui/` over their real dependencies — Radix primitives (Popover, Dropdown
+Menu), `cmdk` (Command), `vaul` (Drawer), and `react-day-picker` (Calendar) — and the generated source
+is then owned and edited in the repo. Icons come from `lucide-react`. Versions are pinned through
+`package-lock.json`. The existing native `<dialog>`-based `Dialog`/`Sheet` (UI-02) stay until a task
+has a concrete reason to replace them. Brand logos and the Hanken Grotesk WOFF2 stay self-hosted:
+that policy is about not loading assets from a live third-party host at runtime, which bundled npm
+packages do not do.
+
+**Why:** The "vendored, never installed" rule (UI-02) carried the Go-era instinct to avoid a
+`node_modules` supply chain, but RESOLVED-24 already accepted that supply chain. Surface v2 (RESOLVED-26)
+needs an accessible combobox-style status editor, a date picker, a mobile drawer, and a consistent
+icon set; hand-rolling those over native elements is more code, weaker keyboard and screen-reader
+behaviour, and more for agents to maintain than the libraries shadcn is designed around.
+
+**Alternatives rejected:** Keep vendoring and hand-roll Popover/Command/Drawer/Calendar over native
+`popover`, `<dialog>`, and `<input type="date">` — the native date input and popover positioning are
+inconsistent across iOS Safari and desktop browsers, and a combobox with typeahead is not a native
+element. Allow only `lucide-react` — leaves the hardest components (combobox, drawer) hand-rolled.
+A full data-grid library (AG Grid, Glide Data Grid) — heavy, canvas- or theme-driven styling that
+fights `app.css`, and TanStack Table already provides pinning, sizing, sorting, and visibility.
+
+**Affects:** `web/package.json`, `web/src/components/ui/`, `web/src/components/ui/ui.test.tsx`
+(its dependency pin), [`CONVENTIONS.md`](CONVENTIONS.md), [`STYLE_GUIDE.md`](STYLE_GUIDE.md),
+[`TESTING.md`](TESTING.md). Supersedes the vendoring clause of UI-02. Tasks UI-06…UI-09.
+
+---
+
+### RESOLVED-26 — Surface v2: spreadsheet tracker grid, re-skinned shell and screens, Rails-owned applied date
+
+**Resolved:** 2026-09-15
+
+**Decision:** The app adopts the approved "Surface v2" design
+(canvas: https://claude.ai/artifact/EejxLR8rLjxT3UzbnPbvVa) as its visual surface.
+
+1. **Tracker.** The Applications tracker becomes a spreadsheet-style grid at every layout width:
+   row numbers, gridlines, a sunken header strip with column icons and a sorted-column state, the Job
+   column pinned while the rest scrolls horizontally, and pagination in a footer inside the grid.
+   Columns are Job (with source logo), Company, Score, Status, Stage, Applied, Updated, Follow-up,
+   and Note. The mobile self-labelling card layout and its `data-label` contract are **retired**,
+   not preserved. Status, stage, follow-up date, and note are editable in the cell; every edit is an
+   explicit owner action written through the existing `PATCH /api/job_posts/:id/application_status`
+   (never a draft, never a submit). On a mobile layout, editing a status opens a bottom drawer with
+   status tiles and the stage select.
+2. **Applied date.** Rails adds `applications.applied_at`, stamped by the model the first time
+   `pipeline_status` becomes `applied` and never moved by later status changes; existing rows are
+   backfilled from `submitted_at`, else from `last_status_change_at` for rows already at applied or
+   beyond. The client never sends it.
+3. **Shell and screens.** The shared chrome becomes a slim desktop top bar and a mobile icon bottom
+   nav, and every other screen is re-skinned to the Surface v2 tokens and checklist in
+   [`STYLE_GUIDE.md`](STYLE_GUIDE.md) without layout, copy, or behaviour changes. Pipeline statuses
+   render as status chips everywhere, including two new chip hues (plum for Drafting, slate for
+   Interviewing); these are chip tones, not new accent colours.
+
+**Why:** The owner wants the tracker to read and behave like a real tracking sheet, and a card per
+row on mobile hides the columns that make a sheet useful. Inline note/follow-up editing uses a write
+path Rails already validates. An applied date derived from `last_status_change_at` drifts on every
+later change, so the only accurate source is a stamp owned by the model.
+
+**Alternatives rejected:** Keep mobile cards and use the grid on desktop only — two layouts to test
+and a mobile view that cannot show stage, dates, or notes side by side. Derive the applied date on
+the client — inaccurate and unsortable server-side. Re-skin only the tracker and shell — leaves two
+visual systems in the app.
+
+**Affects:** `api/` (migration, `Application`, job-post and application serializers, specs),
+`web/src/components/tracker/`, `web/src/components/app-chrome.tsx`, every screen under
+`web/src/components/`, `web/public/app.css`, `web/src/styles/tailwind.css`,
+[`STYLE_GUIDE.md`](STYLE_GUIDE.md), [`ARCHITECTURE.md`](ARCHITECTURE.md),
+[`CONVENTIONS.md`](CONVENTIONS.md), [`TESTING.md`](TESTING.md), [`PRD.md`](PRD.md). Supersedes the
+tracker card-layout parts of UI-04 and TRACK-01. Tasks UI-10…UI-30 and TRACK-02.

@@ -107,9 +107,14 @@ A standalone npm project (no monorepo workspace), exactly like `workers/`. Node 
   only (no Preflight) with `source(none)`. Add an `@source` line for a file before using utilities
   in it, and use only token utilities (`bg-accent-soft`, `rounded-pill`), never arbitrary values
   that bypass `app.css` tokens. See `docs/STYLE_GUIDE.md`.
-- **UI primitives are vendored, never installed.** Build on `src/components/ui/` (Button, Input,
-  Select, Dialog, Sheet) and edit the copied source rather than adding a component-library runtime
-  dependency; `cn` lives in `src/lib/cn.ts` and only joins class names.
+- **UI libraries are installed, and their generated source is owned (RESOLVED-25).** Add shadcn/ui
+  components with its CLI into `src/components/ui/` over their real dependencies (Radix, `cmdk`,
+  `vaul`, `react-day-picker`), pinned by `package-lock.json`, and edit the generated source freely to
+  use `app.css` tokens. Keep using the existing native `Button`, `Input`, `Select`, `Dialog`, and
+  `Sheet` unless a task says otherwise. `ui.test.tsx` pins the dependency list, so a task that adds a
+  UI dependency updates that pin in the same change. `cn` lives in `src/lib/cn.ts`.
+- **Icons come from `lucide-react` only.** No emoji markers and no hand-drawn inline SVG icons in
+  components. Brand logos (`/icons/*.svg`) and the font stay self-hosted assets under `public/`.
 - Rails stays the source of truth for validation, normalization, scoring, route resolution, and
   submit safety. The client does trim-only hints, exactly as the Go client did — porting is not an
   occasion to move logic forward.
@@ -467,6 +472,11 @@ dispatch.
   tracker's "Not applied" `<option>` is an inert placeholder shown only while no Application
   exists. The worker enforces the matching guard on its side
   (see below).
+- Tracker cell edits (RESOLVED-26) send the row's current `pipeline_status` plus **only** the field
+  being edited, and omit every untouched optional field, so a note edit never clears the follow-up
+  date and a follow-up edit never clears the note. Clearing a value is an explicit empty value for
+  that one field. `applications.applied_at` is stamped by `Application` the first time the pipeline
+  status becomes `applied` and is never sent by the client or moved by later status changes.
 
 ---
 

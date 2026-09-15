@@ -1,7 +1,7 @@
 {
   "$schema": "./workboard.schema.json",
   "schema_version": "1.0.0",
-  "last_updated": "2026-09-10",
+  "last_updated": "2026-09-15",
   "tasks": [
     {
       "id": "INFRA-01",
@@ -3078,6 +3078,901 @@
       "commands": [
         "cd web && npm run typecheck",
         "cd web && npm test"
+      ]
+    },
+    {
+      "id": "UI-06",
+      "title": "Install lucide-react and replace emoji source markers with icons",
+      "description": "First consumer of RESOLVED-25. Install lucide-react in web/ and replace the emoji source markers (manual entry, generic email alert) produced for origin pills with lucide icons, keeping the self-hosted LinkedIn/Glassdoor/Indeed SVG logos exactly as they are. Touch only the shared source-marker helper and the two components that render it; no other screen restyling. Update the ui.test.tsx dependency pin to allow lucide-react.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "UI",
+      "depends_on": [],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "lucide-react is a pinned dependency in web/package.json and package-lock.json",
+        "Manual and email-alert origin pills render a lucide icon in currentColor instead of an emoji, while branded sources still render their /icons/*.svg logo",
+        "No emoji marker remains in rendered origin pills on the feed, ingestion batches, or job detail",
+        "ui.test.tsx dependency pin and labels tests pass with the new icon mapping"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "web/package.json",
+        "web/src/lib/labels.ts",
+        "web/src/components/jobs/job-row.tsx",
+        "web/src/components/ingestion-batches/batch.tsx",
+        "web/src/components/ui/ui.test.tsx"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm run lint",
+        "cd web && npm test",
+        "cd web && npm run build"
+      ]
+    },
+    {
+      "id": "UI-07",
+      "title": "Generate shadcn Popover, Command, and DropdownMenu primitives",
+      "description": "Use the shadcn CLI to generate Popover and DropdownMenu (Radix) and Command (cmdk) into web/src/components/ui/, then edit the generated source to use app.css tokens (--radius-panel, surface fill, hairline border, --shadow-md, sage focus ring) through token utilities only. Do not adopt them in any screen yet. Add a smoke test per primitive covering open, keyboard navigation, Escape to close, and focus return, and update the ui.test.tsx dependency pin.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-06",
+        "UI-10"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Popover, Command, and DropdownMenu exist under web/src/components/ui/ with their Radix/cmdk dependencies pinned",
+        "The primitives use only app.css token utilities, with no Tailwind default colors or arbitrary values",
+        "Tests show each opens, supports arrow-key navigation where applicable, closes on Escape, and returns focus to its trigger",
+        "No shipped screen changes appearance"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "web/package.json",
+        "web/src/components/ui/popover.tsx",
+        "web/src/components/ui/command.tsx",
+        "web/src/components/ui/dropdown-menu.tsx",
+        "web/src/components/ui/ui.test.tsx",
+        "web/src/styles/tailwind.css"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm run lint",
+        "cd web && npm test",
+        "cd web && npm run build"
+      ]
+    },
+    {
+      "id": "UI-08",
+      "title": "Generate the shadcn Drawer primitive",
+      "description": "Use the shadcn CLI to generate Drawer (vaul) into web/src/components/ui/drawer.tsx and theme it from app.css tokens: surface fill, 18px top radius, a 36x4 strong-hairline handle, warm scrim, and iPhone safe-area bottom padding. Do not adopt it in any screen. Keep the existing native Sheet untouched. Add a smoke test and update the dependency pin.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-07"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Drawer exists with vaul pinned and themed only from app.css token utilities",
+        "The drawer respects env(safe-area-inset-bottom) and has a visible title for assistive technology",
+        "A test shows it opens, closes on Escape and scrim tap, and returns focus",
+        "The existing Sheet and every shipped screen are unchanged"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "web/package.json",
+        "web/src/components/ui/drawer.tsx",
+        "web/src/components/ui/ui.test.tsx"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm run lint",
+        "cd web && npm test",
+        "cd web && npm run build"
+      ]
+    },
+    {
+      "id": "UI-09",
+      "title": "Generate the shadcn Calendar primitive",
+      "description": "Use the shadcn CLI to generate Calendar (react-day-picker) into web/src/components/ui/calendar.tsx, themed from app.css tokens (sage selected day, sage-soft today, faint outside days, 44px touch cells on mobile layouts). It must produce and accept plain YYYY-MM-DD strings with no timezone conversion, matching how Rails stores next_follow_up_on. Do not adopt it in any screen. Add tests and update the dependency pin.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-07"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Calendar exists with react-day-picker pinned and themed from app.css token utilities",
+        "Selecting a day yields a YYYY-MM-DD string identical in every timezone, verified by a test run under a non-UTC TZ",
+        "Keyboard navigation between days works and today is visually distinct",
+        "No shipped screen changes appearance"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "web/package.json",
+        "web/src/components/ui/calendar.tsx",
+        "web/src/components/ui/ui.test.tsx"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm run lint",
+        "cd web && npm test",
+        "cd web && npm run build"
+      ]
+    },
+    {
+      "id": "UI-10",
+      "title": "Add Surface v2 design tokens to app.css and the Tailwind theme",
+      "description": "Add the tokens listed in STYLE_GUIDE.md 'Surface v2 > Tokens added' (--radius-control, --radius-panel, --color-grid-header, --color-grid-line, --color-row-hover, --color-row-active, --color-header-sorted, --control-h-desktop, --control-h-touch) to the :root block of web/public/app.css and restate them value for value in web/src/styles/tailwind.css @theme. Tokens only: do not change any existing token value or any existing rule, so no screen changes appearance.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "UI",
+      "depends_on": [],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Every Surface v2 token exists in app.css :root with the value from STYLE_GUIDE.md",
+        "tailwind.css @theme restates each token and tailwind-probe.test.tsx fails on drift",
+        "No existing token value or CSS rule changed, and app.css was not reformatted"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "web/public/app.css",
+        "web/src/styles/tailwind.css",
+        "web/src/components/tailwind-probe.test.tsx"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm test",
+        "cd web && npm run build"
+      ]
+    },
+    {
+      "id": "UI-11",
+      "title": "Build the StatusChip component and status tone mapping",
+      "description": "Add a StatusChip component that renders any pipeline_status (plus the tracker's Not applied placeholder) with the fill, ink, dot, and border from the STYLE_GUIDE.md 'Status chips' table, and a pure tone/group mapping in web/src/lib/labels.ts whose groups are asserted against Rails' APPLICATION_GROUPS the same way trackerGroup already is. Provide a size prop for desktop (22px) and touch (24px). Do not adopt it in any screen yet.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-10"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "StatusChip renders all nine statuses and the Not applied placeholder with the documented colors and label text",
+        "The status-to-group mapping used for menu grouping matches Rails APPLICATION_GROUPS, verified by parsing the controller constant in a test",
+        "An unknown status renders the Interested tone rather than an unstyled pill",
+        "No shipped screen changes appearance"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "web/src/components/ui/status-chip.tsx",
+        "web/src/lib/labels.ts",
+        "web/src/lib/labels.test.ts",
+        "web/public/app.css"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm run lint",
+        "cd web && npm test"
+      ]
+    },
+    {
+      "id": "UI-12",
+      "title": "Re-skin the desktop app chrome as the Surface v2 top bar",
+      "description": "Restyle AppChrome for desktop layouts (explicit Desktop and Auto at 960px and wider) to the STYLE_GUIDE.md 'Surface v2 > Shell > Desktop' spec: a 56px surface top bar with a bottom hairline holding the wordmark, text nav items with a sage-soft active state, and on the right the compact layout select and a sage filled Add job button with a lucide plus icon. Mobile layout rendering must not change in this task. Keep the update banner, toaster, active-tab derivation, and the rule that the chrome renders as each screen's first child.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-06",
+        "UI-10"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "On desktop layouts the chrome renders as the documented top bar with the correct active nav item for every routed section",
+        "The layout select still persists waunder.layout and Add job still navigates to /jobs/new",
+        "Mobile layout chrome is visually and structurally unchanged",
+        "app-chrome.test.tsx passes and STYLE_GUIDE.md's shell bullet is rewritten for desktop"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md"
+      ],
+      "files": [
+        "web/src/components/app-chrome.tsx",
+        "web/src/components/app-chrome.test.tsx",
+        "web/public/app.css"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm run lint",
+        "cd web && npm test",
+        "cd web && npm run build"
+      ]
+    },
+    {
+      "id": "UI-13",
+      "title": "Re-skin the mobile app chrome with an icon bottom nav",
+      "description": "Restyle AppChrome for mobile layouts to the STYLE_GUIDE.md 'Surface v2 > Shell > Mobile' spec: a 60px header with the wordmark and a 44px sage add button, and a bottom nav where each of the four items is a 20px lucide icon over an 11px label with a sage-soft pill behind the active icon. Keep the fixed-position bar, --screen-bottom reservation, and safe-area padding exactly as they work today. Desktop rendering from UI-12 must not change.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-12"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "On mobile layouts each nav item shows an icon and label with a 44px minimum touch target and the correct active state",
+        "The add button navigates to /jobs/new and has an accessible name",
+        "The last row of every screen is still not hidden behind the bottom bar, and safe-area padding is preserved",
+        "Desktop chrome from UI-12 is unchanged and app-chrome.test.tsx passes"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md"
+      ],
+      "files": [
+        "web/src/components/app-chrome.tsx",
+        "web/src/components/app-chrome.test.tsx",
+        "web/public/app.css"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm run lint",
+        "cd web && npm test",
+        "cd web && npm run build"
+      ]
+    },
+    {
+      "id": "TRACK-02",
+      "title": "Add a Rails-owned applications.applied_at stamp",
+      "description": "Rails side of RESOLVED-26. Add a nullable applications.applied_at datetime by migration, stamp it in Application#assign_pipeline_status the first time pipeline_status becomes applied (never moved by later changes, never cleared, never accepted from params), and backfill existing rows from submitted_at, else last_status_change_at, for applications whose pipeline_status is applied, interviewing, or offer. Expose applied_at in the job-post feed's serialize_application and the applications serializer. No web/ changes in this task.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "TRACK",
+      "depends_on": [],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "A migration adds applications.applied_at and backfills it as described, and is reversible",
+        "The first transition to applied stamps applied_at; later transitions, including away from and back to applied, leave it unchanged",
+        "applied_at is not a permitted status param and cannot be set by a client request",
+        "GET /api/job_posts rows and GET /api/applications include applied_at, covered by model and request specs"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "api/db/migrate/",
+        "api/app/models/application.rb",
+        "api/app/controllers/api/job_posts_controller.rb",
+        "api/app/controllers/api/applications_controller.rb",
+        "api/spec/models/application_spec.rb",
+        "api/spec/requests/api/job_posts_spec.rb",
+        "api/spec/requests/api/applications_spec.rb"
+      ],
+      "commands": [
+        "cd api && bundle exec rspec",
+        "cd api && bin/rubocop"
+      ]
+    },
+    {
+      "id": "UI-14",
+      "title": "Rebuild the tracker rows as the Surface v2 spreadsheet grid",
+      "description": "Structural grid only, over the tracker's existing columns (Job, Company, Status with its current native select, Intaked, Updated). Replace the responsive card/table markup with the STYLE_GUIDE.md 'Surface v2 > Tracker grid' layout at every width: row-number column, gridlines, sunken 36px header strip with lucide column icons and the sorted-column state, the Job column pinned via TanStack column pinning while other columns scroll horizontally inside the panel, TanStack column sizing, 40px desktop / 56px mobile rows with the company as a second line under the title on mobile, and the right-edge scroll fade on mobile. Retire the data-label card CSS and rewrite tracker.test.tsx's app.css assertions to pin the new grid rules. Keep sorting, column visibility, virtualization, group tabs, and invalidate-and-refetch writes working. Toolbar, footer, new columns, and cell editors are later tasks.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-10",
+        "UI-06"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "The tracker renders as one grid at desktop and mobile layouts, with the Job column staying visible while the other columns scroll horizontally",
+        "Row numbers reflect the row position within the loaded page and the sorted column header shows its direction",
+        "Header sorting, column visibility, virtualization past 60 rows, and status writes with refetch behave as before",
+        "The retired data-label card rules are removed from app.css and tracker.test.tsx asserts the new grid rules instead",
+        "STYLE_GUIDE.md tracker bullets and the intro tracker-contract block describe the grid"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "web/src/components/tracker/tracker-table.tsx",
+        "web/src/components/tracker/tracker-row.tsx",
+        "web/src/lib/tracker-columns.ts",
+        "web/src/components/tracker/tracker.test.tsx",
+        "web/public/app.css"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm run lint",
+        "cd web && npm test",
+        "cd web && npm run build"
+      ]
+    },
+    {
+      "id": "UI-15",
+      "title": "Re-skin the tracker toolbar and move pagination into a grid footer",
+      "description": "Restyle everything around the tracker grid per STYLE_GUIDE.md 'Surface v2 > Tracker grid' toolbar and footer bullets: the title with a one-line stats sentence replacing the stat boxes, segmented group tabs with count pills, Show and Sort as compact labelled controls (still native selects, still server-driven), the Columns control as the DropdownMenu primitive with checkbox items, and a footer inside the grid panel with the row range and Previous / Page X of Y / Next. Rows and cells are out of scope. Counts, tab behavior, bin/sort params, and pagination logic must not change.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-14",
+        "UI-07"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "The header shows applied-to and tracked totals as one sentence, and tabs show Rails' counts with the active tab styled per the guide",
+        "Columns opens a keyboard-accessible dropdown whose checkboxes hide and show columns, and Job is not offered",
+        "The footer shows the correct row range and page indicator, with Previous and Next disabled at the ends",
+        "Existing tracker tests for tabs, counts, bin, sort, and pagination pass unchanged in behavior"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "web/src/components/tracker/tracker.tsx",
+        "web/src/components/tracker/tracker.test.tsx",
+        "web/public/app.css"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm run lint",
+        "cd web && npm test",
+        "cd web && npm run build"
+      ]
+    },
+    {
+      "id": "UI-16",
+      "title": "Add the tracker's read-only Score, Stage, Applied, Follow-up, and Note columns",
+      "description": "Add applied_at to the client ApplicationTracker schema and extend the tracker columns to the full Surface v2 order: source logo in the Job cell, Score as the match-score band pill, Stage as plain text, Applied from applied_at, Follow-up with the past/today/future tones, and Note as single-line ellipsis text, each with a faint dash when empty. All are display-only in this task, sortable over the loaded page, and hideable from the Columns control. Dates render exactly as Rails sent them with no timezone conversion.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-14",
+        "TRACK-02"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "The schema parses applied_at, and a missing key resolves to an empty value per the existing go* helper semantics",
+        "Each new column renders the documented treatment, including an overdue follow-up in danger tone and today's date as Today",
+        "Every new column can be sorted and hidden, and its header and cells hide together",
+        "Tests cover empty values, each follow-up tone, and a long note that does not widen the row"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md",
+        "docs/TESTING.md",
+        "docs/PRD.md"
+      ],
+      "files": [
+        "web/src/api/schemas.ts",
+        "web/src/lib/tracker-columns.ts",
+        "web/src/lib/tracker.ts",
+        "web/src/components/tracker/tracker-row.tsx",
+        "web/src/components/tracker/tracker.test.tsx",
+        "web/public/app.css"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm run lint",
+        "cd web && npm test",
+        "cd web && npm run build"
+      ]
+    },
+    {
+      "id": "UI-17",
+      "title": "Replace the tracker status select with a StatusChip cell editor",
+      "description": "Replace the native status select in the tracker Status cell with a StatusChip that opens the Command popover listing statuses grouped by tracker group with a check on the current one, and introduce the shared cell-editing states from STYLE_GUIDE.md (focused ring, editing row tint and row number, Saving… text, every other cell editor disabled while a write is in flight). The write keeps today's contract exactly: PATCH application_status with pipeline_status and a blank stage, omitting note and follow-up, then invalidate and refetch, with failures as toasts. Build the editing states so UI-18, UI-19, and UI-20 can reuse them. Desktop and mobile both use the popover in this task; the mobile drawer is UI-21.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-14",
+        "UI-11",
+        "UI-07"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Clicking or pressing Enter on a Status cell opens the grouped status list, and choosing a status sends exactly one PATCH with the existing payload shape",
+        "Choosing the current status or dismissing the popover sends nothing, and Not applied is never offered once a job is tracked",
+        "While a write is in flight the row shows Saving… and every cell editor in the grid is disabled until the refetch lands",
+        "The editor never creates a draft or submits, and a failed write shows a toast, both asserted by tests"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md",
+        "docs/TESTING.md",
+        "docs/ARCHITECTURE.md"
+      ],
+      "files": [
+        "web/src/components/tracker/tracker-row.tsx",
+        "web/src/components/tracker/status-cell.tsx",
+        "web/src/components/tracker/tracker.tsx",
+        "web/src/components/tracker/tracker.test.tsx",
+        "web/public/app.css"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm run lint",
+        "cd web && npm test",
+        "cd web && npm run build"
+      ]
+    },
+    {
+      "id": "UI-18",
+      "title": "Make the tracker Stage cell editable",
+      "description": "Add a Stage cell editor reusing UI-17's editing states: a popover list of PIPELINE_STAGE_OPTIONS including No stage with a check on the current stage. It is available only for rows with a tracked application. A change sends PATCH application_status with the row's current pipeline_status and the chosen pipeline_stage (blank for No stage, never the literal none sentinel), omitting note and follow-up, then refetches.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-17",
+        "UI-16"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Choosing a stage sends the current status plus that stage only, and No stage sends a blank stage rather than none",
+        "Untracked rows show the stage cell as read-only",
+        "Note and follow-up values survive a stage edit, asserted against the request body",
+        "The shared saving and disabled states apply during the write"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "web/src/components/tracker/stage-cell.tsx",
+        "web/src/components/tracker/tracker-row.tsx",
+        "web/src/components/tracker/tracker.test.tsx"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm run lint",
+        "cd web && npm test"
+      ]
+    },
+    {
+      "id": "UI-19",
+      "title": "Make the tracker Follow-up cell editable with a calendar",
+      "description": "Add a Follow-up cell editor reusing UI-17's editing states: a popover holding the Calendar primitive plus a Clear action. It is available only for rows with a tracked application. Picking a day sends PATCH application_status with the row's current pipeline_status and next_follow_up_on as YYYY-MM-DD, and Clear sends an explicit empty next_follow_up_on; stage and note are omitted. Then refetch.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-17",
+        "UI-16",
+        "UI-09"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Picking a day sends that YYYY-MM-DD with the current status, identical under a non-UTC TZ",
+        "Clear sends an empty next_follow_up_on and the cell then shows a faint dash after refetch",
+        "The note survives a follow-up edit, asserted against the request body",
+        "Untracked rows show the follow-up cell as read-only"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "web/src/components/tracker/follow-up-cell.tsx",
+        "web/src/components/tracker/tracker-row.tsx",
+        "web/src/components/tracker/tracker.test.tsx"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm run lint",
+        "cd web && npm test"
+      ]
+    },
+    {
+      "id": "UI-20",
+      "title": "Make the tracker Note cell editable",
+      "description": "Add a Note cell editor reusing UI-17's editing states: a popover with a textarea prefilled with the current note and explicit Save and Cancel buttons; nothing is written on blur, Escape, or closing the popover. It is available only for rows with a tracked application. Save sends PATCH application_status with the row's current pipeline_status and pipeline_note (an empty string when the owner cleared it), omitting stage and follow-up, then refetches. A validation error from Rails stays inline in the popover.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-17",
+        "UI-16"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Save sends the current status plus the note only, and Cancel, Escape, or closing sends nothing",
+        "The follow-up date survives a note edit, asserted against the request body",
+        "A Rails validation error renders inline in the popover and keeps the typed text",
+        "The textarea wraps long unbroken tokens and untracked rows show the note cell as read-only"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md",
+        "docs/TESTING.md",
+        "docs/PRD.md"
+      ],
+      "files": [
+        "web/src/components/tracker/note-cell.tsx",
+        "web/src/components/tracker/tracker-row.tsx",
+        "web/src/components/tracker/tracker.test.tsx"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm run lint",
+        "cd web && npm test"
+      ]
+    },
+    {
+      "id": "UI-21",
+      "title": "Edit tracker status in a bottom drawer on mobile layouts",
+      "description": "On mobile layouts only, tapping a Status cell opens the Drawer instead of the popover, laid out per STYLE_GUIDE.md: job title and company, status tiles in a two-column grid under the four group labels with the current tile outlined and checked, and the stage select for tracked rows. A tile tap writes immediately using UI-17's status write; a stage change uses UI-18's stage write. Desktop layouts keep the popover. Decide mobile versus desktop from the same layout signal the chrome uses, not the user agent.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-17",
+        "UI-18",
+        "UI-08",
+        "UI-13"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "With the Mobile layout selected, a Status tap opens the drawer, and with Desktop selected the popover opens, regardless of viewport width",
+        "Tile and stage writes send the same payloads as UI-17 and UI-18, and only one write runs at a time",
+        "Every tile is at least 44px tall and the drawer respects the safe area",
+        "Closing the drawer without a choice sends nothing"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "web/src/components/tracker/status-drawer.tsx",
+        "web/src/components/tracker/status-cell.tsx",
+        "web/src/components/tracker/tracker.test.tsx",
+        "web/public/app.css"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm run lint",
+        "cd web && npm test",
+        "cd web && npm run build"
+      ]
+    },
+    {
+      "id": "UI-22",
+      "title": "Re-skin the Intake screen to Surface v2",
+      "description": "Apply the STYLE_GUIDE.md 'Surface v2 > Re-skin checklist' to the ingestion landing only: the intake control panel, date headers, and collapsible batch blocks and their posting rows. No layout, copy, or behavior changes; native details/summary stays, and intake pause/resume stays an explicit action. Update the Intake bullets in STYLE_GUIDE.md to describe the result.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-10",
+        "UI-11",
+        "UI-12"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Intake controls, batches, and rows follow every checklist item, with panels at --radius-panel and controls at the documented heights",
+        "No markup order, copy, or behavior changed, and ingestion-batches tests pass without weakened assertions",
+        "No other screen's appearance changed"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md"
+      ],
+      "files": [
+        "web/src/components/ingestion-batches/ingestion-batches.tsx",
+        "web/src/components/ingestion-batches/batch.tsx",
+        "web/src/components/ingestion-batches/intake-control.tsx",
+        "web/public/app.css"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm run lint",
+        "cd web && npm test",
+        "cd web && npm run build"
+      ]
+    },
+    {
+      "id": "UI-23",
+      "title": "Re-skin the Jobs feed and filter drawer to Surface v2",
+      "description": "Apply the Surface v2 re-skin checklist to the Jobs feed only: bin tabs, filter trigger and drawer, feed rows, pills, the manage bar, and pagination. No layout, copy, filter persistence, or behavior changes; lifecycle writes stay explicit and waunder.jobFilters keeps its shape. Update the Jobs feed bullets in STYLE_GUIDE.md.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-10",
+        "UI-11",
+        "UI-12"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Feed controls, rows, and the filter drawer follow every checklist item",
+        "Saved filters still load, and lifecycle and bulk actions behave as before with existing tests passing",
+        "No other screen's appearance changed"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md"
+      ],
+      "files": [
+        "web/src/components/jobs/job-list.tsx",
+        "web/src/components/jobs/job-row.tsx",
+        "web/src/components/jobs/job-filters.tsx",
+        "web/src/components/jobs/job-bins.tsx",
+        "web/src/components/jobs/job-actions.tsx",
+        "web/public/app.css"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm run lint",
+        "cd web && npm test",
+        "cd web && npm run build"
+      ]
+    },
+    {
+      "id": "UI-24",
+      "title": "Re-skin the Job detail screen to Surface v2",
+      "description": "Apply the Surface v2 re-skin checklist to the job detail only: header, assessment sections, the manual application panel, the pipeline status panel (show the current status as a StatusChip beside its existing controls), cover letter, and optional actions. No layout, CSS order, copy, or behavior changes; mark-applied and status writes stay explicit and never draft or submit. Update the job detail bullets in STYLE_GUIDE.md.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-10",
+        "UI-11",
+        "UI-12"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Job detail sections follow every checklist item and the current pipeline status renders as a StatusChip",
+        "The .job-workspace-actions child order assertion and all job-detail, tracker-action, and cover-letter tests pass",
+        "No other screen's appearance changed"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md"
+      ],
+      "files": [
+        "web/src/components/job-detail/job-detail.tsx",
+        "web/src/components/job-detail/tracker-action.tsx",
+        "web/src/components/job-detail/requirements.tsx",
+        "web/src/components/job-detail/cover-letter.tsx",
+        "web/public/app.css"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm run lint",
+        "cd web && npm test",
+        "cd web && npm run build"
+      ]
+    },
+    {
+      "id": "UI-25",
+      "title": "Re-skin the Draft review screen to Surface v2",
+      "description": "Apply the Surface v2 re-skin checklist to draft review only: materials, autofill answers, warnings, and the automation section. Styling only. The submit gating is safety-relevant: the submit control must stay disabled until the draft is ready and warnings are clear, approve-and-submit stays one explicit action, and no transition may delay or hide gating state. Update the draft review bullets in STYLE_GUIDE.md.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-10",
+        "UI-11",
+        "UI-12"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Draft review follows every checklist item",
+        "Every draft-review test, including submit gating and never-submit-on-mount, passes without weakened assertions",
+        "No other screen's appearance changed"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md"
+      ],
+      "files": [
+        "web/src/components/draft-review/draft-review.tsx",
+        "web/src/components/draft-review/autofill-answers.tsx",
+        "web/public/app.css"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm run lint",
+        "cd web && npm test",
+        "cd web && npm run build"
+      ]
+    },
+    {
+      "id": "UI-26",
+      "title": "Re-skin the Profile screen to Surface v2",
+      "description": "Apply the Surface v2 re-skin checklist to the profile screen only: profile form, resume metadata, push toggle, and install guide. No layout, copy, or behavior changes; saves, push subscribe, and unsubscribe stay explicit actions. Update the profile bullets in STYLE_GUIDE.md.",
+      "status": "todo",
+      "priority": "low",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-10",
+        "UI-11",
+        "UI-12"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Profile, resume, push, and install guide follow every checklist item",
+        "profile, push-toggle, and install-guide tests pass without weakened assertions",
+        "No other screen's appearance changed"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md"
+      ],
+      "files": [
+        "web/src/components/profile/profile.tsx",
+        "web/src/components/profile/resume-meta.tsx",
+        "web/src/components/push-toggle.tsx",
+        "web/src/components/install-guide.tsx",
+        "web/public/app.css"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm run lint",
+        "cd web && npm test",
+        "cd web && npm run build"
+      ]
+    },
+    {
+      "id": "UI-27",
+      "title": "Re-skin the Manual entry screen to Surface v2",
+      "description": "Apply the Surface v2 re-skin checklist to manual job entry only: the form, URL lookup control and prefill note, and import result states. No layout, copy, or behavior changes; the form stays noValidate so Rails validation messages still show, and imports stay explicit. Update the manual entry bullets in STYLE_GUIDE.md.",
+      "status": "todo",
+      "priority": "low",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-10",
+        "UI-11",
+        "UI-12"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Manual entry form, lookup, and results follow every checklist item",
+        "manual-entry and lookup tests pass without weakened assertions",
+        "No other screen's appearance changed"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md"
+      ],
+      "files": [
+        "web/src/components/manual-entry/manual-entry.tsx",
+        "web/src/components/manual-entry/lookup.tsx",
+        "web/src/components/manual-entry/import-result.tsx",
+        "web/public/app.css"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm run lint",
+        "cd web && npm test",
+        "cd web && npm run build"
+      ]
+    },
+    {
+      "id": "UI-28",
+      "title": "Re-skin the Contacts and outreach screen to Surface v2",
+      "description": "Apply the Surface v2 re-skin checklist to the contacts screen only: contact cards, outreach generation controls, and draft wells with copy controls. No layout, copy, or behavior changes; outreach stays generate-and-copy only with no send affordance. Update the contacts bullets in STYLE_GUIDE.md.",
+      "status": "todo",
+      "priority": "low",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-10",
+        "UI-11",
+        "UI-12"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Contacts and outreach follow every checklist item",
+        "contacts tests, including the no-send request log assertion, pass without weakened assertions",
+        "No other screen's appearance changed"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md"
+      ],
+      "files": [
+        "web/src/components/contacts/contacts.tsx",
+        "web/src/components/contacts/outreach-draft.tsx",
+        "web/src/components/copy-button.tsx",
+        "web/public/app.css"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm run lint",
+        "cd web && npm test",
+        "cd web && npm run build"
+      ]
+    },
+    {
+      "id": "UI-29",
+      "title": "Re-skin the Login screen to Surface v2",
+      "description": "Apply the Surface v2 re-skin checklist to the login screen only: wordmark, passphrase field, submit button, and error state. No copy or behavior changes; the passphrase input stays uncontrolled and is never stored in query or mutation state. Update the login bullet in STYLE_GUIDE.md.",
+      "status": "todo",
+      "priority": "low",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-10",
+        "UI-12"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Login follows every applicable checklist item, and the sage button keeps --focus-ring-strong",
+        "login tests pass without weakened assertions",
+        "No other screen's appearance changed"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md"
+      ],
+      "files": [
+        "web/src/components/login.tsx",
+        "web/public/app.css"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm run lint",
+        "cd web && npm test",
+        "cd web && npm run build"
+      ]
+    },
+    {
+      "id": "UI-30",
+      "title": "Remove app.css rules left dead by the Surface v2 re-skin",
+      "description": "After every Surface v2 task lands, find app.css selectors that no component under web/src/ emits any more (for example retired tracker card rules and superseded chrome rules) by diffing class names used in source against selectors in app.css, and delete only those. Check inheritance and grouped selectors before removing a rule. Mark STYLE_GUIDE.md's Surface v2 section as complete and fold anything still pending into the main sections.",
+      "status": "todo",
+      "priority": "low",
+      "group_id": "UI",
+      "depends_on": [
+        "UI-15",
+        "UI-19",
+        "UI-20",
+        "UI-21",
+        "UI-22",
+        "UI-23",
+        "UI-24",
+        "UI-25",
+        "UI-26",
+        "UI-27",
+        "UI-28",
+        "UI-29"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Every removed selector is shown to have no emitter in web/src/, and no screen changes appearance",
+        "All web tests pass, including those that parse app.css",
+        "STYLE_GUIDE.md no longer describes Surface v2 as in progress"
+      ],
+      "docs": [
+        "docs/STYLE_GUIDE.md"
+      ],
+      "files": [
+        "web/public/app.css",
+        "docs/STYLE_GUIDE.md"
+      ],
+      "commands": [
+        "cd web && npm run typecheck",
+        "cd web && npm run lint",
+        "cd web && npm test",
+        "cd web && npm run build"
       ]
     }
   ]
