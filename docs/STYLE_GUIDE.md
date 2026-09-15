@@ -44,6 +44,11 @@ source of truth; the stylesheet is `web/public/app.css`, linked from `web/index.
 > **UI-07** adds Popover, Command, and DropdownMenu as owned primitives. Their generated surfaces use
 > only Waunder token utilities (`rounded-panel`, `bg-surface`, `border-border`, `shadow-md`, and the
 > sage focus-ring utilities); they are foundational only until a later UI task adopts one in a screen.
+> **UI-08** adds the owned Vaul Drawer as another foundational primitive. Its bottom surface uses the
+> warm `bg-surface`/`border-border`/`shadow-md` treatment, an 18px top radius, a 36x4
+> `bg-border-strong` handle, a warm `bg-ink` scrim, and bottom padding for
+> `env(safe-area-inset-bottom)`; `DrawerTitle` remains visible for assistive technology. It is not
+> adopted by a shipped screen yet.
 >
 > The class *suffixes* this file specifies — `.job-score--high|mid|low|pending`,
 > `.job-status--active|backlog|removed`, `.tracker-row--<group>` — plus the brand-logo paths

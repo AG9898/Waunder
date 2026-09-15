@@ -1,11 +1,20 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { useState } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { Button } from "./button";
 import { CommandDialog, CommandGroup, CommandInput, CommandItem, CommandList } from "./command";
 import { Dialog } from "./dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "./drawer";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +45,7 @@ class TestResizeObserver {
 
 beforeAll(() => {
   vi.stubGlobal("ResizeObserver", TestResizeObserver);
+  vi.stubGlobal("matchMedia", () => ({ matches: false }));
   HTMLElement.prototype.scrollIntoView = vi.fn();
 });
 
@@ -50,7 +60,7 @@ describe("vendored UI primitives", () => {
       dependencies: Record<string, string>;
     };
     expect(Object.keys(pkg.dependencies).sort()).toEqual(
-      // UI-06 adds lucide-react; UI-07 adds the pinned shadcn command/Radix runtime dependencies.
+      // UI-06 adds lucide-react; UI-07 adds command/Radix and UI-08 adds the pinned vaul runtime.
       [
         "@tanstack/react-query",
         "@tanstack/react-table",
@@ -61,27 +71,43 @@ describe("vendored UI primitives", () => {
         "react",
         "react-dom",
         "react-router",
+        "vaul",
         "zod",
       ].sort(),
     );
     expect(pkg.dependencies["lucide-react"]).toBe("1.46.0");
     expect(pkg.dependencies.cmdk).toBe("1.1.1");
     expect(pkg.dependencies["radix-ui"]).toBe("1.6.7");
+    expect(pkg.dependencies.vaul).toBe("1.1.2");
   });
 
   it("keeps generated primitives on Waunder token utilities", () => {
     const source = ["popover.tsx", "command.tsx", "dropdown-menu.tsx"]
       .map((file) => readFileSync(join(root, "src", "components", "ui", file), "utf8"))
       .join("\n");
+    const drawerSource = readFileSync(join(root, "src", "components", "ui", "drawer.tsx"), "utf8");
     expect(source).toContain("rounded-panel");
     expect(source).toContain("bg-surface");
     expect(source).toContain("border-border");
     expect(source).toContain("shadow-md");
     expect(source).toContain("focus-visible:ring-accent");
-    for (const forbidden of ["bg-popover", "text-popover-foreground", "text-muted-foreground", "bg-black"]) {
+    for (const forbidden of [
+      "bg-popover",
+      "text-popover-foreground",
+      "text-muted-foreground",
+      "bg-black",
+    ]) {
       expect(source).not.toContain(forbidden);
     }
     expect(source).not.toMatch(/\b(?:bg|text|border|shadow|ring)-\[[^\]]+\]/);
+    expect(drawerSource).not.toContain("bg-background");
+    expect(drawerSource).not.toContain("text-foreground");
+    expect(drawerSource).not.toContain("text-muted-foreground");
+    expect(drawerSource).not.toContain("bg-black");
+    expect(drawerSource).toContain("pb-[env(safe-area-inset-bottom)]");
+    expect(drawerSource).toContain("rounded-t-[18px]");
+    expect(drawerSource).toContain("h-1 w-9 shrink-0 rounded-pill bg-border-strong");
+    expect(drawerSource).toContain("fixed inset-0 z-40 bg-ink/30");
   });
 
   it("opts the ui directory into Tailwind utilities", () => {
@@ -136,6 +162,60 @@ describe("vendored UI primitives", () => {
     );
     expect(dialog.hasAttribute("open")).toBe(false);
     expect(sheet.hasAttribute("open")).toBe(true);
+  });
+
+  it("opens Drawer, closes on Escape and scrim tap, and returns focus", async () => {
+    function DrawerHarness() {
+      const [open, setOpen] = useState(false);
+
+      return (
+        <Drawer open={open} onOpenChange={setOpen} shouldScaleBackground={false}>
+          <DrawerTrigger asChild>
+            <button type="button">Open drawer</button>
+          </DrawerTrigger>
+          <DrawerContent>
+            <DrawerHeader>
+              <DrawerTitle>Job filters</DrawerTitle>
+              <DrawerDescription>Filter the intake list.</DrawerDescription>
+            </DrawerHeader>
+          </DrawerContent>
+        </Drawer>
+      );
+    }
+
+    render(<DrawerHarness />);
+    const trigger = screen.getByRole("button", { name: "Open drawer" });
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    const drawer = await screen.findByRole("dialog", { name: "Job filters" });
+    expect(drawer).toHaveClass("rounded-t-[18px]", "bg-surface", "border-border");
+    expect(drawer).toHaveAttribute("data-slot", "drawer-content");
+    expect(drawer.querySelector('[data-slot="drawer-handle"]')).toHaveClass(
+      "h-1",
+      "w-9",
+      "bg-border-strong",
+    );
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Job filters" })).not.toBeInTheDocument(),
+    );
+    expect(document.activeElement).toBe(trigger);
+
+    fireEvent.click(trigger);
+    const overlay = document.querySelector('[data-slot="drawer-overlay"]');
+    expect(overlay).not.toBeNull();
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
+    });
+    fireEvent.pointerDown(overlay!);
+    fireEvent.pointerUp(overlay!);
+    fireEvent.click(overlay!);
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Job filters" })).not.toBeInTheDocument(),
+    );
+    expect(document.activeElement).toBe(trigger);
   });
 
   it("routes Escape (cancel) to onClose", () => {

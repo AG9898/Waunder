@@ -3154,7 +3154,7 @@
       "id": "UI-08",
       "title": "Generate the shadcn Drawer primitive",
       "description": "Use the shadcn CLI to generate Drawer (vaul) into web/src/components/ui/drawer.tsx and theme it from app.css tokens: surface fill, 18px top radius, a 36x4 strong-hairline handle, warm scrim, and iPhone safe-area bottom padding. Do not adopt it in any screen. Keep the existing native Sheet untouched. Add a smoke test and update the dependency pin.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "UI",
       "depends_on": [

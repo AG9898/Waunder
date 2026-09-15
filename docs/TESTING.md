@@ -212,6 +212,12 @@ Be honest about the current state — most of the suite is still to be written.
   the trigger, while the source/dependency checks pin the Radix/cmdk versions and reject generated
   default-color or arbitrary-value utilities.
 
+- **web/** — `src/components/ui/ui.test.tsx` (`UI-08`): smoke-tests the generated Vaul Drawer. The
+  controlled harness opens it through its trigger, verifies the token-themed surface, handle, warm
+  scrim, safe-area utility, and visible title, then closes it through Escape and a scrim tap while
+  asserting focus returns to the trigger. The source/dependency checks pin `vaul` and ensure the
+  existing native Sheet remains the separate primitive.
+
 - **web/** — `src/api/schemas.test.ts` (`FE-03`): the API boundary contract. Fixtures are copied
   from what the Rails serializers actually emit, **including the keys they leave out** — the
   digest's six-key row, the job feed's abbreviated tracker, an `unavailable` posting lookup that

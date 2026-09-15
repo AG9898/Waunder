@@ -1571,3 +1571,9 @@ table and one scroll panel at every width; do not reintroduce the retired `data-
 `cmdk` mounts a `ResizeObserver` when a Command opens, so tracker tests that exercise `StatusCell`
 in jsdom need a local no-op observer (and `scrollIntoView` stub) before opening it. Keep the shim
 test-only; do not add browser API fallbacks to production components.
+
+### 2026-09-15 — Temporary shadcn config must be removed after generation
+This repo intentionally does not retain `components.json`; without a temporary CLI config, shadcn
+writes an `@/` directory literally under `web/` and can install an unintended `cn` package. For a
+new primitive, generate with a temporary config, restore `../../lib/cn`, pin the intended dependency,
+and remove both the config and any accidental package before verification.
