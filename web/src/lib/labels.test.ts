@@ -3,7 +3,7 @@
  *
  * Every case table below is the corresponding Go test's table, transcribed rather than
  * rewritten: `TestMatchScoreLabel`, `TestMatchScoreBand`, `TestSourceLabel`,
- * `TestSourceIconPath`, and `TestSourceEmoji` from `web/components/jobs_test.go`, and
+ * `TestSourceIconPath`, and `TestSourceIcon` from `web/components/jobs_test.go`, and
  * `TestTrackerGroupMapsPipelineStatus` from `web/components/applications_test.go`. A
  * transcription is the point: these strings are consumed by `app.css` and by the `FE-28`
  * screenshot gate, so the test's job is to reject a rewording, not to describe one.
@@ -31,7 +31,7 @@ import {
   lifecycleLabel,
   matchScoreBand,
   matchScoreLabel,
-  sourceEmoji,
+  sourceIcon,
   sourceIconPath,
   sourceLabel,
   trackerGroup,
@@ -135,28 +135,28 @@ describe("sourceIconPath", () => {
     }
   });
 
-  it("hands non-branded sources to the emoji marker, never to both", () => {
+  it("hands non-branded sources to the lucide marker, never to both", () => {
     for (const source of ["linkedin", "glassdoor", "indeed", "manual", "inbound", ""]) {
       const hasLogo = sourceIconPath(source) !== "";
-      const hasEmoji = sourceEmoji(source) !== "";
-      expect(hasLogo && hasEmoji).toBe(false);
+      const hasIcon = sourceIcon(source) !== "";
+      expect(hasLogo && hasIcon).toBe(false);
     }
   });
 });
 
-describe("sourceEmoji", () => {
+describe("sourceIcon", () => {
   it.each([
-    { source: "manual", want: "✍️" },
-    { source: "inbound_llm", want: "📧" },
-    { source: "inbound", want: "📧" },
-    // Branded sources render a logo, not an emoji.
+    { source: "manual", want: "pencil" },
+    { source: "inbound_llm", want: "mail" },
+    { source: "inbound", want: "mail" },
+    // Branded sources render a logo, not a lucide marker.
     { source: "linkedin", want: "" },
     { source: "glassdoor", want: "" },
     { source: "indeed", want: "" },
     { source: "", want: "" },
     { source: "weird", want: "" },
   ])("$source → $want", ({ source, want }) => {
-    expect(sourceEmoji(source)).toBe(want);
+    expect(sourceIcon(source)).toBe(want);
   });
 });
 

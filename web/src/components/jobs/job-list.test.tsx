@@ -167,13 +167,22 @@ describe("job feed rows", () => {
     expect(logo).toHaveClass("job-source-logo");
   });
 
-  it("uses the emoji marker for a source with no brand logo", async () => {
-    answer = pageOf([{ ...fixtures.scoredJob, source: "manual" }]);
+  it.each([
+    { source: "manual", label: "Manual entry" },
+    { source: "inbound_llm", label: "Email alert" },
+  ])("uses a currentColor lucide marker for $source", async ({ source, label }) => {
+    answer = pageOf([{ ...fixtures.scoredJob, source }]);
     const { container } = await renderedFeed();
 
     expect(container.querySelector(".job-source-logo")).toBeNull();
-    expect(container.querySelector(".job-source-emoji")).toHaveTextContent("✍️");
-    expect(container.querySelector(".job-source")).toHaveTextContent("Manual entry");
+    const marker = container.querySelector<SVGSVGElement>(".job-source-icon");
+    expect(marker).not.toBeNull();
+    expect(marker?.tagName).toBe("svg");
+    expect(marker).toHaveAttribute("aria-hidden", "true");
+    expect(marker).toHaveAttribute("stroke", "currentColor");
+    expect(marker?.querySelector("path")).not.toBeNull();
+    expect(container.querySelector(".job-source-emoji")).toBeNull();
+    expect(container.querySelector(".job-source")).toHaveTextContent(label);
   });
 
   it("omits the origin pill entirely when the posting records no source", async () => {

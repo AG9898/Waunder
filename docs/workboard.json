@@ -3084,7 +3084,7 @@
       "id": "UI-06",
       "title": "Install lucide-react and replace emoji source markers with icons",
       "description": "First consumer of RESOLVED-25. Install lucide-react in web/ and replace the emoji source markers (manual entry, generic email alert) produced for origin pills with lucide icons, keeping the self-hosted LinkedIn/Glassdoor/Indeed SVG logos exactly as they are. Touch only the shared source-marker helper and the two components that render it; no other screen restyling. Update the ui.test.tsx dependency pin to allow lucide-react.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "UI",
       "depends_on": [],

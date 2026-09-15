@@ -27,6 +27,7 @@
  * than transcribed a second time.
  */
 import type { ReactNode } from "react";
+import { Mail, Pencil } from "lucide-react";
 import { Link } from "react-router";
 
 import type { JobSummary } from "../../api/schemas";
@@ -34,7 +35,7 @@ import {
   lifecycleLabel,
   matchScoreBand,
   matchScoreLabel,
-  sourceEmoji,
+  sourceIcon,
   sourceIconPath,
   sourceLabel,
 } from "../../lib/labels";
@@ -106,7 +107,7 @@ export function LifecycleStatusPill({ state }: { state: string }) {
 }
 
 /**
- * The origin pill: where the posting came from, led by its brand logo or emoji marker.
+ * The origin pill: where the posting came from, led by its brand logo or lucide marker.
  *
  * An unrecognised-but-present source still renders (`sourceLabel` passes it through), while
  * an empty source suppresses the pill entirely — a blank pill would read as a missing
@@ -126,8 +127,8 @@ export function SourcePill({ source }: { source: string }) {
 }
 
 /**
- * `sourceIcon`: the self-hosted brand SVG for a branded source, an emoji for the ones with
- * no logo (manual entry, unattributed email alerts), or nothing when neither applies.
+ * `sourceIcon`: the self-hosted brand SVG for a branded source, a lucide marker for the ones
+ * with no logo (manual entry, unattributed email alerts), or nothing when neither applies.
  *
  * The logo paths are same-origin files under `public/icons/`, resolved by
  * `sourceIconPath` — they carry no `/web/` prefix any more (docs/GO_MIGRATION.md), and a
@@ -141,6 +142,14 @@ export function SourceMarker({ source }: { source: string }) {
   if (icon !== "") {
     return <img className="job-source-logo" src={icon} alt={sourceLabel(source)} loading="lazy" />;
   }
-  const emoji = sourceEmoji(source);
-  return emoji === "" ? null : <span className="job-source-emoji">{emoji}</span>;
+  switch (sourceIcon(source)) {
+    case "pencil":
+      return (
+        <Pencil className="job-source-icon" aria-hidden="true" color="currentColor" size={14} />
+      );
+    case "mail":
+      return <Mail className="job-source-icon" aria-hidden="true" color="currentColor" size={14} />;
+    default:
+      return null;
+  }
 }

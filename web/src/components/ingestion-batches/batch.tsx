@@ -33,6 +33,7 @@
  * already names the source for every row it contains.
  */
 import { Link } from "react-router";
+import { Mail, Pencil } from "lucide-react";
 
 import type { IngestionBatch } from "../../api/schemas";
 import {
@@ -41,7 +42,7 @@ import {
   batchSourceLabel,
   formatBatchTime,
 } from "../../lib/ingestion-batches";
-import { sourceEmoji, sourceIconPath, sourceLabel } from "../../lib/labels";
+import { sourceIcon, sourceIconPath, sourceLabel } from "../../lib/labels";
 import { JobPills } from "../jobs/job-row";
 
 export function Batch({ batch, open }: { batch: IngestionBatch; open: boolean }) {
@@ -72,8 +73,8 @@ export function Batch({ batch, open }: { batch: IngestionBatch; open: boolean })
 }
 
 /**
- * `sourceIcon` for a batch summary: the self-hosted brand SVG, an emoji for the sources with
- * no logo, or nothing.
+ * `sourceIcon` for a batch summary: the self-hosted brand SVG, a lucide marker for the sources
+ * with no logo, or nothing.
  *
  * Identical to `job-row.tsx`'s `SourceMarker`, and deliberately not exported from there: that
  * one belongs to `SourcePill`, which suppresses the whole pill for an unrecorded source. A
@@ -86,6 +87,14 @@ function BatchSourceMarker({ source }: { source: string }) {
   if (icon !== "") {
     return <img className="job-source-logo" src={icon} alt={sourceLabel(source)} loading="lazy" />;
   }
-  const emoji = sourceEmoji(source);
-  return emoji === "" ? null : <span className="job-source-emoji">{emoji}</span>;
+  switch (sourceIcon(source)) {
+    case "pencil":
+      return (
+        <Pencil className="job-source-icon" aria-hidden="true" color="currentColor" size={14} />
+      );
+    case "mail":
+      return <Mail className="job-source-icon" aria-hidden="true" color="currentColor" size={14} />;
+    default:
+      return null;
+  }
 }

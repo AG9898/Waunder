@@ -142,7 +142,7 @@ export function sourceLabel(source: string): string {
  * and takes only the logo out of the pill, which is exactly the kind of miss that survives
  * a test suite, so the paths are asserted rather than eyeballed.
  *
- * Returning `""` is the hand-off to {@link sourceEmoji}: a source has a logo or an emoji
+ * Returning `""` is the hand-off to {@link sourceIcon}: a source has a logo or a lucide
  * marker, never both.
  */
 export function sourceIconPath(source: string): string {
@@ -158,17 +158,20 @@ export function sourceIconPath(source: string): string {
   }
 }
 
+/** Names of the lucide markers used by sources without a brand logo. */
+export type SourceIconName = "pencil" | "mail";
+
 /**
- * Emoji marker for the sources with no brand logo (manual entry, unattributed email
- * alerts). Branded sources return `""` because they render {@link sourceIconPath} instead.
+ * Lucide marker for sources with no brand logo (manual entry, unattributed email alerts).
+ * Branded sources return `""` because they render {@link sourceIconPath} instead.
  */
-export function sourceEmoji(source: string): string {
+export function sourceIcon(source: string): SourceIconName | "" {
   switch (source) {
     case "manual":
-      return "✍️";
+      return "pencil";
     case "inbound_llm":
     case "inbound":
-      return "📧";
+      return "mail";
     default:
       return "";
   }

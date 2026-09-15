@@ -420,9 +420,9 @@ Be honest about the current state — most of the suite is still to be written.
   (`job-score job-score--high`, `job-status job-status--backlog`) because they are a contract with
   `public/app.css`: a renamed band is an unstyled pill, not a failing render. Also covered: an
   unscored row taking `--pending` and never `--low`, an absent `lifecycle_state` still painting
-  `--active`, the origin pill leading with the unprefixed `/icons/linkedin.svg` or the emoji
-  marker and disappearing entirely for a sourceless posting, **no location element** (the feed
-  payload carries none — see [`GO_MIGRATION.md`](GO_MIGRATION.md)), the loading/error/empty
+  `--active`, the origin pill leading with the unprefixed `/icons/linkedin.svg` or the lucide
+  `Pencil`/`Mail` marker and disappearing entirely for a sourceless posting, **no location element**
+  (the feed payload carries none — see [`GO_MIGRATION.md`](GO_MIGRATION.md)), the loading/error/empty
   states including the 401 sign-in link, and stepping back a page costing no refetch because
   `page` is part of the query key. The error case uses a 422 rather than a 500 so it fails at
   once; the retry policy itself is covered in `endpoints.test.ts`.

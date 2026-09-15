@@ -176,8 +176,8 @@ figures where possible.
 - The origin pill leads with the source's official brand logo (LinkedIn/Glassdoor/Indeed),
   self-hosted as SVGs under `web/public/icons/` (vendored from Simple Icons with the brand color
   baked into the fill — no live CDN dependency, matching the self-hosted-font policy). Sources
-  without a brand logo (manual entry, generic email alert) use an emoji marker instead. The
-  logo/emoji sits inline before the source label via `flex` + `gap` on the pill.
+  without a brand logo (manual entry, generic email alert) use a lucide marker in `currentColor`
+  instead. The logo/icon sits inline before the source label via `flex` + `gap` on the pill.
 - The Applications screen is one unified tracker (TRACK-01), not a two-view toggle: every
   intaked job post gets a row, and its application status is set inline on that row. Its title
   pairs with a stats cluster in the top-right (`.applications-header` / `.applications-stats` —

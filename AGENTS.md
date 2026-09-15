@@ -1544,3 +1544,9 @@ When a Gemfile pins a newer version of a Ruby default gem such as `json`, requir
 `config/environment` can activate the image's older default version and make Bundler abort. In
 standalone `api/bin/*` Rails commands, require `config/environment` first, then `json`/other pinned
 default gems; cover the actual executable with a subprocess smoke spec.
+
+### 2026-09-15 — Lucide source markers expose stable SVG attributes, not data-lucide metadata
+`lucide-react` renders the selected icon as an inline SVG with `stroke="currentColor"` and does not
+add the `data-lucide` attribute used by the framework's DOM helpers. Keep source identity in the pure
+`sourceIcon` mapping and test the rendered marker's SVG/currentColor contract rather than library-
+specific metadata; branded source logos remain self-hosted image assets.

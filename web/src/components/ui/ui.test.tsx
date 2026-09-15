@@ -12,22 +12,24 @@ import { Sheet } from "./sheet";
 const root = join(import.meta.dirname, "..", "..", "..");
 
 describe("vendored UI primitives", () => {
-  it("adds no runtime UI dependency", () => {
+  it("pins the runtime UI dependency list", () => {
     const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
       dependencies: Record<string, string>;
     };
     expect(Object.keys(pkg.dependencies).sort()).toEqual(
-      // UI-04 deliberately adds TanStack Table + Virtual for the tracker; nothing else is allowed.
+      // UI-06 adds lucide-react for the shared source markers; later UI tasks extend this list.
       [
         "@tanstack/react-query",
         "@tanstack/react-table",
         "@tanstack/react-virtual",
+        "lucide-react",
         "react",
         "react-dom",
         "react-router",
         "zod",
       ].sort(),
     );
+    expect(pkg.dependencies["lucide-react"]).toBe("1.46.0");
   });
 
   it("opts the ui directory into Tailwind utilities", () => {
