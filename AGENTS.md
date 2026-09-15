@@ -1561,3 +1561,8 @@ The current shadcn CLI registry makes `command` pull in the Dialog primitive and
 
 ### 2026-09-15 — Mobile chrome rules must account for the later tab selector
 The generic `.app-chrome .app-tab` rule appears after the base `.app-tab` rule and overrides its padding, so mobile icon-nav changes must be checked against that more-specific selector. When mobile base flex or label rules change, duplicate desktop root overrides must restore the UI-12 text-nav geometry while leaving the fixed bar and `--screen-bottom` variables untouched.
+
+### 2026-09-15 — Tracker pinning needs the row-number rail offset
+UI-14 keeps the row-number rail outside TanStack's data columns, so the pinned Job column's CSS `left`
+offset must add `--tracker-row-number-width` to `column.getStart("left")`. The tracker now uses one
+table and one scroll panel at every width; do not reintroduce the retired `data-label` card layout.

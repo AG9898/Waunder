@@ -2,25 +2,12 @@
  * One application-tracker row, ported from `renderRow`, `renderStatusControl`, and
  * `trackerStatusOptions` in `web/components/applications.go` (see docs/GO_MIGRATION.md).
  *
- * ## One markup, two layouts, and every class below is load-bearing
+ * ## One markup, one grid
  *
- * This row is a real `<tr>` of `<td>`s, and `public/app.css` decides what it looks like. Below the
- * 800px container query each row is a card: `.tracker-row` and `.tracker-cell` are
- * `display: block`, the header row is visually hidden, and each cell paints its own label through
- * `.tracker-cell::before { content: attr(data-label) }`. Inside the query the same markup becomes
- * a table again with explicit `table-row` / `table-cell` values. Because the query is a
- * **container** query against the screen root, it follows the Auto/Desktop/Mobile layout the owner
- * picked rather than the viewport width.
- *
- * So the `data-label` on each cell is not decoration: it is the only label a phone shows, and it
- * has to say what the matching `<th>` says. `tracker.test.tsx` asserts that pairing cell by cell.
- *
- * ## The group tint lives on the row class and is painted by the leading cell
- *
- * `trackerRowClass` yields `tracker-row tracker-row--<group>`. On a card that suffix colours the
- * left border; in table mode a collapsed-border `<tr>` cannot paint one, so `app.css` paints an
- * inset `box-shadow` on `.tracker-cell-job` instead. That is why the title cell must stay first
- * and keep that class — moving it would put the tint in the middle of the row.
+ * This row is a real `<tr>` of `<td>`s, and `public/app.css` lays it out as one horizontally
+ * scrolling Surface v2 grid at every width. The row-number rail and Job cell are sticky; the
+ * company is repeated as a quiet second line inside the pinned Job cell on mobile while its
+ * existing column remains available to TanStack visibility controls.
  *
  * ## The status select writes the tracker and nothing else
  *
@@ -30,7 +17,7 @@
  * Every other choice goes up to the screen, which writes `PATCH
  * /api/job_posts/:id/application_status` — never a draft, never a submit.
  */
-import { type ChangeEvent, type Ref, useCallback } from "react";
+import { type ChangeEvent, type CSSProperties, type Ref, useCallback } from "react";
 import { Link } from "react-router";
 
 import type { JobSummary } from "../../api/schemas";
@@ -49,6 +36,8 @@ export interface TrackerRowProps {
   job: JobSummary;
   /** The visible columns, in order; the Job column is always first. */
   columns: readonly TrackerColumnId[];
+  /** TanStack's current width and pin offset for each visible data column. */
+  columnStyle: (id: TrackerColumnId) => CSSProperties;
   /** The row's position, for the virtualizer's measurement. */
   index?: number;
   ref?: Ref<HTMLTableRowElement>;
@@ -63,6 +52,7 @@ export interface TrackerRowProps {
 export function TrackerRow({
   job,
   columns,
+  columnStyle,
   index,
   ref,
   saving,
@@ -79,20 +69,48 @@ export function TrackerRow({
     [job.id, onStatusChange],
   );
 
+  const rowNumber = (index ?? 0) + 1;
+
   return (
     <tr ref={ref} data-index={index} className={trackerRowClass(job.application)}>
-      <td className="tracker-cell tracker-cell-job" data-label="Job">
-        <Link className="tracker-job-link" to={`/jobs/${job.id}`}>
-          {job.title}
+      <td
+        className="tracker-cell tracker-cell-number"
+        data-column="row-number"
+        aria-label={`Row ${rowNumber}`}
+        style={{ width: "var(--tracker-row-number-width)" }}
+      >
+        {rowNumber}
+      </td>
+      <td
+        className="tracker-cell tracker-cell-job"
+        data-column="job"
+        data-pinned="left"
+        style={columnStyle("job")}
+      >
+        <Link className="tracker-job-link" to={`/jobs/${job.id}`} aria-label={job.title}>
+          <span className="tracker-job-title">{job.title}</span>
+          {columns.includes("company") ? (
+            <span className="tracker-job-company-mobile" aria-hidden="true">
+              {job.company}
+            </span>
+          ) : null}
         </Link>
       </td>
       {!columns.includes("company") ? null : (
-        <td className="tracker-cell tracker-cell-company" data-label="Company">
+        <td
+          className="tracker-cell tracker-cell-company"
+          data-column="company"
+          style={columnStyle("company")}
+        >
           {job.company}
         </td>
       )}
       {!columns.includes("status") ? null : (
-        <td className="tracker-cell tracker-cell-status" data-label="Status">
+        <td
+          className="tracker-cell tracker-cell-status"
+          data-column="status"
+          style={columnStyle("status")}
+        >
           <div className="tracker-status">
             <select
               className="tracker-status-select"
@@ -120,12 +138,20 @@ export function TrackerRow({
         </td>
       )}
       {!columns.includes("intaked") ? null : (
-        <td className="tracker-cell tracker-cell-date" data-label="Intaked">
+        <td
+          className="tracker-cell tracker-cell-date"
+          data-column="intaked"
+          style={columnStyle("intaked")}
+        >
           {trackerDate(job.created_at)}
         </td>
       )}
       {!columns.includes("updated") ? null : (
-        <td className="tracker-cell tracker-cell-date" data-label="Updated">
+        <td
+          className="tracker-cell tracker-cell-date"
+          data-column="updated"
+          style={columnStyle("updated")}
+        >
           {trackerUpdatedLabel(job)}
         </td>
       )}

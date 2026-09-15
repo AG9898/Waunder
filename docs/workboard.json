@@ -3381,7 +3381,7 @@
       "id": "UI-14",
       "title": "Rebuild the tracker rows as the Surface v2 spreadsheet grid",
       "description": "Structural grid only, over the tracker's existing columns (Job, Company, Status with its current native select, Intaked, Updated). Replace the responsive card/table markup with the STYLE_GUIDE.md 'Surface v2 > Tracker grid' layout at every width: row-number column, gridlines, sunken 36px header strip with lucide column icons and the sorted-column state, the Job column pinned via TanStack column pinning while other columns scroll horizontally inside the panel, TanStack column sizing, 40px desktop / 56px mobile rows with the company as a second line under the title on mobile, and the right-edge scroll fade on mobile. Retire the data-label card CSS and rewrite tracker.test.tsx's app.css assertions to pin the new grid rules. Keep sorting, column visibility, virtualization, group tabs, and invalidate-and-refetch writes working. Toolbar, footer, new columns, and cell editors are later tasks.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "UI",
       "depends_on": [

@@ -1,20 +1,19 @@
 /**
- * The tracker's rows on TanStack Table (`UI-04`): column sorting, column visibility, and window
- * virtualization for long pages, over the one responsive `<table>` markup `app.css` lays out as
- * cards below the 800px container query and as a real table above it (see `tracker-row.tsx`).
+ * The tracker's rows on TanStack Table (`UI-04`/`UI-14`): column sorting, visibility, pinning,
+ * sizing, and window virtualization. The same table is a Surface v2 grid at every width: the
+ * row-number rail and Job column stay pinned while the remaining columns scroll in the panel.
  *
- * - **Sorting is a view over the page Rails served.** The Sort select still orders the feed on the
- *   server; a header click reorders only the loaded rows, and clicking through to "unsorted" puts
- *   Rails' order back. The header text stays the bare column name (the direction lives in
- *   `aria-sort` and the button's `data-sort`), because every cell's `data-label` must equal it.
- * - **Visibility never hides the Job column.** Its cell leads each row and paints the group tint
- *   as an inset box-shadow in table mode, so it is not offered as a toggle.
- * - **Virtualization only engages past `VIRTUALIZE_AFTER` rows**, so a normal 30-row page renders
- *   every row. Above it, rows are measured (cards have variable height) and the gap is held by
- *   `.tracker-spacer` rows, which `app.css` gives explicit block/table display in both layouts.
+ * - Sorting is a view over the page Rails served. The Sort select still orders the feed on the
+ *   server; a header click reorders only the loaded rows.
+ * - Visibility never hides Job. It is the only TanStack-pinned data column and leads every row.
+ * - Virtualization only engages past `VIRTUALIZE_AFTER` rows, so a normal 30-row page renders all
+ *   rows. Above it, measured rows are held between explicit spacer rows.
  */
 import {
+  type Column,
   type ColumnDef,
+  type ColumnPinningState,
+  type ColumnSizingState,
   type OnChangeFn,
   type SortingState,
   type VisibilityState,
@@ -24,20 +23,30 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
-import { useCallback, useState } from "react";
+import { ArrowDown, ArrowUp, Hash } from "lucide-react";
+import { type CSSProperties, useCallback, useState } from "react";
 
 import type { JobSummary } from "../../api/schemas";
 import { TRACKER_COLUMNS, type TrackerColumnId, VIRTUALIZE_AFTER } from "../../lib/tracker-columns";
 import { TrackerRow } from "./tracker-row";
 
-/** Estimated px per row before measurement; cards and table rows differ, so rows are measured. */
-const ROW_ESTIMATE = 72;
+/** The row-number rail is outside TanStack's data columns but remains pinned with the Job column. */
+const FIXED_COLUMN_COUNT = 1;
+
+/** Estimated px per row before measurement; the mobile row is the conservative height. */
+const ROW_ESTIMATE = 56;
+
+const PINNED_COLUMNS: ColumnPinningState = { left: ["job"], right: [] };
 
 const COLUMNS: ColumnDef<JobSummary, string>[] = TRACKER_COLUMNS.map((column) => ({
   id: column.id,
   accessorFn: column.value,
   header: column.label,
   enableHiding: column.hideable,
+  enablePinning: column.id === "job",
+  enableResizing: true,
+  size: column.size,
+  minSize: column.minSize,
   sortingFn: "alphanumeric",
   sortDescFirst: false,
 }));
@@ -61,12 +70,17 @@ export function TrackerTable({
   saving,
   onStatusChange,
 }: TrackerTableProps) {
+  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table returns fresh functions each render by design.
   const table = useReactTable({
     data: jobs as JobSummary[],
     columns: COLUMNS,
-    state: { sorting, columnVisibility },
+    state: { sorting, columnVisibility, columnPinning: PINNED_COLUMNS, columnSizing },
     onSortingChange,
+    onColumnSizingChange: setColumnSizing,
+    enableColumnPinning: true,
+    enableColumnResizing: true,
+    columnResizeMode: "onChange",
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getRowId: (job) => String(job.id),
@@ -75,6 +89,20 @@ export function TrackerTable({
   const visible = table.getVisibleLeafColumns().map((column) => column.id as TrackerColumnId);
   const rows = table.getRowModel().rows;
   const virtualized = rows.length > VIRTUALIZE_AFTER;
+
+  const columnStyle = (column: Column<JobSummary, unknown>): CSSProperties => {
+    const size = column.getSize();
+    const style: CSSProperties = { width: `${size}px`, minWidth: `${size}px` };
+    if (column.getIsPinned() === "left") {
+      style.left = `calc(var(--tracker-row-number-width) + ${column.getStart("left")}px)`;
+    }
+    return style;
+  };
+
+  const rowColumnStyle = (id: TrackerColumnId): CSSProperties => {
+    const column = table.getColumn(id);
+    return column === undefined ? {} : columnStyle(column);
+  };
 
   const [scrollMargin, setScrollMargin] = useState(0);
   const tbodyRef = useCallback((element: HTMLTableSectionElement | null) => {
@@ -105,52 +133,91 @@ export function TrackerTable({
     : rows.map((row, index) => ({ row, index }));
 
   return (
-    <table className="tracker-table">
-      <thead>
-        {table.getHeaderGroups().map((group) => (
-          <tr key={group.id}>
-            {group.headers.map((header) => {
-              const meta = TRACKER_COLUMNS.find((column) => column.id === header.column.id);
-              const direction = header.column.getIsSorted();
-              return (
-                <th
-                  key={header.id}
-                  className={meta?.className}
-                  aria-sort={
-                    direction === "asc" ? "ascending" : direction === "desc" ? "descending" : "none"
-                  }
-                >
-                  <button
-                    type="button"
-                    className="tracker-sort"
-                    data-sort={direction === false ? "none" : direction}
-                    onClick={header.column.getToggleSortingHandler()}
+    <div className="tracker-grid-scroll">
+      <table className="tracker-table">
+        <thead>
+          {table.getHeaderGroups().map((group) => (
+            <tr key={group.id}>
+              <th
+                className="tracker-row-number-header"
+                aria-label="Row"
+                scope="col"
+                style={{ width: "var(--tracker-row-number-width)" }}
+              >
+                <Hash className="tracker-column-icon" aria-hidden="true" size={13} />
+                <span className="tracker-row-number-label">#</span>
+              </th>
+              {group.headers.map((header) => {
+                const meta = TRACKER_COLUMNS.find((column) => column.id === header.column.id);
+                const direction = header.column.getIsSorted();
+                const HeaderIcon = meta?.icon;
+                const sorted = direction !== false;
+                return (
+                  <th
+                    key={header.id}
+                    className={[meta?.className, sorted ? "tracker-header-sorted" : ""]
+                      .filter(Boolean)
+                      .join(" ")}
+                    data-column={header.column.id}
+                    data-pinned={header.column.getIsPinned() || undefined}
+                    aria-sort={
+                      direction === "asc"
+                        ? "ascending"
+                        : direction === "desc"
+                          ? "descending"
+                          : "none"
+                    }
+                    scope="col"
+                    style={columnStyle(header.column)}
                   >
-                    {flexRender(header.column.columnDef.header, header.getContext())}
-                  </button>
-                </th>
-              );
-            })}
-          </tr>
-        ))}
-      </thead>
-      <tbody ref={tbodyRef}>
-        {padTop > 0 ? <Spacer height={padTop} span={visible.length} /> : null}
-        {shown.map(({ row, index }) => (
-          <TrackerRow
-            key={row.id}
-            ref={virtualized ? virtualizer.measureElement : undefined}
-            index={index}
-            columns={visible}
-            job={row.original}
-            saving={savingId === row.original.id}
-            disabled={saving}
-            onStatusChange={onStatusChange}
-          />
-        ))}
-        {padBottom > 0 ? <Spacer height={padBottom} span={visible.length} /> : null}
-      </tbody>
-    </table>
+                    <button
+                      type="button"
+                      className="tracker-sort"
+                      data-sort={direction === false ? "none" : direction}
+                      aria-label={meta?.label}
+                      onClick={header.column.getToggleSortingHandler()}
+                    >
+                      {HeaderIcon === undefined ? null : (
+                        <HeaderIcon className="tracker-column-icon" aria-hidden="true" size={13} />
+                      )}
+                      <span className="tracker-header-label">
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                      </span>
+                      {direction === "asc" ? (
+                        <ArrowUp className="tracker-sort-arrow" aria-hidden="true" size={13} />
+                      ) : direction === "desc" ? (
+                        <ArrowDown className="tracker-sort-arrow" aria-hidden="true" size={13} />
+                      ) : null}
+                    </button>
+                  </th>
+                );
+              })}
+            </tr>
+          ))}
+        </thead>
+        <tbody ref={tbodyRef}>
+          {padTop > 0 ? (
+            <Spacer height={padTop} span={visible.length + FIXED_COLUMN_COUNT} />
+          ) : null}
+          {shown.map(({ row, index }) => (
+            <TrackerRow
+              key={row.id}
+              ref={virtualized ? virtualizer.measureElement : undefined}
+              index={index}
+              columns={visible}
+              columnStyle={rowColumnStyle}
+              job={row.original}
+              saving={savingId === row.original.id}
+              disabled={saving}
+              onStatusChange={onStatusChange}
+            />
+          ))}
+          {padBottom > 0 ? (
+            <Spacer height={padBottom} span={visible.length + FIXED_COLUMN_COUNT} />
+          ) : null}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

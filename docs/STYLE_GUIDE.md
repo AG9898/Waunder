@@ -50,19 +50,20 @@ source of truth; the stylesheet is `web/public/app.css`, linked from `web/index.
 > are produced by `web/src/lib/labels.ts`. Renaming a band or a state there
 > silently unstyles a pill, so treat those return values as part of this style contract.
 >
-> The tracker's responsive table carries its markup contract into
-> `web/src/components/tracker/` unchanged: one `<table class="tracker-table">`, a `data-label` on
-> every `.tracker-cell` that matches its column header (the only label a phone shows),
-> `.tracker-cell-job` as every row's leading cell (it paints the group tint in table mode), and
-> `tracker-row tracker-row--<group>` from `trackerRowClass`. `tracker.test.tsx` parses `app.css` to
-> pin the rules that markup depends on — the `attr(data-label)` card labels, the explicit table
-> display values inside the 800px container query, and the inset box-shadow tint — so restyling the
-> tracker means updating that test deliberately. A pipeline stage with no label renders no
-> `.tracker-stage` pill rather than an empty one.
+> The tracker's grid carries its markup contract into `web/src/components/tracker/`: one
+> `<table class="tracker-table">` inside `.tracker-grid-scroll`, a row-number rail, and
+> `.tracker-cell-job` as the TanStack-pinned leading data cell. `tracker-row tracker-row--<group>`
+> from `trackerRowClass` remains the group-tint hook; the company is also rendered as a quiet second
+> line inside the pinned Job cell on mobile. The current structural slice keeps the existing Job,
+> Company, Status, Intaked, and Updated columns, with the native Status select unchanged.
+> `tracker.test.tsx` parses `app.css` to pin the grid dimensions, gridlines, sticky columns, mobile
+> scroll fade, desktop/mobile row heights, and explicit virtualization spacer display, so
+> restyling the tracker means updating that test deliberately. A pipeline stage with no label renders
+> no `.tracker-stage` pill rather than an empty one.
 >
-> **RESOLVED-26 retires this card-layout contract.** It describes the shipped tracker until `UI-14`
-> lands the Surface v2 grid (see "Surface v2" below), which replaces the `data-label` cards with a
-> horizontally scrolling grid at every width and rewrites `tracker.test.tsx`'s CSS assertions.
+> **RESOLVED-26 replaces the former card/table contract.** The tracker is a horizontally scrolling
+> Surface v2 grid at every width; the later Surface v2 tasks add the remaining columns, toolbar,
+> footer, and editors without changing this structural grid foundation.
 
 ---
 
@@ -189,19 +190,18 @@ figures where possible.
   with the Jobs bin tabs) select All / Not applied / Applied / In progress / Closed, each with a
   count badge; the strip scrolls horizontally so five tabs stay reachable on a phone. Lifecycle
   bin and sort sit under them as plain labelled selects (`.tracker-controls`).
-- The tracker table runs on TanStack Table (UI-04): a header click sorts only the loaded page
-  (direction in `aria-sort` and the `.tracker-sort[data-sort]` arrow, so header text still equals
-  each cell's `data-label`); a collapsed `.tracker-columns` control hides Company/Status/dates
-  (never Job, which leads the row and paints the tint) and drops header and cells together; pages
-  over 60 rows are window-virtualized with measured rows and `.tracker-spacer` rows given explicit
-  block/table display in both layouts. The server Sort select still orders the feed.
-- The tracker rows (`.tracker-table`) are one responsive markup, not two: on mobile each row is a
-  card whose cells label themselves via `data-label` + `::before`, and inside the 800px container
-  query the same table reverts to real `table` display with a sunken header row, hairline
-  dividers, and a hover tint. The tracker group is carried by a colored left edge (a border on the
-  mobile card; an inset `box-shadow` on the leading cell in table mode, since a collapsed-border
-  table row cannot paint one) — sage for applied, amber for in progress, faint for closed. Empty
-  states name the active tab ("No applications submitted yet.") rather than a generic "no rows".
+- The tracker grid runs on TanStack Table (UI-04/UI-14): a header click sorts only the loaded page
+  (direction in `aria-sort` and the `.tracker-sort[data-sort]` arrow), while the sunken header uses
+  Lucide column icons and a sorted-column state. The row-number rail and Job column are pinned,
+  column widths come from TanStack sizing, and the remaining columns scroll inside the panel. A
+  collapsed `.tracker-columns` control hides Company/Status/dates (never Job), pages over 60 rows
+  are window-virtualized with measured rows, and `.tracker-spacer` rows stay explicit table rows.
+  The server Sort select still orders the feed.
+- The tracker uses one real table at every width, with gridlines, a 34px mobile / 36px desktop
+  header strip, 56px mobile / 40px desktop rows, and a 28px mobile right-edge scroll fade. The
+  pinned Job cell ellipsizes its title and places Company beneath it on mobile; the existing
+  native Status select and group tint remain unchanged. Empty states name the active tab ("No
+  applications submitted yet.") rather than a generic "no rows".
 - The Jobs feed's filter + sort controls live in a collapsed-by-default `.job-filters-panel`
   (`<details>`/`<summary>` "Filters & sort") so they don't push the feed down on mobile; the
   summary carries a small count badge of how many filters are active, and the controls lay out
@@ -322,6 +322,9 @@ Menus that list statuses group them under these four group labels, in this order
 
 - One grid at every width inside a surface panel (`--radius-panel`, hairline border, `--shadow-sm`).
   Header strip 36px (34px mobile), rows 40px desktop / 56px mobile, 13px body text.
+- **UI-14 structural slice:** the shipped grid currently contains row number, Job, Company, Status,
+  Intaked, and Updated. Job keeps its existing link and native Status select; later tasks add the
+  Score, Stage, Applied, Follow-up, and Note cells without changing the pinned/scrolling frame.
 - Column order: row number (48px desktop / 34px mobile, centered, faint tabular digits), Job (pinned;
   source logo 14px + title 600, ellipsis; on mobile the company sits under the title as a 12px faint
   second line), Company, Score (match-score band pill), Status (`StatusChip`), Stage (plain text,

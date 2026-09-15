@@ -12,8 +12,9 @@
  *   `OnClick` could not be invoked from a test. Here the controls are pressed.
  * - A status write is proven by its request, the absence of any draft or submit request, and the
  *   refetch that follows — including a row leaving the tab it was edited in.
- * - The responsive-table rules are `app.css` facts. jsdom has no layout, so the stylesheet is parsed
- *   and the rules the markup depends on are pinned next to the markup that keys off them.
+ * - The Surface v2 grid rules are `app.css` facts. jsdom has no layout, so the stylesheet is parsed
+ *   and the pinned-column, scroll, row-height, and gridline rules are pinned next to the markup
+ *   that keys off them.
  */
 import { QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -709,7 +710,7 @@ describe("tracker rendering", () => {
 });
 
 /* -------------------------------------------------------------------------- */
-/* One markup, two layouts                                                     */
+/* One markup, one Surface v2 grid                                             */
 /* -------------------------------------------------------------------------- */
 
 /** `public/app.css` with comments removed. */
@@ -777,8 +778,8 @@ function declared(rules: Map<string, string>, selector: string, property: string
   return values.at(-1)?.[1]?.trim() ?? "";
 }
 
-describe("one table markup, two layouts", () => {
-  it("renders a single real table whose every cell labels itself with its column header", async () => {
+describe("Surface v2 tracker grid", () => {
+  it("renders one grid with row numbers, icons, pinned Job, and mobile company text", async () => {
     rows = [
       { ...fixtures.unscoredJob, id: 1, title: "Untracked", application: null },
       {
@@ -798,11 +799,16 @@ describe("one table markup, two layouts", () => {
     ];
     const { container } = await loadedTracker();
 
-    // No second, card-shaped markup: the same table is what app.css lays out both ways.
+    // No second, card-shaped markup: the same grid is what app.css lays out at every width.
     expect(container.querySelectorAll("table")).toHaveLength(1);
-    const headers = Array.from(container.querySelectorAll("thead th")).map((th) => th.textContent);
-    expect(headers).toEqual(["Job", "Company", "Status", "Intaked", "Updated"]);
+    expect(container.querySelector(".tracker-grid-scroll")).not.toBeNull();
+    const headers = Array.from(container.querySelectorAll("thead th")).map(
+      (th) => th.querySelector(".tracker-header-label")?.textContent ?? th.textContent,
+    );
+    expect(headers).toEqual(["#", "Job", "Company", "Status", "Intaked", "Updated"]);
+    expect(container.querySelectorAll("thead th .tracker-column-icon")).toHaveLength(6);
     expect(Array.from(container.querySelectorAll("thead th")).map((th) => th.className)).toEqual([
+      "tracker-row-number-header",
       "tracker-col-job",
       "tracker-col-company",
       "tracker-col-status",
@@ -818,30 +824,54 @@ describe("one table markup, two layouts", () => {
       "tracker-row tracker-row--closed",
       "tracker-row tracker-row--not_applied",
     ]);
-    for (const row of bodyRows) {
+    expect(bodyRows.map((row) => row.cells[0]?.textContent)).toEqual(["1", "2", "3", "4", "5"]);
+    for (const [index, row] of bodyRows.entries()) {
       const cells = Array.from(row.cells);
-      // On a phone the header row is hidden, so each cell's data-label is the only label shown.
-      expect(cells.map((cell) => cell.dataset.label)).toEqual(headers);
+      expect(cells.map((cell) => cell.dataset.column)).toEqual([
+        "row-number",
+        "job",
+        "company",
+        "status",
+        "intaked",
+        "updated",
+      ]);
       for (const cell of cells) expect(cell).toHaveClass("tracker-cell");
-      // The tint is painted by the leading cell in table mode, so the title cell must lead.
-      expect(cells[0]).toHaveClass("tracker-cell-job");
+      const numberCell = cells[0];
+      const jobCell = cells[1];
+      if (numberCell === undefined || jobCell === undefined)
+        throw new Error("tracker row is incomplete");
+      expect(numberCell).toHaveClass("tracker-cell-number");
+      expect(jobCell).toHaveClass("tracker-cell-job");
+      expect(jobCell).toHaveAttribute("data-pinned", "left");
+      expect(jobCell.querySelector(".tracker-job-company-mobile")).toHaveTextContent(
+        [
+          "Cascadia",
+          "Northwind Robotics",
+          "Northwind Robotics",
+          "Northwind Robotics",
+          "Northwind Robotics",
+        ][index] ?? "",
+      );
+      expect(cells.some((cell) => cell.hasAttribute("data-label"))).toBe(false);
     }
   });
 
-  it("paints each cell's label from data-label on mobile and hides the header row", () => {
+  it("uses the mobile grid dimensions and scroll fade without the retired card labels", () => {
     const mobile = rulesOf(unconditional(stylesheet()));
 
-    expect(declared(mobile, ".tracker-cell::before", "content")).toBe("attr(data-label)");
-    expect(declared(mobile, ".tracker-cell-job::before", "content")).toBe("none");
-    expect(declared(mobile, ".tracker-table", "display")).toBe("block");
-    expect(declared(mobile, ".tracker-row", "display")).toBe("block");
-    expect(declared(mobile, ".tracker-table tbody", "display")).toBe("block");
-    expect(declared(mobile, ".tracker-table thead", "position")).toBe("absolute");
-    expect(declared(mobile, ".tracker-table thead", "clip-path")).toBe("inset(50%)");
-    // The card carries the group on its left border.
-    expect(declared(mobile, ".tracker-row--applied", "border-left-color")).toBe(
-      "var(--color-accent)",
-    );
+    expect(declared(mobile, ".tracker-wrap", "overflow")).toBe("hidden");
+    expect(declared(mobile, ".tracker-grid-scroll", "overflow-x")).toBe("auto");
+    expect(declared(mobile, ".tracker-grid-scroll::after", "width")).toBe("28px");
+    expect(declared(mobile, ".tracker-table", "width")).toBe("max-content");
+    expect(declared(mobile, ".tracker-table", "min-width")).toBe("100%");
+    expect(declared(mobile, ".tracker-table", "table-layout")).toBe("fixed");
+    expect(declared(mobile, ".tracker-table th", "height")).toBe("34px");
+    expect(declared(mobile, ".tracker-row", "height")).toBe("56px");
+    expect(declared(mobile, ".tracker-cell", "height")).toBe("56px");
+    expect(declared(mobile, ".tracker-cell-number", "position")).toBe("sticky");
+    expect(declared(mobile, '.tracker-table [data-pinned="left"]', "position")).toBe("sticky");
+    expect(declared(mobile, ".tracker-job-company-mobile", "display")).toBe("block");
+    expect(unconditional(stylesheet())).not.toContain("data-label");
   });
 
   it("follows the selected layout: the switch is a container query on the screen root", () => {
@@ -856,16 +886,17 @@ describe("one table markup, two layouts", () => {
     }
   });
 
-  it("sets explicit table display values inside the container query, never revert", () => {
+  it("tightens rows on desktop and keeps the same table display values", () => {
     const css = stylesheet();
     const desktop = rulesOf(atRuleBody(css, "@container (min-width: 800px)"));
 
-    expect(declared(desktop, ".tracker-table", "display")).toBe("table");
-    expect(declared(desktop, ".tracker-table thead", "display")).toBe("table-header-group");
-    expect(declared(desktop, ".tracker-table tbody", "display")).toBe("table-row-group");
-    expect(declared(desktop, ".tracker-row", "display")).toBe("table-row");
-    expect(declared(desktop, ".tracker-cell", "display")).toBe("table-cell");
-    expect(declared(desktop, ".tracker-cell::before", "content")).toBe("none");
+    expect(declared(desktop, ".tracker-wrap", "--tracker-row-number-width")).toBe("48px");
+    expect(declared(desktop, ".tracker-table th", "height")).toBe("36px");
+    expect(declared(desktop, ".tracker-sort", "min-height")).toBe("36px");
+    expect(declared(desktop, ".tracker-row", "height")).toBe("40px");
+    expect(declared(desktop, ".tracker-cell", "height")).toBe("40px");
+    expect(declared(desktop, ".tracker-grid-scroll::after", "display")).toBe("none");
+    expect(declared(desktop, ".tracker-job-company-mobile", "display")).toBe("none");
 
     const trackerRules = [...rulesOf(unconditional(css)), ...desktop].filter(([selector]) =>
       selector.includes("tracker"),
@@ -876,25 +907,27 @@ describe("one table markup, two layouts", () => {
     }
   });
 
-  it("tints the group with an inset box-shadow on the leading cell, not a border on the row", () => {
-    const desktop = rulesOf(atRuleBody(stylesheet(), "@container (min-width: 800px)"));
+  it("pins the rail and Job column while preserving group tint and gridlines", () => {
+    const mobile = rulesOf(unconditional(stylesheet()));
 
-    expect(declared(desktop, ".tracker-row", "border")).toBe("0");
-    expect(declared(desktop, ".tracker-cell-job", "box-shadow")).toBe(
+    expect(declared(mobile, ".tracker-row-number-header", "left")).toBe("0");
+    expect(declared(mobile, ".tracker-cell-job", "border-right")).toBe(
+      "1px solid var(--color-border-strong)",
+    );
+    expect(declared(mobile, ".tracker-cell-job", "box-shadow")).toBe(
       "inset 3px 0 0 var(--color-border-strong)",
+    );
+    expect(declared(mobile, ".tracker-cell", "border-bottom")).toBe(
+      "1px solid var(--color-grid-line)",
     );
     for (const [group, color] of [
       ["applied", "var(--color-accent)"],
       ["in_progress", "var(--color-warning)"],
       ["closed", "var(--color-ink-faint)"],
     ] as const) {
-      expect(declared(desktop, `.tracker-row--${group} .tracker-cell-job`, "box-shadow")).toBe(
+      expect(declared(mobile, `.tracker-row--${group} .tracker-cell-job`, "box-shadow")).toBe(
         `inset 3px 0 0 ${color}`,
       );
-      expect(desktop.has(`.tracker-row--${group}`)).toBe(false);
-    }
-    for (const [selector, body] of desktop) {
-      if (selector.startsWith(".tracker-row")) expect(body, selector).not.toMatch(/border-left/);
     }
   });
 });
@@ -1044,8 +1077,8 @@ describe("tracker writes", () => {
 
 describe("tracker table behaviour", () => {
   function titles(container: HTMLElement): string[] {
-    return Array.from(container.querySelectorAll("tbody .tracker-job-link")).map(
-      (link) => link.textContent ?? "",
+    return Array.from(container.querySelectorAll("tbody .tracker-job-title")).map(
+      (title) => title.textContent ?? "",
     );
   }
 
@@ -1064,12 +1097,14 @@ describe("tracker table behaviour", () => {
     fireEvent.click(sortButton());
     expect(titles(container)).toEqual(["Alpha", "Bravo", "Charlie"]);
     expect(jobHeader()).toHaveAttribute("aria-sort", "ascending");
-    // The header still reads just "Job", so it keeps matching every cell's data-label.
-    expect(jobHeader().textContent).toBe("Job");
+    expect(jobHeader()).toHaveClass("tracker-header-sorted");
+    expect(jobHeader().querySelector(".tracker-sort-arrow")).not.toBeNull();
+    expect(jobHeader().textContent).toContain("Job");
     fireEvent.click(sortButton());
     expect(titles(container)).toEqual(["Charlie", "Bravo", "Alpha"]);
     fireEvent.click(sortButton());
     expect(titles(container)).toEqual(["Bravo", "Alpha", "Charlie"]);
+    expect(jobHeader()).not.toHaveClass("tracker-header-sorted");
     expect(requests.length).toBe(before);
   });
 
@@ -1085,11 +1120,20 @@ describe("tracker table behaviour", () => {
 
     fireEvent.click(screen.getByRole("checkbox", { name: "Company" }));
 
-    const headers = Array.from(container.querySelectorAll("thead th")).map((th) => th.textContent);
-    expect(headers).toEqual(["Job", "Status", "Intaked", "Updated"]);
+    const headers = Array.from(container.querySelectorAll("thead th")).map(
+      (th) => th.querySelector(".tracker-header-label")?.textContent ?? th.textContent,
+    );
+    expect(headers).toEqual(["#", "Job", "Status", "Intaked", "Updated"]);
     for (const row of Array.from(container.querySelectorAll<HTMLTableRowElement>("tbody tr"))) {
-      expect(Array.from(row.cells).map((cell) => cell.dataset.label)).toEqual(headers);
-      expect(row.cells[0]).toHaveClass("tracker-cell-job");
+      expect(Array.from(row.cells).map((cell) => cell.dataset.column)).toEqual([
+        "row-number",
+        "job",
+        "status",
+        "intaked",
+        "updated",
+      ]);
+      expect(row.cells[0]).toHaveClass("tracker-cell-number");
+      expect(row.cells[1]).toHaveClass("tracker-cell-job");
     }
   });
 
@@ -1108,11 +1152,12 @@ describe("tracker table behaviour", () => {
     expect(container.querySelector("tbody tr.tracker-spacer")).not.toBeNull();
   });
 
-  it("gives virtualization spacers explicit display values in both layouts", () => {
+  it("gives virtualization spacers explicit table display values", () => {
     const css = stylesheet();
     const mobile = rulesOf(unconditional(css));
     const desktop = rulesOf(atRuleBody(css, "@container (min-width: 800px)"));
-    expect(declared(mobile, ".tracker-spacer", "display")).toBe("block");
+    expect(declared(mobile, ".tracker-spacer", "display")).toBe("table-row");
+    expect(declared(mobile, ".tracker-spacer td", "display")).toBe("table-cell");
     expect(declared(desktop, ".tracker-spacer", "display")).toBe("table-row");
     expect(declared(desktop, ".tracker-spacer td", "display")).toBe("table-cell");
   });

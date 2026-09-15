@@ -479,6 +479,14 @@ Be honest about the current state — most of the suite is still to be written.
   hanging write is held open by a promise the handler awaits and `afterEach` releases, so the
   in-flight assertions are deterministic rather than timing-dependent.
 
+- **web/** — `src/components/tracker/tracker.test.tsx` (`FE-22`/`UI-04`/`UI-14`): the tracker
+  request, sorting, visibility, virtualization, and status-write contract. In addition to Rails'
+  query and refetch assertions, it pins the Surface v2 grid markup (row numbers, Lucide header
+  icons, sorted direction, pinned Job cell, mobile company subline) and parses `app.css` for the
+  horizontal scroll panel, sticky columns, gridlines, mobile fade, responsive row/header heights,
+  and table spacer display. The old `data-label` responsive-card assertions are intentionally
+  absent: UI-14 uses one table grid at every width.
+
 ### Planned (from the plan's Testing Plan)
 
 **Intake management (INTAKE / RESOLVED-20):**
