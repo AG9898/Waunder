@@ -55,7 +55,7 @@ source of truth; the stylesheet is `web/public/app.css`, linked from `web/index.
 > `.tracker-cell-job` as the TanStack-pinned leading data cell. `tracker-row tracker-row--<group>`
 > from `trackerRowClass` remains the group-tint hook; the company is also rendered as a quiet second
 > line inside the pinned Job cell on mobile. The current structural slice keeps the existing Job,
-> Company, Status, Intaked, and Updated columns, with the native Status select unchanged.
+> Company, Status, Intaked, and Updated columns; Status is an editable `StatusChip` command popover.
 > `tracker.test.tsx` parses `app.css` to pin the grid dimensions, gridlines, sticky columns, mobile
 > scroll fade, desktop/mobile row heights, and explicit virtualization spacer display, so
 > restyling the tracker means updating that test deliberately. A pipeline stage with no label renders
@@ -199,8 +199,8 @@ figures where possible.
   The server Sort select still orders the feed.
 - The tracker uses one real table at every width, with gridlines, a 34px mobile / 36px desktop
   header strip, 56px mobile / 40px desktop rows, and a 28px mobile right-edge scroll fade. The
-  pinned Job cell ellipsizes its title and places Company beneath it on mobile; the existing
-  native Status select and group tint remain unchanged. Empty states name the active tab ("No
+  pinned Job cell ellipsizes its title and places Company beneath it on mobile; the Status cell
+  uses a grouped `StatusChip` popover and keeps the group tint. Empty states name the active tab ("No
   applications submitted yet.") rather than a generic "no rows".
 - The Jobs feed's filter + sort controls live in a collapsed-by-default `.job-filters-panel`
   (`<details>`/`<summary>` "Filters & sort") so they don't push the feed down on mobile; the
@@ -300,8 +300,8 @@ The pinned Job column's right edge uses `--color-border-strong`; other column ed
 One `StatusChip` renders any `pipeline_status`: a 22px (24px on touch) pill, 12px/600 label, a 6px
 dot, fill and ink from this table. Its pure tone/group metadata lives in `web/src/lib/labels.ts`;
 unknown values use the Interested tone and label, while the "Not applied" tracker placeholder uses
-that tone with its own label. This is a foundational primitive and is not adopted by shipped screens
-until the later Surface v2 screen tasks.
+that tone with its own label. The Applications tracker uses the chip as its editable status-cell
+trigger; later Surface v2 screens reuse the same primitive.
 
 | Group | Status | Fill | Ink | Dot | Border |
 |---|---|---|---|---|---|
@@ -322,8 +322,9 @@ Menus that list statuses group them under these four group labels, in this order
 
 - One grid at every width inside a surface panel (`--radius-panel`, hairline border, `--shadow-sm`).
   Header strip 36px (34px mobile), rows 40px desktop / 56px mobile, 13px body text.
-- **UI-14 structural slice:** the shipped grid currently contains row number, Job, Company, Status,
-  Intaked, and Updated. Job keeps its existing link and native Status select; later tasks add the
+- **UI-14/UI-17 structural slice:** the shipped grid currently contains row number, Job, Company,
+  Status, Intaked, and Updated. Job keeps its existing link and Status is an editable grouped
+  `StatusChip` popover; later tasks add the
   Score, Stage, Applied, Follow-up, and Note cells without changing the pinned/scrolling frame.
 - Column order: row number (48px desktop / 34px mobile, centered, faint tabular digits), Job (pinned;
   source logo 14px + title 600, ellipsis; on mobile the company sits under the title as a 12px faint

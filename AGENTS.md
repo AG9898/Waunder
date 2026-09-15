@@ -1566,3 +1566,8 @@ The generic `.app-chrome .app-tab` rule appears after the base `.app-tab` rule a
 UI-14 keeps the row-number rail outside TanStack's data columns, so the pinned Job column's CSS `left`
 offset must add `--tracker-row-number-width` to `column.getStart("left")`. The tracker now uses one
 table and one scroll panel at every width; do not reintroduce the retired `data-label` card layout.
+
+### 2026-09-15 — cmdk status popovers need a jsdom ResizeObserver shim
+`cmdk` mounts a `ResizeObserver` when a Command opens, so tracker tests that exercise `StatusCell`
+in jsdom need a local no-op observer (and `scrollIntoView` stub) before opening it. Keep the shim
+test-only; do not add browser API fallbacks to production components.

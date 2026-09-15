@@ -34,7 +34,7 @@
  * A status change can move a row out of the active tab (marking a job applied under "Not applied")
  * and changes the counts on every tab, so the write invalidates `jobs.root()` and re-asks Rails —
  * which is exactly what Go's `setStatus` did by calling `Jobs` again after the `PATCH`. The
- * invalidation is **awaited**, so every status select stays disabled until the refetched page has
+ * invalidation is **awaited**, so every status editor stays disabled until the refetched page has
  * landed and the next edit cannot race the previous answer. Mutations never retry
  * (`query-client.ts`), so a failure is reported and left alone.
  *

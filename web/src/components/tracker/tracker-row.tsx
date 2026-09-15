@@ -9,7 +9,7 @@
  * company is repeated as a quiet second line inside the pinned Job cell on mobile while its
  * existing column remains available to TanStack visibility controls.
  *
- * ## The status select writes the tracker and nothing else
+ * ## The status chip writes the tracker and nothing else
  *
  * A row with no tracked application shows a selected "Not applied" placeholder. Choosing it is a
  * no-op, not a reset: clearing a tracked application would destroy its draft and audit history, so
@@ -17,20 +17,19 @@
  * Every other choice goes up to the screen, which writes `PATCH
  * /api/job_posts/:id/application_status` — never a draft, never a submit.
  */
-import { type ChangeEvent, type CSSProperties, type Ref, useCallback } from "react";
+import { type CSSProperties, type Ref, useCallback, useState } from "react";
 import { Link } from "react-router";
 
 import type { JobSummary } from "../../api/schemas";
-import { PIPELINE_STATUS_OPTIONS } from "../../lib/pipeline";
 import type { TrackerColumnId } from "../../lib/tracker-columns";
 import {
-  NOT_APPLIED_OPTION,
   trackerDate,
   trackerRowClass,
   trackerStageLabel,
   trackerStatusValue,
   trackerUpdatedLabel,
 } from "../../lib/tracker";
+import { StatusCell } from "./status-cell";
 
 export interface TrackerRowProps {
   job: JobSummary;
@@ -45,7 +44,7 @@ export interface TrackerRowProps {
   saving: boolean;
   /** True while *any* row's write is in flight: one write at a time, as Go's `savingID` was. */
   disabled: boolean;
-  /** Receives the raw select value; the screen decides whether it is a write. */
+  /** Receives the selected status; the screen decides whether it is a write. */
   onStatusChange: (jobId: number, value: string) => void;
 }
 
@@ -61,18 +60,25 @@ export function TrackerRow({
 }: TrackerRowProps) {
   const status = trackerStatusValue(job.application);
   const stage = trackerStageLabel(job.application);
+  const [editingCell, setEditingCell] = useState<"status" | null>(null);
 
   const onChange = useCallback(
-    (event: ChangeEvent<HTMLSelectElement>) => {
-      onStatusChange(job.id, event.target.value);
-    },
+    (value: string) => onStatusChange(job.id, value),
     [job.id, onStatusChange],
   );
+
+  const onStatusOpenChange = useCallback((open: boolean) => {
+    setEditingCell(open ? "status" : null);
+  }, []);
 
   const rowNumber = (index ?? 0) + 1;
 
   return (
-    <tr ref={ref} data-index={index} className={trackerRowClass(job.application)}>
+    <tr
+      ref={ref}
+      data-index={index}
+      className={`${trackerRowClass(job.application)}${editingCell === "status" || saving ? " tracker-row--editing" : ""}`}
+    >
       <td
         className="tracker-cell tracker-cell-number"
         data-column="row-number"
@@ -112,22 +118,15 @@ export function TrackerRow({
           style={columnStyle("status")}
         >
           <div className="tracker-status">
-            <select
-              className="tracker-status-select"
-              aria-label={`Application status for ${job.title}`}
+            <StatusCell
+              status={status}
+              jobTitle={job.title}
+              tracked={job.application !== null}
+              open={editingCell === "status"}
               disabled={disabled}
-              value={status}
-              onChange={onChange}
-            >
-              {status === NOT_APPLIED_OPTION ? (
-                <option value={NOT_APPLIED_OPTION}>Not applied</option>
-              ) : null}
-              {PIPELINE_STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              onOpenChange={onStatusOpenChange}
+              onStatusChange={onChange}
+            />
             {stage === "" ? null : <span className="tracker-stage">{stage}</span>}
             {saving ? (
               <span className="tracker-saving" role="status">

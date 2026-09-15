@@ -3490,7 +3490,7 @@
       "id": "UI-17",
       "title": "Replace the tracker status select with a StatusChip cell editor",
       "description": "Replace the native status select in the tracker Status cell with a StatusChip that opens the Command popover listing statuses grouped by tracker group with a check on the current one, and introduce the shared cell-editing states from STYLE_GUIDE.md (focused ring, editing row tint and row number, Saving… text, every other cell editor disabled while a write is in flight). The write keeps today's contract exactly: PATCH application_status with pipeline_status and a blank stage, omitting note and follow-up, then invalidate and refetch, with failures as toasts. Build the editing states so UI-18, UI-19, and UI-20 can reuse them. Desktop and mobile both use the popover in this task; the mobile drawer is UI-21.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "UI",
       "depends_on": [

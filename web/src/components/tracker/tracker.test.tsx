@@ -22,7 +22,7 @@ import { delay } from "msw";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { MemoryRouter } from "react-router";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createQueryClient } from "../../api/query-client";
 import type {
@@ -55,6 +55,32 @@ import {
 import { fixtures } from "../../test/handlers";
 import { HttpResponse, http, installMockApi } from "../../test/msw";
 import { TrackerScreen } from "./tracker";
+
+const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+
+class TestResizeObserver {
+  observe(): void {
+    void 0;
+  }
+
+  unobserve(): void {
+    void 0;
+  }
+
+  disconnect(): void {
+    void 0;
+  }
+}
+
+beforeAll(() => {
+  vi.stubGlobal("ResizeObserver", TestResizeObserver);
+  HTMLElement.prototype.scrollIntoView = vi.fn();
+});
+
+afterAll(() => {
+  HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
+  vi.unstubAllGlobals();
+});
 
 /* -------------------------------------------------------------------------- */
 /* Fake Rails                                                                  */
@@ -243,16 +269,33 @@ async function loadedTracker() {
   return view;
 }
 
-function statusSelectFor(title: string): HTMLSelectElement {
-  return screen.getByRole<HTMLSelectElement>("combobox", {
+function statusTriggerFor(title: string): HTMLButtonElement {
+  return screen.getByRole<HTMLButtonElement>("button", {
     name: `Application status for ${title}`,
   });
 }
 
+function statusValueFor(title: string): string | undefined {
+  return statusTriggerFor(title).querySelector<HTMLElement>("[data-slot='status-chip']")?.dataset
+    .status;
+}
+
 function rowFor(title: string): HTMLElement {
-  const row = statusSelectFor(title).closest("tr");
+  const row = statusTriggerFor(title).closest("tr");
   if (row === null) throw new Error(`no row for ${title}`);
   return row;
+}
+
+async function openStatusFor(title: string): Promise<HTMLElement> {
+  fireEvent.click(statusTriggerFor(title));
+  return waitFor(() => screen.getByRole<HTMLElement>("listbox"));
+}
+
+async function chooseStatus(title: string, value: string): Promise<void> {
+  const list = await openStatusFor(title);
+  const option = list.querySelector<HTMLElement>(`[cmdk-item][data-value="${value}"]`);
+  if (option === null) throw new Error(`no status option ${value}`);
+  fireEvent.click(option);
 }
 
 function groupTabs(): HTMLElement[] {
@@ -560,7 +603,7 @@ describe("tracker rendering", () => {
       "tracker-job-link",
     );
     expect(staff.querySelector(".tracker-cell-company")?.textContent).toBe("Acme");
-    expect(statusSelectFor("Staff Engineer").value).toBe("applied");
+    expect(statusValueFor("Staff Engineer")).toBe("applied");
     expect(staff.querySelector(".tracker-stage")?.textContent).toBe("Waiting");
     expect(
       Array.from(staff.querySelectorAll(".tracker-cell-date")).map((cell) => cell.textContent),
@@ -581,24 +624,62 @@ describe("tracker rendering", () => {
   it("offers the Not applied placeholder only while a job is untracked", async () => {
     await loadedTracker();
 
-    const untracked = Array.from(statusSelectFor("Principal Engineer").options);
-    expect(statusSelectFor("Principal Engineer").value).toBe("not_applied");
-    expect(untracked[0]?.textContent).toBe("Not applied");
-    expect(untracked.map((option) => option.value).slice(1)).toEqual([
+    const untracked = await openStatusFor("Principal Engineer");
+    expect(statusValueFor("Principal Engineer")).toBe("not_applied");
+    expect(untracked.querySelector<HTMLElement>('[data-value="not_applied"]')?.textContent).toBe(
+      "Not applied",
+    );
+    expect(
+      Array.from(untracked.querySelectorAll<HTMLElement>("[cmdk-item]"), (option) =>
+        option.getAttribute("data-value"),
+      ).slice(0, 1),
+    ).toEqual(["not_applied"]);
+    expect(
+      Array.from(untracked.querySelectorAll<HTMLElement>("[cmdk-item]"), (option) =>
+        option.getAttribute("data-value"),
+      ).slice(1),
+    ).toEqual([
       "interested",
       "drafting",
+      "needs_review",
       "applied",
       "interviewing",
       "offer",
       "rejected",
       "withdrawn",
       "archived",
-      "needs_review",
     ]);
 
-    const tracked = Array.from(statusSelectFor("Staff Engineer").options);
-    expect(tracked.map((option) => option.value)).not.toContain("not_applied");
-    expect(tracked).toHaveLength(9);
+    fireEvent.click(statusTriggerFor("Principal Engineer"));
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+    const tracked = await openStatusFor("Staff Engineer");
+    expect(tracked.querySelector('[data-value="not_applied"]')).toBeNull();
+    expect(tracked.querySelectorAll("[cmdk-item]")).toHaveLength(9);
+  });
+
+  it("opens grouped statuses from Enter, checks the current one, and dismisses without a write", async () => {
+    await loadedTracker();
+
+    fireEvent.keyDown(statusTriggerFor("Staff Engineer"), { key: "Enter" });
+    const list = await waitFor(() => screen.getByRole<HTMLElement>("listbox"));
+    expect(
+      Array.from(
+        list.querySelectorAll<HTMLElement>("[cmdk-group-heading]"),
+        (heading) => heading.textContent,
+      ),
+    ).toEqual(["Not applied", "Applied", "In progress", "Closed"]);
+    expect(list.querySelector('[data-value="applied"]')).toHaveAttribute("data-current", "true");
+    expect(list.querySelector('[data-value="applied"] .status-cell-check')).not.toBeNull();
+
+    const current = list.querySelector<HTMLElement>('[data-value="applied"]');
+    if (current === null) throw new Error("no current status option");
+    fireEvent.click(current);
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+
+    await openStatusFor("Principal Engineer");
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+    expect(statusWrites).toEqual([]);
   });
 
   // TestApplicationsViewRendersGroupTabsWithCounts.
@@ -871,6 +952,16 @@ describe("Surface v2 tracker grid", () => {
     expect(declared(mobile, ".tracker-cell-number", "position")).toBe("sticky");
     expect(declared(mobile, '.tracker-table [data-pinned="left"]', "position")).toBe("sticky");
     expect(declared(mobile, ".tracker-job-company-mobile", "display")).toBe("block");
+    expect(declared(mobile, ".tracker-row--editing .tracker-cell", "background")).toBe(
+      "var(--color-row-active)",
+    );
+    expect(declared(mobile, ".tracker-row--editing .tracker-cell-number", "color")).toBe(
+      "var(--color-accent-strong)",
+    );
+    expect(declared(mobile, ".tracker-cell-status:focus-within", "box-shadow")).toBe(
+      "inset 0 0 0 2px var(--color-accent)",
+    );
+    expect(declared(mobile, ".status-cell-trigger", "min-height")).toBe("var(--control-h-touch)");
     expect(unconditional(stylesheet())).not.toContain("data-label");
   });
 
@@ -897,6 +988,9 @@ describe("Surface v2 tracker grid", () => {
     expect(declared(desktop, ".tracker-cell", "height")).toBe("40px");
     expect(declared(desktop, ".tracker-grid-scroll::after", "display")).toBe("none");
     expect(declared(desktop, ".tracker-job-company-mobile", "display")).toBe("none");
+    expect(declared(desktop, ".status-cell-trigger", "min-height")).toBe(
+      "var(--control-h-desktop)",
+    );
 
     const trackerRules = [...rulesOf(unconditional(css)), ...desktop].filter(([selector]) =>
       selector.includes("tracker"),
@@ -950,7 +1044,7 @@ describe("tracker writes", () => {
   it("writes through the job-post endpoint, then refetches instead of patching the row", async () => {
     const { container } = await loadedTracker();
 
-    fireEvent.change(statusSelectFor("Principal Engineer"), { target: { value: "applied" } });
+    await chooseStatus("Principal Engineer", "applied");
 
     await waitFor(() => {
       expect(statusWrites).toEqual([
@@ -965,15 +1059,16 @@ describe("tracker writes", () => {
 
     await waitFor(() => {
       expect(requests).toHaveLength(2);
-      expect(statusSelectFor("Principal Engineer").value).toBe("applied");
+      expect(statusValueFor("Principal Engineer")).toBe("applied");
     });
     expect(requests[1]?.get("status")).toBe("all");
     expect(rowFor("Principal Engineer").querySelector(".tracker-stage")?.textContent).toBe(
       "Waiting",
     );
-    expect(
-      Array.from(statusSelectFor("Principal Engineer").options).map((option) => option.value),
-    ).not.toContain("not_applied");
+    const trackedOptions = await openStatusFor("Principal Engineer");
+    expect(trackedOptions.querySelector('[data-value="not_applied"]')).toBeNull();
+    fireEvent.click(statusTriggerFor("Principal Engineer"));
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
     expect(tabCount("Applied")).toBe("2");
     expect(container.querySelector(".toast")).toBeNull();
   });
@@ -986,7 +1081,7 @@ describe("tracker writes", () => {
     });
     expect(tabCount("Not applied")).toBe("1");
 
-    fireEvent.change(statusSelectFor("Principal Engineer"), { target: { value: "applied" } });
+    await chooseStatus("Principal Engineer", "applied");
 
     await waitFor(() => {
       expect(container.querySelector(".tracker-empty")?.textContent).toBe(
@@ -998,27 +1093,29 @@ describe("tracker writes", () => {
     expect(stat("Applied to")).toBe("2");
   });
 
-  it("disables every status select while a write is in flight and marks only its own row", async () => {
+  it("disables every status editor while a write is in flight and marks only its own row", async () => {
     writeDelay = 250;
     await loadedTracker();
 
-    fireEvent.change(statusSelectFor("Principal Engineer"), { target: { value: "interviewing" } });
+    await chooseStatus("Principal Engineer", "interviewing");
 
     await waitFor(() => {
       expect(rowFor("Principal Engineer").querySelector(".tracker-saving")?.textContent).toBe(
         "Saving…",
       );
     });
-    expect(statusSelectFor("Principal Engineer")).toBeDisabled();
-    expect(statusSelectFor("Staff Engineer")).toBeDisabled();
+    expect(rowFor("Principal Engineer")).toHaveClass("tracker-row--editing");
+    expect(rowFor("Principal Engineer").querySelector(".tracker-cell-number")).not.toBeNull();
+    expect(statusTriggerFor("Principal Engineer")).toBeDisabled();
+    expect(statusTriggerFor("Staff Engineer")).toBeDisabled();
     expect(rowFor("Staff Engineer").querySelector(".tracker-saving")).toBeNull();
 
     // Re-enabled only once the refetched page has landed, not when the PATCH answers.
     await waitFor(() => {
-      expect(statusSelectFor("Staff Engineer")).toBeEnabled();
+      expect(statusTriggerFor("Staff Engineer")).toBeEnabled();
     });
     expect(requests).toHaveLength(2);
-    expect(statusSelectFor("Principal Engineer").value).toBe("interviewing");
+    expect(statusValueFor("Principal Engineer")).toBe("interviewing");
     expect(document.querySelector(".tracker-saving")).toBeNull();
     expect(statusWrites).toHaveLength(1);
   });
@@ -1027,7 +1124,10 @@ describe("tracker writes", () => {
   it("treats choosing the Not applied placeholder as a no-op", async () => {
     await loadedTracker();
 
-    fireEvent.change(statusSelectFor("Principal Engineer"), { target: { value: "not_applied" } });
+    const list = await openStatusFor("Principal Engineer");
+    const placeholder = list.querySelector<HTMLElement>('[data-value="not_applied"]');
+    if (placeholder === null) throw new Error("no Not applied option");
+    fireEvent.click(placeholder);
     await settle();
 
     expect(statusWrites).toEqual([]);
@@ -1039,7 +1139,7 @@ describe("tracker writes", () => {
     failWriteWith = 500;
     const { container } = await loadedTracker();
 
-    fireEvent.change(statusSelectFor("Principal Engineer"), { target: { value: "applied" } });
+    await chooseStatus("Principal Engineer", "applied");
 
     await waitFor(() => {
       expect(container.querySelector(".toast")).toHaveTextContent(
@@ -1050,8 +1150,8 @@ describe("tracker writes", () => {
     fireEvent.click(screen.getByRole("button", { name: "Dismiss notification" }));
     expect(container.querySelector(".toast")).toBeNull();
     expect(container.querySelectorAll(".tracker-row")).toHaveLength(2);
-    expect(statusSelectFor("Principal Engineer").value).toBe("not_applied");
-    expect(statusSelectFor("Principal Engineer")).toBeEnabled();
+    expect(statusValueFor("Principal Engineer")).toBe("not_applied");
+    expect(statusTriggerFor("Principal Engineer")).toBeEnabled();
     await settle();
     expect(statusWrites).toHaveLength(1);
     expect(requests).toHaveLength(1);
@@ -1061,7 +1161,7 @@ describe("tracker writes", () => {
     failWriteWith = 401;
     await loadedTracker();
 
-    fireEvent.change(statusSelectFor("Principal Engineer"), { target: { value: "applied" } });
+    await chooseStatus("Principal Engineer", "applied");
 
     await waitFor(() => {
       expect(screen.getByRole("region", { name: "Notifications" })).toHaveTextContent(

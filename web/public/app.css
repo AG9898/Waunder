@@ -1213,8 +1213,7 @@ button { font-family: inherit; }
   color: var(--color-ink-faint);
 }
 .tracker-bin-select,
-.tracker-sort-select,
-.tracker-status-select {
+.tracker-sort-select {
   min-height: 44px;
   padding: 9px 12px;
   background: var(--color-surface);
@@ -1228,13 +1227,11 @@ button { font-family: inherit; }
   letter-spacing: normal;
 }
 .tracker-bin-select:focus,
-.tracker-sort-select:focus,
-.tracker-status-select:focus {
+.tracker-sort-select:focus {
   outline: none;
   border-color: var(--color-accent);
   box-shadow: var(--focus-ring);
 }
-.tracker-status-select:disabled { opacity: .6; cursor: wait; }
 
 /* Jobs feed — lifecycle bin tabs (Active / Backlog / Removed) */
 .job-bin-tabs {
@@ -1600,6 +1597,12 @@ button { font-family: inherit; }
   vertical-align: middle;
 }
 .tracker-row:hover .tracker-cell { background: var(--color-row-hover); }
+.tracker-row--editing .tracker-cell,
+.tracker-row--editing:hover .tracker-cell { background: var(--color-row-active); }
+.tracker-row--editing .tracker-cell-number {
+  color: var(--color-accent-strong);
+  font-weight: 600;
+}
 .tracker-cell-number {
   color: var(--color-ink-faint);
   font-variant-numeric: tabular-nums;
@@ -1644,11 +1647,53 @@ button { font-family: inherit; }
   white-space: nowrap;
 }
 .tracker-cell-status { white-space: nowrap; }
+.tracker-cell-status:focus-within,
+.tracker-cell-status:has(.status-cell--open) {
+  box-shadow: inset 0 0 0 2px var(--color-accent);
+}
 .tracker-status {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   min-width: 0;
+}
+.status-cell {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+}
+.status-cell-trigger {
+  appearance: none;
+  display: inline-flex;
+  min-width: 0;
+  min-height: var(--control-h-touch);
+  align-items: center;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.status-cell-trigger:hover:not(:disabled) { background: var(--color-row-hover); }
+.status-cell-trigger:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--color-accent);
+}
+.status-cell-trigger:disabled { opacity: .6; cursor: wait; }
+.status-cell-trigger .status-chip { pointer-events: none; }
+.status-cell-trigger .status-chip--touch { height: 24px; }
+.status-cell-popover {
+  width: min(280px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  padding: var(--space-2);
+}
+.status-cell-option { min-height: var(--control-h-touch); }
+.status-cell-option[data-current="true"] { font-weight: 600; }
+.status-cell-check {
+  flex: none;
+  margin-left: auto;
+  color: var(--color-accent-strong);
 }
 .tracker-stage {
   padding: 3px 9px;
@@ -1662,11 +1707,6 @@ button { font-family: inherit; }
 .tracker-saving {
   color: var(--color-ink-faint);
   font-size: var(--text-xs);
-}
-.tracker-status-select {
-  min-height: var(--control-h-touch);
-  padding: 7px 10px;
-  border-radius: var(--radius-control);
 }
 /* UI-04/14: header sort buttons, the Columns control, and virtualization spacers. */
 .tracker-columns { margin: 0 0 var(--space-4); font-size: var(--text-sm); color: var(--color-ink-soft); }
@@ -2686,7 +2726,8 @@ html { scroll-padding-bottom: var(--screen-bottom); }
   .tracker-row,
   .tracker-cell { height: 40px; }
   .tracker-cell { padding-left: var(--space-4); padding-right: var(--space-4); }
-  .tracker-status-select { min-height: var(--control-h-desktop); }
+  .status-cell-trigger { min-height: var(--control-h-desktop); }
+  .status-cell-trigger .status-chip--touch { height: 22px; }
   .tracker-job-company-mobile { display: none; }
   .tracker-spacer { display: table-row; }
   .tracker-spacer td { display: table-cell; }

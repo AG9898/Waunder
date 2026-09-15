@@ -149,12 +149,14 @@ The web client's application tracker (`web/src/components/tracker/`) is the same
 explicitly on every request — the feed's scored-only default would otherwise hide the
 triage-deferred postings the owner may still have applied to — plus the chosen group
 (`application`), bin, sort, and page. The group tab totals and the header's "Applied to" / "Jobs
-tracked" figures come from Rails' `application_counts`, never from counting rows. One `<table>`
-renders as self-labelling cards below the 800px container query and as a real table inside it, so
-it follows the selected layout rather than the viewport. A row's status select writes `PATCH
-/api/job_posts/:id/application_status` with a blank stage and no note or follow-up date, reaches no
-draft or submit endpoint, and then invalidates and refetches the feed, because a status change can
-move the row out of the active tab and changes every tab's total.
+tracked" figures come from Rails' `application_counts`, never from counting rows. One real `<table>`
+renders at every width inside the horizontal scroll panel, so it follows the selected layout rather
+than the viewport. A row's grouped StatusChip popover writes
+`PATCH /api/job_posts/:id/application_status` with a blank stage and no note or follow-up date,
+reaches no draft or submit endpoint, and then invalidates and refetches the feed, because a status
+change can move the row out of the active tab and changes every tab's total. The shared editor
+state marks the row while open or saving and disables other cell editors during the one-write
+refetch window.
 
 The web client's manual import (`web/src/components/manual-entry/`) makes the same two
 writes as the Go form, with no Rails change. `POST /api/job_posts` receives all five fields
