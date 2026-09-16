@@ -76,6 +76,7 @@ describe("inferred types", () => {
 
   it("keeps the omitempty request fields optional and the rest required", () => {
     expectTypeOf<ApplicationStatusUpdate["pipeline_status"]>().toEqualTypeOf<string>();
+    expectTypeOf<ApplicationStatusUpdate["pipeline_stage"]>().toEqualTypeOf<string | undefined>();
     expectTypeOf<ApplicationStatusUpdate["pipeline_note"]>().toEqualTypeOf<string | undefined>();
     expectTypeOf<ApplicationStatusUpdate["next_follow_up_on"]>().toEqualTypeOf<
       string | undefined
@@ -733,6 +734,15 @@ describe("request payloads", () => {
     expect(parsed).toEqual({ pipeline_status: "applied", pipeline_stage: "waiting" });
     expect(Object.keys(parsed)).not.toContain("pipeline_note");
     expect(Object.keys(parsed)).not.toContain("next_follow_up_on");
+  });
+
+  it("lets a field-specific tracker edit omit the stage", () => {
+    expect(
+      ApplicationStatusUpdateSchema.parse({
+        pipeline_status: "applied",
+        next_follow_up_on: "2026-09-16",
+      }),
+    ).toEqual({ pipeline_status: "applied", next_follow_up_on: "2026-09-16" });
   });
 
   it("accepts an omitted feed filter but rejects an empty-string sentinel", () => {

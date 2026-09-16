@@ -163,16 +163,22 @@ installMockApi(
     if (writeDelay > 0) await delay(writeDelay);
     if (failWriteWith !== null) return errorBody(failWriteWith);
 
-    const stage =
-      body.application.pipeline_stage || defaultStageFor(body.application.pipeline_status);
     let application: ApplicationTracker = fixtures.feedTracker;
     rows = rows.map((job) => {
       if (job.id !== id) return job;
+      const current = job.application ?? fixtures.feedTracker;
+      const stage = Object.hasOwn(body.application, "pipeline_stage")
+        ? body.application.pipeline_stage || defaultStageFor(body.application.pipeline_status)
+        : current.pipeline_stage;
+      const nextFollowUp = Object.hasOwn(body.application, "next_follow_up_on")
+        ? (body.application.next_follow_up_on ?? "")
+        : current.next_follow_up_on;
       application = {
-        ...(job.application ?? fixtures.feedTracker),
+        ...current,
         job_post_id: id,
         pipeline_status: body.application.pipeline_status,
         pipeline_stage: stage,
+        next_follow_up_on: nextFollowUp,
         last_status_change_at: "2026-09-10T12:00:00Z",
       };
       return { ...job, application };
@@ -297,6 +303,12 @@ function stageTriggerFor(title: string): HTMLButtonElement {
   });
 }
 
+function followUpTriggerFor(title: string): HTMLButtonElement {
+  return screen.getByRole<HTMLButtonElement>("button", {
+    name: `Application follow-up for ${title}`,
+  });
+}
+
 function statusValueFor(title: string): string | undefined {
   return statusTriggerFor(title).querySelector<HTMLElement>("[data-slot='status-chip']")?.dataset
     .status;
@@ -331,6 +343,11 @@ async function chooseStage(title: string, value: string): Promise<void> {
   const option = list.querySelector<HTMLElement>(`[cmdk-item][data-value="${domValue}"]`);
   if (option === null) throw new Error(`no stage option ${value}`);
   fireEvent.click(option);
+}
+
+async function openFollowUpFor(title: string): Promise<HTMLElement> {
+  fireEvent.click(followUpTriggerFor(title));
+  return waitFor(() => screen.getByRole<HTMLElement>("grid"));
 }
 
 function groupTabs(): HTMLElement[] {
@@ -675,6 +692,10 @@ describe("tracker rendering", () => {
     expect(staff.querySelector(".tracker-cell-score .job-score")).toHaveTextContent("82%");
     expect(staff.querySelector(".tracker-cell-stage .tracker-stage")).toHaveTextContent("Waiting");
     expect(staff.querySelector(".tracker-cell-follow-up")?.textContent).toBe("15 Sep 2099");
+    expect(followUpTriggerFor("Staff Engineer")).toHaveAttribute(
+      "aria-label",
+      "Application follow-up for Staff Engineer",
+    );
     expect(staff.querySelector(".tracker-cell-note")?.textContent).toBe(
       "Referred by a former colleague.",
     );
@@ -699,6 +720,11 @@ describe("tracker rendering", () => {
     expect(principal.querySelector(".tracker-cell-stage")?.textContent).toBe("—");
     expect(
       within(principal).queryByRole("button", { name: "Application stage for Principal Engineer" }),
+    ).toBeNull();
+    expect(
+      within(principal).queryByRole("button", {
+        name: "Application follow-up for Principal Engineer",
+      }),
     ).toBeNull();
     expect(principal.querySelector(".tracker-cell-follow-up")?.textContent).toBe("—");
     expect(principal.querySelector(".tracker-cell-note")?.textContent).toBe("—");
@@ -783,10 +809,7 @@ describe("tracker rendering", () => {
       "Reference check",
       "Offer negotiation",
     ]);
-    expect(list.querySelector('[data-value="waiting"]')).toHaveAttribute(
-      "data-current",
-      "true",
-    );
+    expect(list.querySelector('[data-value="waiting"]')).toHaveAttribute("data-current", "true");
     expect(list.querySelector('[data-value="waiting"] .stage-cell-check')).not.toBeNull();
 
     const current = list.querySelector<HTMLElement>('[data-value="waiting"]');
@@ -804,6 +827,20 @@ describe("tracker rendering", () => {
         name: "Application stage for Principal Engineer",
       }),
     ).toBeNull();
+  });
+
+  it("opens the follow-up calendar with the current date selected", async () => {
+    await loadedTracker();
+
+    const calendar = await openFollowUpFor("Staff Engineer");
+    expect(calendar.querySelector('button[data-day="2099-09-15"]')).toHaveClass(
+      "bg-accent",
+      "text-surface",
+    );
+    expect(screen.getByRole("button", { name: "Clear" })).toBeInTheDocument();
+
+    fireEvent.keyDown(calendar, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
   // TestApplicationsViewRendersGroupTabsWithCounts.
@@ -1147,6 +1184,9 @@ describe("Surface v2 tracker grid", () => {
     expect(declared(mobile, ".tracker-cell-stage:focus-within", "box-shadow")).toBe(
       "inset 0 0 0 2px var(--color-accent)",
     );
+    expect(declared(mobile, ".tracker-cell-follow-up:focus-within", "box-shadow")).toBe(
+      "inset 0 0 0 2px var(--color-accent)",
+    );
     expect(declared(mobile, ".tracker-cell-score .job-score", "border-radius")).toBe(
       "var(--radius-pill)",
     );
@@ -1332,6 +1372,54 @@ describe("tracker writes", () => {
     expect(statusWrites[0]?.body.pipeline_stage).not.toBe("none");
   });
 
+  it("writes the current status and selected follow-up date only, then refetches", async () => {
+    await loadedTracker();
+
+    const calendar = await openFollowUpFor("Staff Engineer");
+    const nextDay = calendar.querySelector<HTMLButtonElement>('button[data-day="2099-09-16"]');
+    if (nextDay === null) throw new Error("no next follow-up day");
+    fireEvent.click(nextDay);
+
+    await waitFor(() => {
+      expect(statusWrites).toEqual([
+        { id: 42, body: { pipeline_status: "applied", next_follow_up_on: "2099-09-16" } },
+      ]);
+    });
+    expect(statusWrites[0]?.body).not.toHaveProperty("pipeline_stage");
+    expect(statusWrites[0]?.body).not.toHaveProperty("pipeline_note");
+
+    await waitFor(() => {
+      expect(requests).toHaveLength(2);
+      expect(rowFor("Staff Engineer").querySelector(".tracker-cell-follow-up")?.textContent).toBe(
+        "16 Sep 2099",
+      );
+    });
+    expect(rowFor("Staff Engineer").querySelector(".tracker-cell-note")?.textContent).toBe(
+      "Referred by a former colleague.",
+    );
+  });
+
+  it("clears the follow-up date explicitly and shows a faint dash after refetch", async () => {
+    await loadedTracker();
+
+    await openFollowUpFor("Staff Engineer");
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+
+    await waitFor(() => {
+      expect(statusWrites).toEqual([
+        { id: 42, body: { pipeline_status: "applied", next_follow_up_on: "" } },
+      ]);
+    });
+    expect(statusWrites[0]?.body).not.toHaveProperty("pipeline_stage");
+    expect(statusWrites[0]?.body).not.toHaveProperty("pipeline_note");
+
+    await waitFor(() => {
+      const cell = rowFor("Staff Engineer").querySelector(".tracker-cell-follow-up");
+      expect(cell).toHaveTextContent("—");
+      expect(cell?.querySelector(".tracker-cell-empty")).not.toBeNull();
+    });
+  });
+
   it("lets the refetch move a row out of the tab it was edited in", async () => {
     const { container } = await loadedTracker();
     fireEvent.click(tab("Not applied"));
@@ -1396,6 +1484,34 @@ describe("tracker writes", () => {
     expect(statusTriggerFor("Principal Engineer")).toBeDisabled();
 
     await waitFor(() => expect(stageTriggerFor("Staff Engineer")).toBeEnabled());
+    expect(statusWrites).toHaveLength(1);
+  });
+
+  it("shares the saving state with the follow-up editor", async () => {
+    writeDelay = 250;
+    await loadedTracker();
+
+    const calendar = await openFollowUpFor("Staff Engineer");
+    const nextDay = calendar.querySelector<HTMLButtonElement>('button[data-day="2099-09-16"]');
+    if (nextDay === null) throw new Error("no next follow-up day");
+    fireEvent.click(nextDay);
+
+    await waitFor(() => {
+      expect(rowFor("Staff Engineer").querySelector(".tracker-saving")?.textContent).toBe(
+        "Saving…",
+      );
+    });
+    expect(rowFor("Staff Engineer")).toHaveClass("tracker-row--editing");
+    expect(followUpTriggerFor("Staff Engineer")).toBeDisabled();
+    expect(statusTriggerFor("Staff Engineer")).toBeDisabled();
+    expect(stageTriggerFor("Staff Engineer")).toBeDisabled();
+    expect(
+      within(rowFor("Principal Engineer")).queryByRole("button", {
+        name: "Application follow-up for Principal Engineer",
+      }),
+    ).toBeNull();
+
+    await waitFor(() => expect(followUpTriggerFor("Staff Engineer")).toBeEnabled());
     expect(statusWrites).toHaveLength(1);
   });
 

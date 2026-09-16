@@ -490,16 +490,17 @@ Be honest about the current state — most of the suite is still to be written.
   hanging write is held open by a promise the handler awaits and `afterEach` releases, so the
   in-flight assertions are deterministic rather than timing-dependent.
 
-- **web/** — `src/components/tracker/tracker.test.tsx` (`FE-22`/`UI-04`/`UI-14`/`UI-15`/`UI-16`/`UI-17`/`UI-18`):
+- **web/** — `src/components/tracker/tracker.test.tsx` (`FE-22`/`UI-04`/`UI-14`/`UI-15`/`UI-16`/`UI-17`/`UI-18`/`UI-19`):
   the tracker request, toolbar counts/tabs, server-driven bin and sort, DropdownMenu column
-  visibility, virtualization, status/stage cell popovers, pagination footer, and tracker-write
-  contract.
+  visibility, virtualization, status/stage/follow-up cell popovers, pagination footer, and
+  tracker-write contract.
   In addition to Rails' query and refetch assertions, it pins the Surface v2 grid markup (row
   numbers, Lucide header icons, sorted direction, pinned Job cell with source logo, mobile company
   subline, score/stage/applied/follow-up/note cells, and empty values), grouped status options,
   stage options with a current-stage check and read-only untracked rows, click/Enter opening,
-  current-status/stage and dismissal no-ops, blank `No stage` writes, note and follow-up
-  preservation, every non-status column's loaded-page sorting, and parses `app.css` for the
+  current-status/stage and dismissal no-ops, calendar date selection and Clear, blank `No stage`
+  writes, note and follow-up preservation, every non-status column's loaded-page sorting, and
+  parses `app.css` for the
   horizontal scroll panel, sticky columns, gridlines, mobile fade, responsive row/header heights,
   follow-up tones, single-line note ellipsis, editing tint, explicit virtualization spacer display,
   and compact toolbar/footer controls. The tracker schema case also pins the missing `applied_at`

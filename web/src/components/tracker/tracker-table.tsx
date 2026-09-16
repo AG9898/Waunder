@@ -60,6 +60,7 @@ export interface TrackerTableProps {
   saving: boolean;
   onStatusChange: (jobId: number, value: string) => void;
   onStageChange: (jobId: number, status: string, stage: string) => void;
+  onFollowUpChange: (jobId: number, status: string, value: string) => void;
 }
 
 export function TrackerTable({
@@ -71,6 +72,7 @@ export function TrackerTable({
   saving,
   onStatusChange,
   onStageChange,
+  onFollowUpChange,
 }: TrackerTableProps) {
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table returns fresh functions each render by design.
@@ -213,6 +215,7 @@ export function TrackerTable({
               disabled={saving}
               onStatusChange={onStatusChange}
               onStageChange={onStageChange}
+              onFollowUpChange={onFollowUpChange}
             />
           ))}
           {padBottom > 0 ? (

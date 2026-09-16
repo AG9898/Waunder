@@ -25,12 +25,12 @@ import type { TrackerColumnId } from "../../lib/tracker-columns";
 import {
   trackerAppliedLabel,
   trackerDate,
-  trackerFollowUpState,
   trackerRowClass,
   trackerStatusValue,
   trackerUpdatedLabel,
 } from "../../lib/tracker";
 import { ScorePill, SourceMarker } from "../jobs/job-row";
+import { FollowUpCell } from "./follow-up-cell";
 import { StageCell } from "./stage-cell";
 import { StatusCell } from "./status-cell";
 
@@ -51,6 +51,8 @@ export interface TrackerRowProps {
   onStatusChange: (jobId: number, value: string) => void;
   /** Receives the row's current status and selected stage; the screen performs the write. */
   onStageChange: (jobId: number, status: string, stage: string) => void;
+  /** Receives the row's current status and selected follow-up date; the screen performs the write. */
+  onFollowUpChange: (jobId: number, status: string, value: string) => void;
 }
 
 export function TrackerRow({
@@ -63,13 +65,13 @@ export function TrackerRow({
   disabled,
   onStatusChange,
   onStageChange,
+  onFollowUpChange,
 }: TrackerRowProps) {
   const status = trackerStatusValue(job.application);
   const stage = job.application?.pipeline_stage ?? "";
   const applied = trackerAppliedLabel(job);
-  const followUp = trackerFollowUpState(job.application);
   const note = job.application?.pipeline_note ?? "";
-  const [editingCell, setEditingCell] = useState<"status" | "stage" | null>(null);
+  const [editingCell, setEditingCell] = useState<"status" | "stage" | "follow_up" | null>(null);
 
   const onChange = useCallback(
     (value: string) => onStatusChange(job.id, value),
@@ -87,6 +89,15 @@ export function TrackerRow({
 
   const onStageOpenChange = useCallback((open: boolean) => {
     setEditingCell(open ? "stage" : null);
+  }, []);
+
+  const onFollowUp = useCallback(
+    (value: string) => onFollowUpChange(job.id, job.application?.pipeline_status ?? "", value),
+    [job.application?.pipeline_status, job.id, onFollowUpChange],
+  );
+
+  const onFollowUpOpenChange = useCallback((open: boolean) => {
+    setEditingCell(open ? "follow_up" : null);
   }, []);
 
   const rowNumber = (index ?? 0) + 1;
@@ -215,13 +226,14 @@ export function TrackerRow({
           data-column="follow_up"
           style={columnStyle("follow_up")}
         >
-          {followUp.tone === null ? (
-            <span className="tracker-cell-empty">{followUp.label}</span>
-          ) : (
-            <span className={`tracker-follow-up tracker-follow-up--${followUp.tone}`}>
-              {followUp.label}
-            </span>
-          )}
+          <FollowUpCell
+            application={job.application}
+            jobTitle={job.title}
+            open={editingCell === "follow_up"}
+            disabled={disabled}
+            onOpenChange={onFollowUpOpenChange}
+            onFollowUpChange={onFollowUp}
+          />
         </td>
       )}
       {!columns.includes("note") ? null : (

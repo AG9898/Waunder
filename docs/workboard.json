@@ -3561,7 +3561,7 @@
       "id": "UI-19",
       "title": "Make the tracker Follow-up cell editable with a calendar",
       "description": "Add a Follow-up cell editor reusing UI-17's editing states: a popover holding the Calendar primitive plus a Clear action. It is available only for rows with a tracked application. Picking a day sends PATCH application_status with the row's current pipeline_status and next_follow_up_on as YYYY-MM-DD, and Clear sends an explicit empty next_follow_up_on; stage and note are omitted. Then refetch.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "UI",
       "depends_on": [

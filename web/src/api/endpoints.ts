@@ -342,8 +342,9 @@ export function submitApplication(
  * the Application on first use, so an untouched posting can be marked applied.
  *
  * This is the tracker lifecycle, not the worker one: it never enqueues a worker job. Omit
- * `pipeline_note` / `next_follow_up_on` to preserve what Rails already holds — sending `""`
- * erases them.
+ * untouched fields to preserve what Rails already holds. The follow-up editor owns
+ * `next_follow_up_on` and sends an explicit `""` when clearing it; `pipeline_note` remains
+ * read-only for now.
  */
 export async function updateJobApplicationStatus(
   jobId: number,

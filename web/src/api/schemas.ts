@@ -573,14 +573,14 @@ export const ProfileEditSchema = z.object({
 export type ProfileEdit = z.infer<typeof ProfileEditSchema>;
 
 /**
- * The user-facing pipeline edit. `pipeline_note` and `next_follow_up_on` carry
- * `,omitempty` in Go: the status controls edit status/stage only, so omitting the other
- * two preserves the note and follow-up date already in Rails. Sending `""` would erase
- * them, so these must stay absent rather than empty.
+ * The user-facing pipeline edit. `pipeline_stage`, `pipeline_note`, and `next_follow_up_on` are
+ * optional because each cell editor sends the current status plus only the field it owns. A status
+ * or stage edit sends `pipeline_stage`; a note or follow-up edit omits it. Sending an untouched
+ * optional field as `""` would erase the value Rails already holds.
  */
 export const ApplicationStatusUpdateSchema = z.object({
   pipeline_status: z.string(),
-  pipeline_stage: z.string(),
+  pipeline_stage: z.string().optional(),
   pipeline_note: z.string().optional(),
   next_follow_up_on: z.string().optional(),
 });

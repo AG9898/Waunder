@@ -22,10 +22,13 @@
  *   `stage.presence || DEFAULT_PIPELINE_STAGE_BY_STATUS[status]`, so sending `""` asks Rails for
  *   that status's default stage (`applied` → `waiting`, everything else → none). Go's status
  *   select relied on exactly that: changing the status sends a blank stage and lets Rails pick.
- * - **`pipeline_note` and `next_follow_up_on` must stay absent.** They carried `,omitempty` in
- *   Go, and `update_pipeline_status` assigns each one only when it is non-nil. Sending `""`
- *   would erase a note the owner wrote on another screen, so `ApplicationStatusUpdate` leaves
- *   them optional and nothing here ever fills them in.
+ * - **`pipeline_note` must stay absent.** It carried `,omitempty` in Go, and
+ *   `update_pipeline_status` assigns it only when it is non-nil. Sending `""` would erase a note
+ *   the owner wrote on another screen, so `ApplicationStatusUpdate` leaves it optional and no
+ *   tracker editor fills it in yet.
+ * - **`next_follow_up_on` is omitted unless the follow-up editor owns the write.** Status and stage
+ *   edits leave it absent so the current date survives; the follow-up editor sends the selected
+ *   date or an explicit `""` to clear it.
  */
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";

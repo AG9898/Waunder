@@ -132,6 +132,7 @@ export function TrackerScreen() {
             saving={write.saving}
             onStatusChange={write.onStatusChange}
             onStageChange={write.onStageChange}
+            onFollowUpChange={write.onFollowUpChange}
           />
           <TrackerPagination
             page={data.page}
@@ -159,13 +160,13 @@ const ZERO_COUNTS: ApplicationCounts = {
 
 /**
  * The tracker-cell write shared by every row: the in-flight flag, which row it is for (a failure is
- * a toast, UI-05), and status/stage change handlers.
+ * a toast, UI-05), and status/stage/follow-up change handlers.
  *
  * A status change sends a **blank** stage, as Go's `ApplicationStatusUpdate{PipelineStatus: status}`
  * did: `Application#assign_pipeline_status` reads that as "this status's default stage", which is
  * how Applied lands on Waiting. A stage change sends the selected stage with the current status.
- * `pipeline_note` and `next_follow_up_on` stay absent so Rails keeps the values it holds
- * (`lib/pipeline.ts`).
+ * A follow-up change sends only the selected date with the current status. Untouched optional fields
+ * stay absent so Rails keeps the values it holds (`lib/pipeline.ts`).
  */
 function useStatusWrite() {
   const queryClient = useQueryClient();
@@ -202,11 +203,20 @@ function useStatusWrite() {
     [isPending, mutate],
   );
 
+  const onFollowUpChange = useCallback(
+    (jobId: number, status: string, value: string) => {
+      if (isPending) return;
+      mutate({ jobId, update: { pipeline_status: status, next_follow_up_on: value } });
+    },
+    [isPending, mutate],
+  );
+
   return {
     saving: isPending,
     savingId: isPending ? (mutation.variables?.jobId ?? 0) : 0,
     onStatusChange,
     onStageChange,
+    onFollowUpChange,
   };
 }
 

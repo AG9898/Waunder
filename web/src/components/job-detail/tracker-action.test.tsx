@@ -50,13 +50,16 @@ installMockApi(
         { status: failTrackerWith },
       );
     }
-    // Rails' own behaviour: a blank stage means "this status's default stage".
-    const stage =
-      body.application.pipeline_stage === ""
+    // Rails' own behaviour: a blank stage means "this status's default stage". A field-specific
+    // edit leaves the stage alone.
+    const current = answer.application ?? fixtures.applicationTracker;
+    const stage = Object.hasOwn(body.application, "pipeline_stage")
+      ? body.application.pipeline_stage === ""
         ? defaultStageFor(body.application.pipeline_status)
-        : body.application.pipeline_stage;
+        : (body.application.pipeline_stage ?? "")
+      : current.pipeline_stage;
     const application: ApplicationTracker = {
-      ...(answer.application ?? fixtures.applicationTracker),
+      ...current,
       pipeline_status: body.application.pipeline_status,
       pipeline_stage: stage,
     };
