@@ -51,8 +51,9 @@ Phase 1 delivers the full plan scenario: forward a job-alert email → Resend in
   filter), sort by newest intake / recent activity / highest match, and page at 30. Each row
   shows the job, company, source, match score, status, stage, applied date, intake date, last status
   update, follow-up date, and note. Status is editable **inline on the row** — creating the tracked
-  application on first use, without ever generating a draft or submitting. The other Surface v2
-  values are currently read-only, sortable, and hideable over the loaded page; dates use Rails'
+  application on first use, without ever generating a draft or submitting. Note is editable through
+  an explicit Save/Cancel popover for tracked rows; Applied remains read-only. The other Surface v2
+  values are sortable and hideable over the loaded page; dates use Rails'
   literal calendar values without browser timezone conversion. A header stats cluster shows how many
   jobs have been applied to out of the total tracked. Untracking is deliberately unsupported, since
   it would destroy an application's draft and audit history.

@@ -120,12 +120,13 @@ through `externalApplicationURL`, which accepts only an `http(s)` URL with a hos
 and falls back to `posting_url` when the route carries none.
 
 The manual tracker and the cover letter (`FE-20`) are the other two writes. `Mark as applied`
-and the status/stage selects share one mutation against `PATCH
+and all tracker cell editors share one mutation against `PATCH
 /api/job_posts/:id/application_status` and reach nothing else — no draft creation, no submit —
 because the owner is recording an application they made by hand; `pipeline_note` and
-`next_follow_up_on` stay absent from every payload so Rails keeps the values it holds, a status
+`next_follow_up_on` stay absent from status/stage edits so Rails keeps the values it holds, while
+the Note cell sends `pipeline_note` explicitly, including an empty string when clearing it. A status
 change sends a blank stage so `Application#assign_pipeline_status` applies that status's default,
-and the stage change reads the status from the refetched tracker rather than from a value
+and stage/follow-up changes read the status from the refetched tracker rather than from a value
 captured in an earlier render. `Mark as applied` is offered only from `interested`, `drafting`,
 `needs_review`, or an untracked posting, so one tap cannot walk an interviewing posting
 backwards. The cover letter reads its own endpoint and generates through `POST

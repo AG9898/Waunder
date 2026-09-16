@@ -9,7 +9,7 @@
  * company is repeated as a quiet second line inside the pinned Job cell on mobile while its
  * existing column remains available to TanStack visibility controls.
  *
- * ## The status chip writes the tracker and nothing else
+ * ## Tracker cell editors write the tracker and nothing else
  *
  * A row with no tracked application shows a selected "Not applied" placeholder. Choosing it is a
  * no-op, not a reset: clearing a tracked application would destroy its draft and audit history, so
@@ -31,6 +31,7 @@ import {
 } from "../../lib/tracker";
 import { ScorePill, SourceMarker } from "../jobs/job-row";
 import { FollowUpCell } from "./follow-up-cell";
+import { NoteCell } from "./note-cell";
 import { StageCell } from "./stage-cell";
 import { StatusCell } from "./status-cell";
 
@@ -53,6 +54,10 @@ export interface TrackerRowProps {
   onStageChange: (jobId: number, status: string, stage: string) => void;
   /** Receives the row's current status and selected follow-up date; the screen performs the write. */
   onFollowUpChange: (jobId: number, status: string, value: string) => void;
+  /** Receives the row's current status and note; the screen performs and awaits the write. */
+  onNoteChange: (jobId: number, status: string, value: string) => Promise<void>;
+  /** The note error belongs only to the row whose save failed. */
+  noteError: string;
 }
 
 export function TrackerRow({
@@ -66,12 +71,15 @@ export function TrackerRow({
   onStatusChange,
   onStageChange,
   onFollowUpChange,
+  onNoteChange,
+  noteError,
 }: TrackerRowProps) {
   const status = trackerStatusValue(job.application);
   const stage = job.application?.pipeline_stage ?? "";
   const applied = trackerAppliedLabel(job);
-  const note = job.application?.pipeline_note ?? "";
-  const [editingCell, setEditingCell] = useState<"status" | "stage" | "follow_up" | null>(null);
+  const [editingCell, setEditingCell] = useState<"status" | "stage" | "follow_up" | "note" | null>(
+    null,
+  );
 
   const onChange = useCallback(
     (value: string) => onStatusChange(job.id, value),
@@ -98,6 +106,15 @@ export function TrackerRow({
 
   const onFollowUpOpenChange = useCallback((open: boolean) => {
     setEditingCell(open ? "follow_up" : null);
+  }, []);
+
+  const onNote = useCallback(
+    (value: string) => onNoteChange(job.id, job.application?.pipeline_status ?? "", value),
+    [job.application?.pipeline_status, job.id, onNoteChange],
+  );
+
+  const onNoteOpenChange = useCallback((open: boolean) => {
+    setEditingCell(open ? "note" : null);
   }, []);
 
   const rowNumber = (index ?? 0) + 1;
@@ -242,9 +259,15 @@ export function TrackerRow({
           data-column="note"
           style={columnStyle("note")}
         >
-          <span className={`tracker-note${note === "" ? " tracker-cell-empty" : ""}`} title={note}>
-            {note === "" ? "—" : note}
-          </span>
+          <NoteCell
+            application={job.application}
+            jobTitle={job.title}
+            open={editingCell === "note"}
+            disabled={disabled}
+            error={noteError}
+            onOpenChange={onNoteOpenChange}
+            onNoteChange={onNote}
+          />
         </td>
       )}
     </tr>

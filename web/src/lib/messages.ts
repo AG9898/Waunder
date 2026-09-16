@@ -87,6 +87,9 @@ export function applicationErrorMessage(error: unknown): string {
 /** `applyJobStatusResult`'s message for a failed manual tracker edit (`FE-20`). */
 const TRACKER_FAILED = "Could not update application status.";
 
+/** A failed note edit: Rails' 422 validation sentence is more useful than generic copy. */
+const TRACKER_NOTE_FAILED = "Could not update application note.";
+
 /**
  * `applyCoverLetterResult`'s 503 branch. "Later" rather than "again" on purpose: Rails answers
  * 503 when no `OPENROUTER_API_KEY` is configured, so a second click now changes nothing.
@@ -103,6 +106,16 @@ const COVER_LETTER_FAILED = "Could not generate the cover letter. Please try aga
  */
 export function trackerErrorMessage(error: unknown): string {
   return isUnauthorized(error) ? SESSION_EXPIRED : TRACKER_FAILED;
+}
+
+/** A failed note edit, preserving Rails' own validation message inside the note popover. */
+export function trackerNoteErrorMessage(error: unknown): string {
+  if (isUnauthorized(error)) return SESSION_EXPIRED;
+  if (asAPIError(error)?.status === 422) {
+    const railsSentence = apiErrorMessage(error);
+    if (railsSentence !== "") return railsSentence;
+  }
+  return TRACKER_NOTE_FAILED;
 }
 
 /**

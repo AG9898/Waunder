@@ -67,7 +67,8 @@ source of truth; the stylesheet is `web/public/app.css`, linked from `web/index.
 > line inside the pinned Job cell on mobile. The full structural slice contains Job, Company, Score,
 > Status, Stage, Applied, Intaked, Updated, Follow-up, and Note; Status is an editable `StatusChip`
 > command popover, Stage is an editable pipeline-stage popover, and Follow-up is an editable
-> Calendar popover; Applied and Note remain read-only until their editor tasks land.
+> Calendar popover; Applied remains read-only, while Note is an editable popover textarea with
+> explicit Save and Cancel.
 > `tracker.test.tsx` parses `app.css` to pin the grid dimensions, gridlines, sticky columns, mobile
 > scroll fade, desktop/mobile row heights, and explicit virtualization spacer display, so
 > restyling the tracker means updating that test deliberately. A pipeline stage with no label renders
@@ -337,11 +338,12 @@ Menus that list statuses group them under these four group labels, in this order
 
 - One grid at every width inside a surface panel (`--radius-panel`, hairline border, `--shadow-sm`).
   Header strip 36px (34px mobile), rows 40px desktop / 56px mobile, 13px body text.
-- **UI-14/UI-16/UI-18/UI-19 structural slice:** the shipped grid contains row number, Job, Company, Score,
+- **UI-14/UI-16/UI-18/UI-19/UI-20 structural slice:** the shipped grid contains row number, Job, Company, Score,
   Status, Stage, Applied, Intaked, Updated, Follow-up, and Note. Job keeps its existing link and
   source logo; Score keeps the match-score band pill; Status is an editable grouped `StatusChip`
   popover, Stage is an editable pipeline-stage popover, and Follow-up is an editable calendar
-  popover with Clear; Applied and Note remain read-only until their editor tasks land.
+  popover with Clear; Applied remains read-only and Note is an editable popover textarea with
+  explicit Save and Cancel.
 - Column order: row number (48px desktop / 34px mobile, centered, faint tabular digits), Job (pinned;
   source logo 14px + title 600, ellipsis; on mobile the company sits under the title as a 12px faint
   second line), Company, Score (match-score band pill), Status (`StatusChip`), Stage (pipeline stage

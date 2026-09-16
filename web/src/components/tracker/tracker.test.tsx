@@ -131,6 +131,7 @@ let countsOverride: ApplicationCounts | null = null;
 let pageFor: ((number: number) => PageMeta) | null = null;
 let failReadWith: number | null = null;
 let failWriteWith: number | null = null;
+let failWriteMessage: string | null = null;
 /** Delays every read after the first, so an in-flight tab switch is observable. */
 let laterReadDelay = 0;
 let writeDelay = 0;
@@ -161,7 +162,12 @@ installMockApi(
     const body = (await request.json()) as { application: ApplicationStatusUpdate };
     statusWrites.push({ id, body: body.application });
     if (writeDelay > 0) await delay(writeDelay);
-    if (failWriteWith !== null) return errorBody(failWriteWith);
+    if (failWriteWith !== null) {
+      return HttpResponse.json(
+        { error: { code: "invalid_status", message: failWriteMessage ?? "boom" } },
+        { status: failWriteWith },
+      );
+    }
 
     let application: ApplicationTracker = fixtures.feedTracker;
     rows = rows.map((job) => {
@@ -178,6 +184,9 @@ installMockApi(
         job_post_id: id,
         pipeline_status: body.application.pipeline_status,
         pipeline_stage: stage,
+        pipeline_note: Object.hasOwn(body.application, "pipeline_note")
+          ? (body.application.pipeline_note ?? "")
+          : current.pipeline_note,
         next_follow_up_on: nextFollowUp,
         last_status_change_at: "2026-09-10T12:00:00Z",
       };
@@ -268,6 +277,7 @@ beforeEach(() => {
   pageFor = null;
   failReadWith = null;
   failWriteWith = null;
+  failWriteMessage = null;
   laterReadDelay = 0;
   writeDelay = 0;
 });
@@ -306,6 +316,12 @@ function stageTriggerFor(title: string): HTMLButtonElement {
 function followUpTriggerFor(title: string): HTMLButtonElement {
   return screen.getByRole<HTMLButtonElement>("button", {
     name: `Application follow-up for ${title}`,
+  });
+}
+
+function noteTriggerFor(title: string): HTMLButtonElement {
+  return screen.getByRole<HTMLButtonElement>("button", {
+    name: `Application note for ${title}`,
   });
 }
 
@@ -348,6 +364,13 @@ async function chooseStage(title: string, value: string): Promise<void> {
 async function openFollowUpFor(title: string): Promise<HTMLElement> {
   fireEvent.click(followUpTriggerFor(title));
   return waitFor(() => screen.getByRole<HTMLElement>("grid"));
+}
+
+async function openNoteFor(title: string): Promise<HTMLElement> {
+  fireEvent.click(noteTriggerFor(title));
+  return waitFor(() =>
+    screen.getByRole<HTMLElement>("dialog", { name: `Change application note for ${title}` }),
+  );
 }
 
 function groupTabs(): HTMLElement[] {
@@ -728,6 +751,9 @@ describe("tracker rendering", () => {
     ).toBeNull();
     expect(principal.querySelector(".tracker-cell-follow-up")?.textContent).toBe("—");
     expect(principal.querySelector(".tracker-cell-note")?.textContent).toBe("—");
+    expect(
+      within(principal).queryByRole("button", { name: "Application note for Principal Engineer" }),
+    ).toBeNull();
   });
 
   it("offers the Not applied placeholder only while a job is untracked", async () => {
@@ -1187,6 +1213,9 @@ describe("Surface v2 tracker grid", () => {
     expect(declared(mobile, ".tracker-cell-follow-up:focus-within", "box-shadow")).toBe(
       "inset 0 0 0 2px var(--color-accent)",
     );
+    expect(declared(mobile, ".tracker-cell-note:focus-within", "box-shadow")).toBe(
+      "inset 0 0 0 2px var(--color-accent)",
+    );
     expect(declared(mobile, ".tracker-cell-score .job-score", "border-radius")).toBe(
       "var(--radius-pill)",
     );
@@ -1199,6 +1228,7 @@ describe("Surface v2 tracker grid", () => {
     expect(declared(mobile, ".tracker-note", "text-overflow")).toBe("ellipsis");
     expect(declared(mobile, ".tracker-note", "white-space")).toBe("nowrap");
     expect(declared(mobile, ".tracker-note", "overflow")).toBe("hidden");
+    expect(declared(mobile, ".note-cell-textarea", "overflow-wrap")).toBe("break-word");
     expect(declared(mobile, ".status-cell-trigger", "min-height")).toBe("var(--control-h-touch)");
     expect(unconditional(stylesheet())).not.toContain("data-label");
   });
@@ -1282,6 +1312,10 @@ describe("Surface v2 tracker grid", () => {
     expect(note).toHaveClass("tracker-note");
     expect(noteCell?.style.width).toBe("240px");
     expect(container.querySelector(".tracker-cell-note")).toBe(noteCell);
+
+    const editor = await openNoteFor("Long note");
+    expect(within(editor).getByRole<HTMLTextAreaElement>("textbox")).toHaveValue(longNote);
+    expect(within(editor).getByRole("textbox")).toHaveClass("note-cell-textarea");
   });
 });
 
@@ -1420,6 +1454,112 @@ describe("tracker writes", () => {
     });
   });
 
+  it("saves the current status and note only, then refetches without changing follow-up", async () => {
+    await loadedTracker();
+
+    const editor = await openNoteFor("Staff Engineer");
+    fireEvent.change(within(editor).getByRole("textbox"), {
+      target: { value: "Spoke with the hiring manager." },
+    });
+    fireEvent.click(within(editor).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(statusWrites).toEqual([
+        {
+          id: 42,
+          body: { pipeline_status: "applied", pipeline_note: "Spoke with the hiring manager." },
+        },
+      ]);
+    });
+    expect(statusWrites[0]?.body).not.toHaveProperty("pipeline_stage");
+    expect(statusWrites[0]?.body).not.toHaveProperty("next_follow_up_on");
+
+    await waitFor(() => {
+      expect(requests).toHaveLength(2);
+      expect(rowFor("Staff Engineer").querySelector(".tracker-cell-note")?.textContent).toBe(
+        "Spoke with the hiring manager.",
+      );
+      expect(rowFor("Staff Engineer").querySelector(".tracker-cell-follow-up")?.textContent).toBe(
+        "15 Sep 2099",
+      );
+    });
+  });
+
+  it("sends an empty note when the owner clears it", async () => {
+    await loadedTracker();
+
+    const editor = await openNoteFor("Staff Engineer");
+    fireEvent.change(within(editor).getByRole("textbox"), { target: { value: "" } });
+    fireEvent.click(within(editor).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(statusWrites).toEqual([
+        { id: 42, body: { pipeline_status: "applied", pipeline_note: "" } },
+      ]);
+    });
+    expect(statusWrites[0]?.body).not.toHaveProperty("pipeline_stage");
+    expect(statusWrites[0]?.body).not.toHaveProperty("next_follow_up_on");
+    await waitFor(() =>
+      expect(rowFor("Staff Engineer").querySelector(".tracker-cell-note")).toHaveTextContent("—"),
+    );
+  });
+
+  it("does not write when a note edit is cancelled, escaped, or dismissed", async () => {
+    await loadedTracker();
+
+    let editor = await openNoteFor("Staff Engineer");
+    fireEvent.change(within(editor).getByRole("textbox"), { target: { value: "discarded" } });
+    fireEvent.click(within(editor).getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Change application note for Staff Engineer" }),
+      ).toBeNull(),
+    );
+
+    editor = await openNoteFor("Staff Engineer");
+    fireEvent.change(within(editor).getByRole("textbox"), { target: { value: "also discarded" } });
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Change application note for Staff Engineer" }),
+      ).toBeNull(),
+    );
+
+    editor = await openNoteFor("Staff Engineer");
+    fireEvent.change(within(editor).getByRole("textbox"), { target: { value: "dismissed" } });
+    fireEvent.click(noteTriggerFor("Staff Engineer"));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Change application note for Staff Engineer" }),
+      ).toBeNull(),
+    );
+
+    expect(statusWrites).toEqual([]);
+    expect(requests).toHaveLength(1);
+  });
+
+  it("keeps typed note text and Rails validation inline after a failed save", async () => {
+    failWriteWith = 422;
+    failWriteMessage = "Pipeline note is too long.";
+    await loadedTracker();
+
+    const editor = await openNoteFor("Staff Engineer");
+    const typed = "a note Rails rejected";
+    fireEvent.change(within(editor).getByRole("textbox"), { target: { value: typed } });
+    fireEvent.click(within(editor).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      const openEditor = screen.getByRole<HTMLElement>("dialog", {
+        name: "Change application note for Staff Engineer",
+      });
+      expect(within(openEditor).getByRole("alert")).toHaveTextContent("Pipeline note is too long.");
+      expect(within(openEditor).getByRole<HTMLTextAreaElement>("textbox")).toHaveValue(typed);
+    });
+    expect(statusWrites).toHaveLength(1);
+    expect(statusWrites[0]?.body).toEqual({ pipeline_status: "applied", pipeline_note: typed });
+    expect(document.querySelector(".toast")).toBeNull();
+  });
+
   it("lets the refetch move a row out of the tab it was edited in", async () => {
     const { container } = await loadedTracker();
     fireEvent.click(tab("Not applied"));
@@ -1512,6 +1652,30 @@ describe("tracker writes", () => {
     ).toBeNull();
 
     await waitFor(() => expect(followUpTriggerFor("Staff Engineer")).toBeEnabled());
+    expect(statusWrites).toHaveLength(1);
+  });
+
+  it("shares the saving state with the note editor", async () => {
+    writeDelay = 250;
+    await loadedTracker();
+
+    const editor = await openNoteFor("Staff Engineer");
+    fireEvent.change(within(editor).getByRole("textbox"), { target: { value: "Updated note" } });
+    fireEvent.click(within(editor).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(
+        within(
+          screen.getByRole("dialog", { name: "Change application note for Staff Engineer" }),
+        ).getByRole("textbox"),
+      ).toBeDisabled();
+    });
+    expect(statusTriggerFor("Staff Engineer")).toBeDisabled();
+    expect(stageTriggerFor("Staff Engineer")).toBeDisabled();
+    expect(followUpTriggerFor("Staff Engineer")).toBeDisabled();
+    expect(statusTriggerFor("Principal Engineer")).toBeDisabled();
+
+    await waitFor(() => expect(noteTriggerFor("Staff Engineer")).toBeEnabled());
     expect(statusWrites).toHaveLength(1);
   });
 

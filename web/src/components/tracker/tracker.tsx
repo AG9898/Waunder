@@ -51,7 +51,7 @@ import { fetchJobs, updateJobApplicationStatus } from "../../api/endpoints";
 import { queryKeys } from "../../api/keys";
 import type { ApplicationCounts, ApplicationStatusUpdate, PageMeta } from "../../api/schemas";
 import { pageIndicatorLabel } from "../../lib/job-feed";
-import { trackerErrorMessage } from "../../lib/messages";
+import { trackerErrorMessage, trackerNoteErrorMessage } from "../../lib/messages";
 import { showToast } from "../../lib/toast";
 import {
   DEFAULT_TRACKER_SELECTION,
@@ -133,6 +133,9 @@ export function TrackerScreen() {
             onStatusChange={write.onStatusChange}
             onStageChange={write.onStageChange}
             onFollowUpChange={write.onFollowUpChange}
+            onNoteChange={write.onNoteChange}
+            noteErrorId={write.noteErrorId}
+            noteError={write.noteError}
           />
           <TrackerPagination
             page={data.page}
@@ -160,31 +163,38 @@ const ZERO_COUNTS: ApplicationCounts = {
 
 /**
  * The tracker-cell write shared by every row: the in-flight flag, which row it is for (a failure is
- * a toast, UI-05), and status/stage/follow-up change handlers.
+ * a toast, UI-05), and status/stage/follow-up/note change handlers.
  *
  * A status change sends a **blank** stage, as Go's `ApplicationStatusUpdate{PipelineStatus: status}`
  * did: `Application#assign_pipeline_status` reads that as "this status's default stage", which is
  * how Applied lands on Waiting. A stage change sends the selected stage with the current status.
- * A follow-up change sends only the selected date with the current status. Untouched optional fields
- * stay absent so Rails keeps the values it holds (`lib/pipeline.ts`).
+ * A follow-up change sends only the selected date with the current status. A note change sends only
+ * the edited note with the current status and reports Rails validation inline in its popover.
+ * Untouched optional fields stay absent so Rails keeps the values it holds (`lib/pipeline.ts`).
  */
 function useStatusWrite() {
   const queryClient = useQueryClient();
+  const [noteError, setNoteError] = useState<{ jobId: number; message: string } | null>(null);
   const mutation = useMutation({
     mutationFn: ({ jobId, update }: { jobId: number; update: ApplicationStatusUpdate }) =>
       updateJobApplicationStatus(jobId, update),
-    onSuccess: async () => {
+    onSuccess: async (_application, variables) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.jobs.root() }),
         queryClient.invalidateQueries({ queryKey: queryKeys.applications.root() }),
       ]);
+      if (Object.hasOwn(variables.update, "pipeline_note")) setNoteError(null);
     },
-    onError: (error) => {
+    onError: (error, variables) => {
+      if (Object.hasOwn(variables.update, "pipeline_note")) {
+        setNoteError({ jobId: variables.jobId, message: trackerNoteErrorMessage(error) });
+        return;
+      }
       showToast(trackerErrorMessage(error), "danger");
     },
   });
 
-  const { isPending, mutate } = mutation;
+  const { isPending, mutate, mutateAsync } = mutation;
   const onStatusChange = useCallback(
     (jobId: number, value: string) => {
       // The "Not applied" placeholder is inert, and a second write while one is in flight is
@@ -211,12 +221,24 @@ function useStatusWrite() {
     [isPending, mutate],
   );
 
+  const onNoteChange = useCallback(
+    async (jobId: number, status: string, value: string) => {
+      if (isPending) return;
+      setNoteError(null);
+      await mutateAsync({ jobId, update: { pipeline_status: status, pipeline_note: value } });
+    },
+    [isPending, mutateAsync],
+  );
+
   return {
     saving: isPending,
     savingId: isPending ? (mutation.variables?.jobId ?? 0) : 0,
+    noteErrorId: noteError?.jobId ?? 0,
+    noteError: noteError?.message ?? "",
     onStatusChange,
     onStageChange,
     onFollowUpChange,
+    onNoteChange,
   };
 }
 

@@ -1013,11 +1013,13 @@ Five things this pass settled:
   across a mark-applied and a status change — the safety property is about requests, which is why
   the test drives the whole screen rather than the two components.
 - **Two payload details are Rails semantics, not client convenience.** `pipeline_note` and
-  `next_follow_up_on` carried `,omitempty` in Go and stay *absent* here (`update_pipeline_status`
-  assigns each only when non-nil, so `""` would erase a note the owner wrote elsewhere). And a
-  status change deliberately sends a **blank** stage: `Application#assign_pipeline_status` reads
-  that as `DEFAULT_PIPELINE_STAGE_BY_STATUS[status]`, which is how moving to Applied from the
-  select lands in the same `applied` + `waiting` the quick action writes.
+  `next_follow_up_on` carried `,omitempty` in Go and stay *absent* from status, stage, and
+  follow-up edits (`update_pipeline_status` assigns each only when non-nil, so `""` would erase a
+  value the owner wrote elsewhere); the Note cell is the deliberate exception and sends its
+  current value, including `""` when clearing it. A status change still deliberately sends a
+  **blank** stage: `Application#assign_pipeline_status` reads that as
+  `DEFAULT_PIPELINE_STAGE_BY_STATUS[status]`, which is how moving to Applied from the select lands
+  in the same `applied` + `waiting` the quick action writes.
 - **The `none` stage sentinel is kept, unlike the feed's `allOption`.** go-app dropped an empty
   `value` attribute, so `optionNodes` rendered `"none"` and mapped it back on read. `FE-16` dropped
   the feed's equivalent because *that* sentinel leaked into the request and produced `source=All`;

@@ -22,10 +22,10 @@
  *   `stage.presence || DEFAULT_PIPELINE_STAGE_BY_STATUS[status]`, so sending `""` asks Rails for
  *   that status's default stage (`applied` → `waiting`, everything else → none). Go's status
  *   select relied on exactly that: changing the status sends a blank stage and lets Rails pick.
- * - **`pipeline_note` must stay absent.** It carried `,omitempty` in Go, and
- *   `update_pipeline_status` assigns it only when it is non-nil. Sending `""` would erase a note
- *   the owner wrote on another screen, so `ApplicationStatusUpdate` leaves it optional and no
- *   tracker editor fills it in yet.
+ * - **`pipeline_note` is absent unless the Note editor owns the write.** It carried `,omitempty` in
+ *   Go, and `update_pipeline_status` assigns it only when it is non-nil. Status, stage, and
+ *   follow-up editors leave it absent; the explicit Note editor sends its current value, including
+ *   `""` when the owner clears it.
  * - **`next_follow_up_on` is omitted unless the follow-up editor owns the write.** Status and stage
  *   edits leave it absent so the current date survives; the follow-up editor sends the selected
  *   date or an explicit `""` to clear it.

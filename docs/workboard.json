@@ -3595,7 +3595,7 @@
       "id": "UI-20",
       "title": "Make the tracker Note cell editable",
       "description": "Add a Note cell editor reusing UI-17's editing states: a popover with a textarea prefilled with the current note and explicit Save and Cancel buttons; nothing is written on blur, Escape, or closing the popover. It is available only for rows with a tracked application. Save sends PATCH application_status with the row's current pipeline_status and pipeline_note (an empty string when the owner cleared it), omitting stage and follow-up, then refetches. A validation error from Rails stays inline in the popover.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "UI",
       "depends_on": [
