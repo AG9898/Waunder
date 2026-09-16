@@ -1724,7 +1724,9 @@ button { font-family: inherit; }
 }
 .tracker-cell-status { white-space: nowrap; }
 .tracker-cell-status:focus-within,
-.tracker-cell-status:has(.status-cell--open) {
+.tracker-cell-status:has(.status-cell--open),
+.tracker-cell-stage:focus-within,
+.tracker-cell-stage:has(.stage-cell--open) {
   box-shadow: inset 0 0 0 2px var(--color-accent);
 }
 .tracker-status {

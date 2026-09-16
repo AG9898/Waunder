@@ -291,6 +291,12 @@ function statusTriggerFor(title: string): HTMLButtonElement {
   });
 }
 
+function stageTriggerFor(title: string): HTMLButtonElement {
+  return screen.getByRole<HTMLButtonElement>("button", {
+    name: `Application stage for ${title}`,
+  });
+}
+
 function statusValueFor(title: string): string | undefined {
   return statusTriggerFor(title).querySelector<HTMLElement>("[data-slot='status-chip']")?.dataset
     .status;
@@ -311,6 +317,19 @@ async function chooseStatus(title: string, value: string): Promise<void> {
   const list = await openStatusFor(title);
   const option = list.querySelector<HTMLElement>(`[cmdk-item][data-value="${value}"]`);
   if (option === null) throw new Error(`no status option ${value}`);
+  fireEvent.click(option);
+}
+
+async function openStageFor(title: string): Promise<HTMLElement> {
+  fireEvent.click(stageTriggerFor(title));
+  return waitFor(() => screen.getByRole<HTMLElement>("listbox"));
+}
+
+async function chooseStage(title: string, value: string): Promise<void> {
+  const list = await openStageFor(title);
+  const domValue = value === "" ? "none" : value;
+  const option = list.querySelector<HTMLElement>(`[cmdk-item][data-value="${domValue}"]`);
+  if (option === null) throw new Error(`no stage option ${value}`);
   fireEvent.click(option);
 }
 
@@ -678,6 +697,9 @@ describe("tracker rendering", () => {
       "Queued later",
     );
     expect(principal.querySelector(".tracker-cell-stage")?.textContent).toBe("—");
+    expect(
+      within(principal).queryByRole("button", { name: "Application stage for Principal Engineer" }),
+    ).toBeNull();
     expect(principal.querySelector(".tracker-cell-follow-up")?.textContent).toBe("—");
     expect(principal.querySelector(".tracker-cell-note")?.textContent).toBe("—");
   });
@@ -741,6 +763,47 @@ describe("tracker rendering", () => {
     fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
     expect(statusWrites).toEqual([]);
+  });
+
+  it("opens the stage list, checks the current stage, and leaves untracked rows read-only", async () => {
+    await loadedTracker();
+
+    const list = await openStageFor("Staff Engineer");
+    expect(
+      Array.from(list.querySelectorAll<HTMLElement>("[cmdk-item]"), (option) => option.textContent),
+    ).toEqual([
+      "No stage",
+      "Waiting",
+      "Recruiter screen",
+      "Phone screen",
+      "Technical",
+      "Take-home",
+      "Onsite",
+      "Final",
+      "Reference check",
+      "Offer negotiation",
+    ]);
+    expect(list.querySelector('[data-value="waiting"]')).toHaveAttribute(
+      "data-current",
+      "true",
+    );
+    expect(list.querySelector('[data-value="waiting"] .stage-cell-check')).not.toBeNull();
+
+    const current = list.querySelector<HTMLElement>('[data-value="waiting"]');
+    if (current === null) throw new Error("no current stage option");
+    fireEvent.click(current);
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+    expect(statusWrites).toEqual([]);
+
+    await openStageFor("Staff Engineer");
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+    expect(statusWrites).toEqual([]);
+    expect(
+      within(rowFor("Principal Engineer")).queryByRole("button", {
+        name: "Application stage for Principal Engineer",
+      }),
+    ).toBeNull();
   });
 
   // TestApplicationsViewRendersGroupTabsWithCounts.
@@ -1081,6 +1144,9 @@ describe("Surface v2 tracker grid", () => {
     expect(declared(mobile, ".tracker-cell-status:focus-within", "box-shadow")).toBe(
       "inset 0 0 0 2px var(--color-accent)",
     );
+    expect(declared(mobile, ".tracker-cell-stage:focus-within", "box-shadow")).toBe(
+      "inset 0 0 0 2px var(--color-accent)",
+    );
     expect(declared(mobile, ".tracker-cell-score .job-score", "border-radius")).toBe(
       "var(--radius-pill)",
     );
@@ -1226,6 +1292,46 @@ describe("tracker writes", () => {
     expect(container.querySelector(".toast")).toBeNull();
   });
 
+  it("writes the current status and selected stage only, then refetches", async () => {
+    await loadedTracker();
+
+    await chooseStage("Staff Engineer", "technical");
+
+    await waitFor(() => {
+      expect(statusWrites).toEqual([
+        { id: 42, body: { pipeline_status: "applied", pipeline_stage: "technical" } },
+      ]);
+    });
+    expect(statusWrites[0]?.body).not.toHaveProperty("pipeline_note");
+    expect(statusWrites[0]?.body).not.toHaveProperty("next_follow_up_on");
+
+    await waitFor(() => {
+      expect(requests).toHaveLength(2);
+      expect(rowFor("Staff Engineer").querySelector(".tracker-stage")?.textContent).toBe(
+        "Technical",
+      );
+    });
+    expect(rowFor("Staff Engineer").querySelector(".tracker-cell-note")?.textContent).toBe(
+      "Referred by a former colleague.",
+    );
+    expect(rowFor("Staff Engineer").querySelector(".tracker-cell-follow-up")?.textContent).toBe(
+      "15 Sep 2099",
+    );
+  });
+
+  it("sends a blank stage for No stage, never the DOM sentinel", async () => {
+    await loadedTracker();
+
+    await chooseStage("Staff Engineer", "");
+
+    await waitFor(() => {
+      expect(statusWrites).toEqual([
+        { id: 42, body: { pipeline_status: "applied", pipeline_stage: "" } },
+      ]);
+    });
+    expect(statusWrites[0]?.body.pipeline_stage).not.toBe("none");
+  });
+
   it("lets the refetch move a row out of the tab it was edited in", async () => {
     const { container } = await loadedTracker();
     fireEvent.click(tab("Not applied"));
@@ -1270,6 +1376,26 @@ describe("tracker writes", () => {
     expect(requests).toHaveLength(2);
     expect(statusValueFor("Principal Engineer")).toBe("interviewing");
     expect(document.querySelector(".tracker-saving")).toBeNull();
+    expect(statusWrites).toHaveLength(1);
+  });
+
+  it("shares the row saving state with the stage editor", async () => {
+    writeDelay = 250;
+    await loadedTracker();
+
+    await chooseStage("Staff Engineer", "technical");
+
+    await waitFor(() => {
+      expect(rowFor("Staff Engineer").querySelector(".tracker-saving")?.textContent).toBe(
+        "Saving…",
+      );
+    });
+    expect(rowFor("Staff Engineer")).toHaveClass("tracker-row--editing");
+    expect(stageTriggerFor("Staff Engineer")).toBeDisabled();
+    expect(statusTriggerFor("Staff Engineer")).toBeDisabled();
+    expect(statusTriggerFor("Principal Engineer")).toBeDisabled();
+
+    await waitFor(() => expect(stageTriggerFor("Staff Engineer")).toBeEnabled());
     expect(statusWrites).toHaveLength(1);
   });
 
@@ -1361,7 +1487,7 @@ describe("tracker table behaviour", () => {
     expect(requests.length).toBe(before);
   });
 
-  it("sorts every read-only column over the loaded page", async () => {
+  it("sorts every non-status column over the loaded page", async () => {
     rows = [
       {
         ...fixtures.scoredJob,

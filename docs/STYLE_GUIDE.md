@@ -66,8 +66,8 @@ source of truth; the stylesheet is `web/public/app.css`, linked from `web/index.
 > from `trackerRowClass` remains the group-tint hook; the company is also rendered as a quiet second
 > line inside the pinned Job cell on mobile. The full structural slice contains Job, Company, Score,
 > Status, Stage, Applied, Intaked, Updated, Follow-up, and Note; Status is an editable `StatusChip`
-> command popover, while the other Surface v2 cells are currently read-only until their editor tasks
-> land.
+> command popover and Stage is an editable pipeline-stage popover, while the other Surface v2 cells
+> are currently read-only until their editor tasks land.
 > `tracker.test.tsx` parses `app.css` to pin the grid dimensions, gridlines, sticky columns, mobile
 > scroll fade, desktop/mobile row heights, and explicit virtualization spacer display, so
 > restyling the tracker means updating that test deliberately. A pipeline stage with no label renders
@@ -214,8 +214,9 @@ figures where possible.
 - The tracker uses one real table at every width, with gridlines, a 34px mobile / 36px desktop
   header strip, 56px mobile / 40px desktop rows, and a 28px mobile right-edge scroll fade. The
   pinned Job cell ellipsizes its title and places Company beneath it on mobile; the Status cell
-  uses a grouped `StatusChip` popover and keeps the group tint. Empty states name the active tab ("No
-  applications submitted yet.") rather than a generic "no rows".
+  uses a grouped `StatusChip` popover and the Stage cell uses the pipeline-stage popover, both
+  keeping the group tint. Empty states name the active tab ("No applications submitted yet.") rather
+  than a generic "no rows".
 - The Jobs feed's filter + sort controls live in a collapsed-by-default `.job-filters-panel`
   (`<details>`/`<summary>` "Filters & sort") so they don't push the feed down on mobile; the
   summary carries a small count badge of how many filters are active, and the controls lay out
@@ -336,14 +337,15 @@ Menus that list statuses group them under these four group labels, in this order
 
 - One grid at every width inside a surface panel (`--radius-panel`, hairline border, `--shadow-sm`).
   Header strip 36px (34px mobile), rows 40px desktop / 56px mobile, 13px body text.
-- **UI-14/UI-16 structural slice:** the shipped grid contains row number, Job, Company, Score, Status,
-  Stage, Applied, Intaked, Updated, Follow-up, and Note. Job keeps its existing link and source logo;
-  Score keeps the match-score band pill; Status is an editable grouped `StatusChip` popover; and
-  Stage, Applied, Follow-up, and Note are read-only cells until their editor tasks land.
+- **UI-14/UI-16/UI-18 structural slice:** the shipped grid contains row number, Job, Company, Score,
+  Status, Stage, Applied, Intaked, Updated, Follow-up, and Note. Job keeps its existing link and
+  source logo; Score keeps the match-score band pill; Status is an editable grouped `StatusChip`
+  popover and Stage is an editable pipeline-stage popover; Applied, Follow-up, and Note remain
+  read-only until their editor tasks land.
 - Column order: row number (48px desktop / 34px mobile, centered, faint tabular digits), Job (pinned;
   source logo 14px + title 600, ellipsis; on mobile the company sits under the title as a 12px faint
-  second line), Company, Score (match-score band pill), Status (`StatusChip`), Stage (plain text,
-  faint `—` when empty), Applied, Updated, Follow-up, Note (ink-soft, single-line ellipsis). Dates
+  second line), Company, Score (match-score band pill), Status (`StatusChip`), Stage (pipeline stage
+  popover, faint `—` when empty), Applied, Updated, Follow-up, Note (ink-soft, single-line ellipsis). Dates
   are tabular; an empty date is a faint `—`.
 - Follow-up tone: a past date is danger ink 600 with a 6px danger dot; today reads "Today" in sage
   strong 600; future dates are ink-soft. Applied and follow-up dates use the literal Rails calendar

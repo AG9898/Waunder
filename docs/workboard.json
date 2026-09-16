@@ -3528,7 +3528,7 @@
       "id": "UI-18",
       "title": "Make the tracker Stage cell editable",
       "description": "Add a Stage cell editor reusing UI-17's editing states: a popover list of PIPELINE_STAGE_OPTIONS including No stage with a check on the current stage. It is available only for rows with a tracked application. A change sends PATCH application_status with the row's current pipeline_status and the chosen pipeline_stage (blank for No stage, never the literal none sentinel), omitting note and follow-up, then refetches.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "UI",
       "depends_on": [

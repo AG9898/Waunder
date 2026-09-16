@@ -27,11 +27,11 @@ import {
   trackerDate,
   trackerFollowUpState,
   trackerRowClass,
-  trackerStageLabel,
   trackerStatusValue,
   trackerUpdatedLabel,
 } from "../../lib/tracker";
 import { ScorePill, SourceMarker } from "../jobs/job-row";
+import { StageCell } from "./stage-cell";
 import { StatusCell } from "./status-cell";
 
 export interface TrackerRowProps {
@@ -49,6 +49,8 @@ export interface TrackerRowProps {
   disabled: boolean;
   /** Receives the selected status; the screen decides whether it is a write. */
   onStatusChange: (jobId: number, value: string) => void;
+  /** Receives the row's current status and selected stage; the screen performs the write. */
+  onStageChange: (jobId: number, status: string, stage: string) => void;
 }
 
 export function TrackerRow({
@@ -60,13 +62,14 @@ export function TrackerRow({
   saving,
   disabled,
   onStatusChange,
+  onStageChange,
 }: TrackerRowProps) {
   const status = trackerStatusValue(job.application);
-  const stage = trackerStageLabel(job.application);
+  const stage = job.application?.pipeline_stage ?? "";
   const applied = trackerAppliedLabel(job);
   const followUp = trackerFollowUpState(job.application);
   const note = job.application?.pipeline_note ?? "";
-  const [editingCell, setEditingCell] = useState<"status" | null>(null);
+  const [editingCell, setEditingCell] = useState<"status" | "stage" | null>(null);
 
   const onChange = useCallback(
     (value: string) => onStatusChange(job.id, value),
@@ -77,13 +80,22 @@ export function TrackerRow({
     setEditingCell(open ? "status" : null);
   }, []);
 
+  const onStage = useCallback(
+    (value: string) => onStageChange(job.id, job.application?.pipeline_status ?? "", value),
+    [job.application?.pipeline_status, job.id, onStageChange],
+  );
+
+  const onStageOpenChange = useCallback((open: boolean) => {
+    setEditingCell(open ? "stage" : null);
+  }, []);
+
   const rowNumber = (index ?? 0) + 1;
 
   return (
     <tr
       ref={ref}
       data-index={index}
-      className={`${trackerRowClass(job.application)}${editingCell === "status" || saving ? " tracker-row--editing" : ""}`}
+      className={`${trackerRowClass(job.application)}${editingCell !== null || saving ? " tracker-row--editing" : ""}`}
     >
       <td
         className="tracker-cell tracker-cell-number"
@@ -159,11 +171,15 @@ export function TrackerRow({
           data-column="stage"
           style={columnStyle("stage")}
         >
-          {stage === "" ? (
-            <span className="tracker-cell-empty">—</span>
-          ) : (
-            <span className="tracker-stage">{stage}</span>
-          )}
+          <StageCell
+            stage={stage}
+            jobTitle={job.title}
+            tracked={job.application !== null}
+            open={editingCell === "stage"}
+            disabled={disabled}
+            onOpenChange={onStageOpenChange}
+            onStageChange={onStage}
+          />
         </td>
       )}
       {!columns.includes("applied") ? null : (

@@ -49,7 +49,7 @@ import { type ChangeEvent, useCallback, useState } from "react";
 
 import { fetchJobs, updateJobApplicationStatus } from "../../api/endpoints";
 import { queryKeys } from "../../api/keys";
-import type { ApplicationCounts, PageMeta } from "../../api/schemas";
+import type { ApplicationCounts, ApplicationStatusUpdate, PageMeta } from "../../api/schemas";
 import { pageIndicatorLabel } from "../../lib/job-feed";
 import { trackerErrorMessage } from "../../lib/messages";
 import { showToast } from "../../lib/toast";
@@ -131,6 +131,7 @@ export function TrackerScreen() {
             savingId={write.savingId}
             saving={write.saving}
             onStatusChange={write.onStatusChange}
+            onStageChange={write.onStageChange}
           />
           <TrackerPagination
             page={data.page}
@@ -157,19 +158,20 @@ const ZERO_COUNTS: ApplicationCounts = {
 };
 
 /**
- * The status write shared by every row: the in-flight flag, which row it is for (a failure is a toast, UI-05),
- * and the change handler.
+ * The tracker-cell write shared by every row: the in-flight flag, which row it is for (a failure is
+ * a toast, UI-05), and status/stage change handlers.
  *
  * A status change sends a **blank** stage, as Go's `ApplicationStatusUpdate{PipelineStatus: status}`
  * did: `Application#assign_pipeline_status` reads that as "this status's default stage", which is
- * how Applied lands on Waiting. `pipeline_note` and `next_follow_up_on` stay absent so Rails keeps
- * the values it holds (`lib/pipeline.ts`).
+ * how Applied lands on Waiting. A stage change sends the selected stage with the current status.
+ * `pipeline_note` and `next_follow_up_on` stay absent so Rails keeps the values it holds
+ * (`lib/pipeline.ts`).
  */
 function useStatusWrite() {
   const queryClient = useQueryClient();
   const mutation = useMutation({
-    mutationFn: ({ jobId, status }: { jobId: number; status: string }) =>
-      updateJobApplicationStatus(jobId, { pipeline_status: status, pipeline_stage: "" }),
+    mutationFn: ({ jobId, update }: { jobId: number; update: ApplicationStatusUpdate }) =>
+      updateJobApplicationStatus(jobId, update),
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.jobs.root() }),
@@ -187,7 +189,15 @@ function useStatusWrite() {
       // The "Not applied" placeholder is inert, and a second write while one is in flight is
       // refused: two edits racing decide the final status by response order, not click order.
       if (isPending || !isStatusWrite(value)) return;
-      mutate({ jobId, status: value });
+      mutate({ jobId, update: { pipeline_status: value, pipeline_stage: "" } });
+    },
+    [isPending, mutate],
+  );
+
+  const onStageChange = useCallback(
+    (jobId: number, status: string, stage: string) => {
+      if (isPending) return;
+      mutate({ jobId, update: { pipeline_status: status, pipeline_stage: stage } });
     },
     [isPending, mutate],
   );
@@ -196,6 +206,7 @@ function useStatusWrite() {
     saving: isPending,
     savingId: isPending ? (mutation.variables?.jobId ?? 0) : 0,
     onStatusChange,
+    onStageChange,
   };
 }
 
