@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Deterministic Rails API helper for supervised local apply sessions.
 #
-#   waunder-api.sh login                 sign in with APP_SHARED_SECRET from api/.env (never printed)
+#   waunder-api.sh login                 sign in with $APP_SHARED_SECRET, else api/.env (never printed)
 #   waunder-api.sh queue [N]             next N (default 5) un-applied open jobs, oldest intake first,
 #                                        excluding ids in .apply-session/skipped.txt
 #   waunder-api.sh job ID                one job's detail (URLs, compensation, description excerpt)
@@ -45,8 +45,12 @@ api_patch() {
 
 case "${1:-}" in
   login)
-    secret="$(grep -E '^APP_SHARED_SECRET=' "$ROOT/api/.env" | head -1 | cut -d= -f2- | sed 's/^"//;s/"$//')"
-    [[ -n "$secret" ]] || die "APP_SHARED_SECRET missing from api/.env"
+    # Prefer the environment (e.g. `railway run`), fall back to the gitignored api/.env.
+    secret="${APP_SHARED_SECRET:-}"
+    if [[ -z "$secret" && -f "$ROOT/api/.env" ]]; then
+      secret="$(grep -E '^APP_SHARED_SECRET=' "$ROOT/api/.env" | head -1 | cut -d= -f2- | sed 's/^"//;s/"$//')"
+    fi
+    [[ -n "$secret" ]] || die "APP_SHARED_SECRET not set and missing from api/.env"
     code="$(jq -n --arg p "$secret" '{passphrase:$p}' | curl -sS -o /dev/null -w '%{http_code}' -c "$JAR" \
       -H 'Content-Type: application/json' -X POST "$BASE/api/session" --data @-)"
     chmod 600 "$JAR"

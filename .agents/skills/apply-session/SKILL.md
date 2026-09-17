@@ -20,7 +20,7 @@ use the Rails trusted-submit dispatcher or the `workers/` service (see RESOLVED-
   creation, never scoring. Never retry a write.
 - Personal answers live in `.apply-session/answers.local.json` (gitignored). Never copy them into
   the repo, docs, commits, memory, or chat beyond what the owner is reviewing.
-- Never print `APP_SHARED_SECRET`; the helper reads it from `api/.env`.
+- Never print `APP_SHARED_SECRET`; the helper reads it from the environment, else `api/.env`.
 
 ## Setup (once per session)
 
