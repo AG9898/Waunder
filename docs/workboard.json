@@ -3666,7 +3666,7 @@
       "id": "UI-22",
       "title": "Re-skin the Intake screen to Surface v2",
       "description": "Apply the STYLE_GUIDE.md 'Surface v2 > Re-skin checklist' to the ingestion landing only: the intake control panel, date headers, and collapsible batch blocks and their posting rows. No layout, copy, or behavior changes; native details/summary stays, and intake pause/resume stays an explicit action. Update the Intake bullets in STYLE_GUIDE.md to describe the result.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "UI",
       "depends_on": [

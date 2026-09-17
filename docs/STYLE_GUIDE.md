@@ -161,23 +161,26 @@ figures where possible.
    area padding. Desktop uses up to 1280px with in-flow top navigation; narrow desktop windows still
    wrap safely. **Import job** is available from the shared header and the Jobs screen, including a
    clear empty-feed action. Intake is the ingestion-history tab.
-- Feed and digest rows are soft list cards with the color-coded score pill and a lifecycle
-  status pill (Active / Backlog / Removed — `.job-status--active|backlog|removed`, tinted
-  success-soft / warning-soft / danger-soft) stacked top-right of the card in a `.job-pills`
-  column, and an origin pill under the company line. The status pill makes a card's intake bin
-  visible at a glance, which matters most on the mixed ingestion landing where rows aren't
-  pre-filtered by bin.
-- The ingestion landing groups its rows under a date header (`.digest-date`) and one collapsible
-  `.digest-batch` block per alert email, whose `.digest-batch-summary` carries the origin pill, the
-  posting count, and the arrival time. The disclosure is a native `<details>`/`<summary>` with a
-  CSS-only chevron (`.digest-batch-summary::after`, rotated by `.digest-batch[open]`), so every
-  posting stays in the DOM while collapsed and the control needs no JavaScript. Dates and times
-  render exactly as Rails sent them — never converted to the viewing device's timezone — so a
-  header cannot disagree with the day the batch was grouped on.
-- The intake panel (`.intake-control`) sits above the batches with a status pill
-  (`.intake-status--on|paused`), a held-alert count when any are waiting, and a single
-  pause/resume button that shows `Updating…` disabled while in flight. It never changes intake on
-  render; the outcome is reported in a quiet `.intake-message` pill, failures in `.intake-error`.
+- Jobs feed rows remain soft list cards with the color-coded score pill and a lifecycle status pill
+  (Active / Backlog / Removed — `.job-status--active|backlog|removed`, tinted success-soft /
+  warning-soft / danger-soft) stacked top-right of the card in a `.job-pills` column, and an
+  origin pill under the company line. The status pill makes a card's intake bin visible at a
+  glance. On the ingestion landing, posting rows live inside their batch panel instead of being
+  nested cards; they use the same score/status pills and the batch summary supplies the origin.
+- The ingestion landing groups its rows under a 12px/600 uppercase date header (`.digest-date`) and
+  one collapsible `--radius-panel` `.digest-batch` per alert email. Its `.digest-batch-summary`
+  uses the grid-header strip and control height, carrying the origin pill, posting count, and
+  arrival time; its posting rows are one `--color-grid-line`-separated list surface rather than
+  cards inside the batch. The disclosure is a native `<details>`/`<summary>` with a CSS-only
+  chevron (`.digest-batch-summary::after`, rotated by `.digest-batch[open]`), so every posting
+  stays in the DOM while collapsed and the control needs no JavaScript. Dates and times render
+  exactly as Rails sent them — never converted to the viewing device's timezone — so a header
+  cannot disagree with the day the batch was grouped on.
+- The intake panel (`.intake-control`) sits above the batches as a `--radius-panel` surface with a
+  status pill (`.intake-status--on|paused`), a held-alert count when any are waiting, and a single
+  `--radius-control` pause/resume button at the touch or desktop control height that shows
+  `Updating…` disabled while in flight. It never changes intake on render; the outcome is reported
+  in a quiet `.intake-message` pill, failures in `.intake-error`.
 - The job detail is a header (title, company, origin sentence, compensation, score pill) above a
   `.job-workspace` that holds the assessment column and a `.job-workspace-actions` aside. Below
   800px the aside is `display: contents`, so its panels interleave with the assessment by CSS
