@@ -47,8 +47,8 @@ source of truth; the stylesheet is `web/public/app.css`, linked from `web/index.
 > **UI-08** adds the owned Vaul Drawer as another foundational primitive. Its bottom surface uses the
 > warm `bg-surface`/`border-border`/`shadow-md` treatment, an 18px top radius, a 36x4
 > `bg-border-strong` handle, a warm `bg-ink` scrim, and bottom padding for
-> `env(safe-area-inset-bottom)`; `DrawerTitle` remains visible for assistive technology. It is not
-> adopted by a shipped screen yet.
+> `env(safe-area-inset-bottom)`; `DrawerTitle` remains visible for assistive technology. `UI-21`
+> adopts it for the tracker's mobile status editor.
 > **UI-09** adds the owned Calendar primitive on pinned `react-day-picker` `10.0.1`. Selected days
 > use sage, today uses sage-soft, outside days use faint ink, and day/navigation controls are at
 > least 44px for touch layouts. Its public boundary is a Rails-compatible `YYYY-MM-DD` string;
@@ -66,7 +66,8 @@ source of truth; the stylesheet is `web/public/app.css`, linked from `web/index.
 > from `trackerRowClass` remains the group-tint hook; the company is also rendered as a quiet second
 > line inside the pinned Job cell on mobile. The full structural slice contains Job, Company, Score,
 > Status, Stage, Applied, Intaked, Updated, Follow-up, and Note; Status is an editable `StatusChip`
-> command popover, Stage is an editable pipeline-stage popover, and Follow-up is an editable
+> command popover on desktop and a bottom drawer on mobile, Stage is an editable pipeline-stage
+> popover, and Follow-up is an editable
 > Calendar popover; Applied remains read-only, while Note is an editable popover textarea with
 > explicit Save and Cancel.
 > `tracker.test.tsx` parses `app.css` to pin the grid dimensions, gridlines, sticky columns, mobile
@@ -338,10 +339,11 @@ Menus that list statuses group them under these four group labels, in this order
 
 - One grid at every width inside a surface panel (`--radius-panel`, hairline border, `--shadow-sm`).
   Header strip 36px (34px mobile), rows 40px desktop / 56px mobile, 13px body text.
-- **UI-14/UI-16/UI-18/UI-19/UI-20 structural slice:** the shipped grid contains row number, Job, Company, Score,
+- **UI-14/UI-16/UI-18/UI-19/UI-20/UI-21 structural slice:** the shipped grid contains row number, Job, Company, Score,
   Status, Stage, Applied, Intaked, Updated, Follow-up, and Note. Job keeps its existing link and
   source logo; Score keeps the match-score band pill; Status is an editable grouped `StatusChip`
-  popover, Stage is an editable pipeline-stage popover, and Follow-up is an editable calendar
+  popover on desktop and a bottom drawer on mobile, Stage is an editable pipeline-stage popover, and
+  Follow-up is an editable calendar
   popover with Clear; Applied remains read-only and Note is an editable popover textarea with
   explicit Save and Cancel.
 - Column order: row number (48px desktop / 34px mobile, centered, faint tabular digits), Job (pinned;

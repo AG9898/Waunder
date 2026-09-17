@@ -490,7 +490,7 @@ Be honest about the current state — most of the suite is still to be written.
   hanging write is held open by a promise the handler awaits and `afterEach` releases, so the
   in-flight assertions are deterministic rather than timing-dependent.
 
-- **web/** — `src/components/tracker/tracker.test.tsx` (`FE-22`/`UI-04`/`UI-14`/`UI-15`/`UI-16`/`UI-17`/`UI-18`/`UI-19`/`UI-20`):
+- **web/** — `src/components/tracker/tracker.test.tsx` (`FE-22`/`UI-04`/`UI-14`/`UI-15`/`UI-16`/`UI-17`/`UI-18`/`UI-19`/`UI-20`/`UI-21`):
   the tracker request, toolbar counts/tabs, server-driven bin and sort, DropdownMenu column
   visibility, virtualization, status/stage/follow-up/note cell popovers, pagination footer, and
   tracker-write contract.
@@ -504,7 +504,9 @@ Be honest about the current state — most of the suite is still to be written.
   horizontal scroll panel, sticky columns, gridlines, mobile fade, responsive row/header heights,
   follow-up tones, single-line note ellipsis, editing tint, explicit virtualization spacer display,
   and compact toolbar/footer controls. The tracker schema case also pins the missing `applied_at`
-  field's zero-value behavior.
+  field's zero-value behavior. Forced Mobile and Desktop preferences are tested against opposite
+  viewport widths, including the mobile drawer's job context, four status groups, current check,
+  stage select, immediate status/stage payloads, and dismissal without a write.
   The old `data-label` responsive-card assertions are intentionally absent: UI-14 uses one table
   grid at every width. Failed writes are asserted as one toast with no retry, and status writes are
   asserted to avoid draft and submit endpoints.

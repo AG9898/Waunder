@@ -1577,3 +1577,9 @@ This repo intentionally does not retain `components.json`; without a temporary C
 writes an `@/` directory literally under `web/` and can install an unintended `cn` package. For a
 new primitive, generate with a temporary config, restore `../../lib/cn`, pin the intended dependency,
 and remove both the config and any accidental package before verification.
+
+### 2026-09-17 — Tracker editor layout follows the root preference
+The tracker status editor resolves Mobile/Desktop from the shared `data-layout` root preference and
+the existing 960px Auto breakpoint, not from the user agent. A layout-sensitive editor should refresh
+that signal on the opening gesture so a viewport resize or chrome selection takes effect without a
+global resize listener.

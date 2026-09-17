@@ -34,6 +34,7 @@ import {
   type JobSummary,
   type PageMeta,
 } from "../../api/schemas";
+import { LAYOUT_STORAGE_KEY } from "../../lib/layout";
 import { SESSION_EXPIRED } from "../../lib/messages";
 import {
   DEFAULT_TRACKER_SELECTION,
@@ -61,6 +62,7 @@ import { HttpResponse, http, installMockApi } from "../../test/msw";
 import { TrackerScreen } from "./tracker";
 
 const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+const originalInnerWidth = window.innerWidth;
 
 class TestResizeObserver {
   observe(): void {
@@ -78,6 +80,7 @@ class TestResizeObserver {
 
 beforeAll(() => {
   vi.stubGlobal("ResizeObserver", TestResizeObserver);
+  vi.stubGlobal("matchMedia", () => ({ matches: false }));
   HTMLElement.prototype.scrollIntoView = vi.fn();
 });
 
@@ -269,6 +272,9 @@ function trackerJobs(): JobSummary[] {
 }
 
 beforeEach(() => {
+  document.documentElement.removeAttribute("data-layout");
+  window.localStorage.clear();
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: originalInnerWidth });
   rows = trackerJobs();
   requests = [];
   statusWrites = [];
@@ -330,6 +336,14 @@ function statusValueFor(title: string): string | undefined {
     .status;
 }
 
+function selectLayout(layout: "desktop" | "mobile"): void {
+  window.localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(layout));
+}
+
+function setViewportWidth(width: number): void {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
+}
+
 function rowFor(title: string): HTMLElement {
   const row = statusTriggerFor(title).closest("tr");
   if (row === null) throw new Error(`no row for ${title}`);
@@ -339,6 +353,15 @@ function rowFor(title: string): HTMLElement {
 async function openStatusFor(title: string): Promise<HTMLElement> {
   fireEvent.click(statusTriggerFor(title));
   return waitFor(() => screen.getByRole<HTMLElement>("listbox"));
+}
+
+async function openStatusDrawerFor(title: string): Promise<HTMLElement> {
+  fireEvent.click(statusTriggerFor(title));
+  return waitFor(() => {
+    const drawer = document.querySelector<HTMLElement>(".status-drawer-content");
+    if (drawer === null) throw new Error(`no status drawer for ${title}`);
+    return drawer;
+  });
 }
 
 async function chooseStatus(title: string, value: string): Promise<void> {
@@ -792,6 +815,74 @@ describe("tracker rendering", () => {
     expect(tracked.querySelectorAll("[cmdk-item]")).toHaveLength(9);
   });
 
+  it("uses the selected layout, not viewport width, for the status editor", async () => {
+    setViewportWidth(1280);
+    selectLayout("mobile");
+    const { container } = await loadedTracker();
+
+    const drawer = await openStatusDrawerFor("Principal Engineer");
+    expect(drawer).toHaveTextContent("Principal Engineer");
+    expect(drawer).toHaveTextContent("Globex");
+    expect(
+      Array.from(
+        drawer.querySelectorAll(".status-drawer-group-label"),
+        (label) => label.textContent,
+      ),
+    ).toEqual(["Not applied", "Applied", "In progress", "Closed"]);
+    expect(drawer.querySelectorAll(".status-drawer-option")).toHaveLength(10);
+    expect(drawer.querySelector('[data-value="not_applied"]')).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(drawer.querySelector('[data-value="not_applied"] .status-drawer-check')).not.toBeNull();
+    expect(drawer.querySelector(".status-drawer-stage-select")).toBeNull();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(statusWrites).toEqual([]);
+    expect(container.querySelector(".status-cell-popover")).toBeNull();
+  });
+
+  it("keeps the popover for Desktop even in a narrow viewport", async () => {
+    setViewportWidth(320);
+    selectLayout("desktop");
+    await loadedTracker();
+
+    await openStatusFor("Principal Engineer");
+    expect(document.querySelector(".status-drawer-content")).toBeNull();
+  });
+
+  it("writes mobile status tiles and stage changes through the existing tracker payloads", async () => {
+    selectLayout("mobile");
+    await loadedTracker();
+
+    const statusDrawer = await openStatusDrawerFor("Principal Engineer");
+    const applied = statusDrawer.querySelector<HTMLElement>('[data-value="applied"]');
+    if (applied === null) throw new Error("no Applied status tile");
+    fireEvent.click(applied);
+
+    await waitFor(() => {
+      expect(statusWrites).toEqual([
+        { id: 43, body: { pipeline_status: "applied", pipeline_stage: "" } },
+      ]);
+    });
+    await waitFor(() => expect(requests).toHaveLength(2));
+
+    const stageDrawer = await openStatusDrawerFor("Staff Engineer");
+    const stage = within(stageDrawer).getByRole<HTMLSelectElement>("combobox", {
+      name: "Pipeline stage",
+    });
+    fireEvent.change(stage, { target: { value: "technical" } });
+
+    await waitFor(() => {
+      expect(statusWrites).toEqual([
+        { id: 43, body: { pipeline_status: "applied", pipeline_stage: "" } },
+        { id: 42, body: { pipeline_status: "applied", pipeline_stage: "technical" } },
+      ]);
+    });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
   it("opens grouped statuses from Enter, checks the current one, and dismisses without a write", async () => {
     await loadedTracker();
 
@@ -1231,6 +1322,18 @@ describe("Surface v2 tracker grid", () => {
     expect(declared(mobile, ".note-cell-textarea", "overflow-wrap")).toBe("break-word");
     expect(declared(mobile, ".status-cell-trigger", "min-height")).toBe("var(--control-h-touch)");
     expect(unconditional(stylesheet())).not.toContain("data-label");
+  });
+
+  it("keeps the mobile status drawer touch-sized and safe-area padded", () => {
+    const mobile = rulesOf(unconditional(stylesheet()));
+
+    expect(declared(mobile, ".status-drawer-option", "min-height")).toBe("var(--control-h-touch)");
+    expect(declared(mobile, ".status-drawer-stage-select", "min-height")).toBe(
+      "var(--control-h-touch)",
+    );
+    expect(stylesheet()).toMatch(
+      /\.status-drawer-content\s*\{[^}]*padding: 0 0 calc\(var\(--space-4\) \+ env\(safe-area-inset-bottom, 0px\)\);/,
+    );
   });
 
   it("follows the selected layout: the switch is a container query on the screen root", () => {

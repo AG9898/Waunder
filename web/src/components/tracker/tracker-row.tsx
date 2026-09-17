@@ -178,12 +178,15 @@ export function TrackerRow({
           <div className="tracker-status">
             <StatusCell
               status={status}
+              stage={stage}
               jobTitle={job.title}
+              jobCompany={job.company}
               tracked={job.application !== null}
               open={editingCell === "status"}
               disabled={disabled}
               onOpenChange={onStatusOpenChange}
               onStatusChange={onChange}
+              onStageChange={onStage}
             />
             {saving ? (
               <span className="tracker-saving" role="status">

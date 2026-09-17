@@ -3629,7 +3629,7 @@
       "id": "UI-21",
       "title": "Edit tracker status in a bottom drawer on mobile layouts",
       "description": "On mobile layouts only, tapping a Status cell opens the Drawer instead of the popover, laid out per STYLE_GUIDE.md: job title and company, status tiles in a two-column grid under the four group labels with the current tile outlined and checked, and the stage select for tracked rows. A tile tap writes immediately using UI-17's status write; a stage change uses UI-18's stage write. Desktop layouts keep the popover. Decide mobile versus desktop from the same layout signal the chrome uses, not the user agent.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "UI",
       "depends_on": [
