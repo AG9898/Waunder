@@ -3700,7 +3700,7 @@
       "id": "UI-23",
       "title": "Re-skin the Jobs feed and filter drawer to Surface v2",
       "description": "Apply the Surface v2 re-skin checklist to the Jobs feed only: bin tabs, filter trigger and drawer, feed rows, pills, the manage bar, and pagination. No layout, copy, filter persistence, or behavior changes; lifecycle writes stay explicit and waunder.jobFilters keeps its shape. Update the Jobs feed bullets in STYLE_GUIDE.md.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "UI",
       "depends_on": [

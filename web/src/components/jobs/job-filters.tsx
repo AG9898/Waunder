@@ -30,6 +30,7 @@
  * faithfully), so that task adds a control over state that already exists rather than widening
  * this contract.
  */
+import { ChevronRight, SlidersHorizontal } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { Dialog } from "../ui/dialog";
@@ -75,8 +76,20 @@ export function JobFilters({ selection, onChange, children }: JobFiltersProps) {
             setOpen(true);
           }}
         >
+          <SlidersHorizontal
+            className="job-filters-summary-icon"
+            aria-hidden="true"
+            color="currentColor"
+            size={16}
+          />
           <span className="job-filters-summary-label">Filters &amp; sort</span>
           {active > 0 ? <span className="job-filters-summary-count">{active}</span> : null}
+          <ChevronRight
+            className="job-filters-summary-chevron"
+            aria-hidden="true"
+            color="currentColor"
+            size={16}
+          />
         </button>
         <Dialog
           open={open}

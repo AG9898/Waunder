@@ -48,6 +48,7 @@
  * left alone rather than replayed.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 
@@ -320,11 +321,13 @@ function Pagination({
   return (
     <div className="job-pagination">
       <button className="job-page-prev" disabled={page.number <= 1} onClick={onPrevious}>
-        Previous
+        <ChevronLeft aria-hidden="true" color="currentColor" size={16} />
+        <span>Previous</span>
       </button>
       <span className="job-page-indicator">{pageIndicatorLabel(page)}</span>
       <button className="job-page-next" disabled={!page.has_next} onClick={onNext}>
-        Next
+        <span>Next</span>
+        <ChevronRight aria-hidden="true" color="currentColor" size={16} />
       </button>
     </div>
   );

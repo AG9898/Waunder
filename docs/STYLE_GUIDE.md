@@ -164,9 +164,10 @@ figures where possible.
 - Jobs feed rows remain soft list cards with the color-coded score pill and a lifecycle status pill
   (Active / Backlog / Removed — `.job-status--active|backlog|removed`, tinted success-soft /
   warning-soft / danger-soft) stacked top-right of the card in a `.job-pills` column, and an
-  origin pill under the company line. The status pill makes a card's intake bin visible at a
-  glance. On the ingestion landing, posting rows live inside their batch panel instead of being
-  nested cards; they use the same score/status pills and the batch summary supplies the origin.
+  origin pill under the company line. Feed cards use `--radius-panel` and a quiet row hover; the
+  status pill makes a card's intake bin visible at a glance. On the ingestion landing, posting rows
+  live inside their batch panel instead of being nested cards; they use the same score/status pills
+  and the batch summary supplies the origin.
 - The ingestion landing groups its rows under a 12px/600 uppercase date header (`.digest-date`) and
   one collapsible `--radius-panel` `.digest-batch` per alert email. Its `.digest-batch-summary`
   uses the grid-header strip and control height, carrying the origin pill, posting count, and
@@ -193,7 +194,9 @@ figures where possible.
 - On the Jobs feed each row card is followed by a `.job-list-actions` manage bar: the selection
   checkbox (`.job-select-label`, "Select") is grouped on the left with the lifecycle
   backlog/remove/restore buttons on the right, rather than floating the bare checkbox above the
-  card. This keeps the per-row controls together and reads cleanly when the card stacks on mobile.
+  card. The bar is separated by a grid hairline, and the bulk bar uses the same grid-header panel;
+  all of their controls use the touch height on mobile and compact desktop height on wide layouts.
+  This keeps the per-row controls together and reads cleanly when the card stacks on mobile.
 - The origin pill leads with the source's official brand logo (LinkedIn/Glassdoor/Indeed),
   self-hosted as SVGs under `web/public/icons/` (vendored from Simple Icons with the brand color
   baked into the fill — no live CDN dependency, matching the self-hosted-font policy). Sources
@@ -222,11 +225,16 @@ figures where possible.
   uses a grouped `StatusChip` popover and the Stage cell uses the pipeline-stage popover, both
   keeping the group tint. Empty states name the active tab ("No applications submitted yet.") rather
   than a generic "no rows".
-- The Jobs feed's filter + sort controls live in a collapsed-by-default `.job-filters-panel`
-  (`<details>`/`<summary>` "Filters & sort") so they don't push the feed down on mobile; the
-  summary carries a small count badge of how many filters are active, and the controls lay out
-  in a 2-up grid (auto-fit on wide screens). The Applications tracker has its own leaner
-  controls (group tabs + bin + sort) and does not reuse this panel.
+- The Jobs feed's scored/unscored view and Active / Backlog / Removed bins use segmented controls
+  with `--radius-panel` tracks and `--radius-control` tabs. Its filter + sort trigger is a compact
+  `.job-filters-summary` control with a small active-filter count; it opens the native modal
+  `.job-filters-drawer`, bottom-anchored on narrow layouts and right-anchored inside the 800px
+  container query. The drawer's inputs use touch height on mobile, desktop control height in the
+  sidebar, and a 2-up mobile / single-column desktop layout. The Applications tracker has its own
+  leaner controls (group tabs + bin + sort) and does not reuse this panel.
+- Jobs feed pagination keeps the existing Previous / Page X of Y / Next copy, with a grid-line
+  divider and lucide direction icons; its buttons use `--radius-control` and touch or desktop
+  control height without changing the server-owned page behavior.
 - Job detail, draft review, profile, and route sections use top hairlines plus spacing.
 - Desktop workspaces use the available width: Jobs has a filter sidebar and compact rows;
   job detail pairs the assessment with a sticky application panel; ingestion batches, contacts,
