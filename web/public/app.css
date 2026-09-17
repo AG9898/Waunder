@@ -1001,6 +1001,23 @@ button { font-family: inherit; }
   text-transform: capitalize;
 }
 
+.draft-pipeline-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.draft-pipeline-label {
+  color: var(--color-ink-faint);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.draft-pipeline-stage {
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+}
+
 .draft-resume-emphasis p,
 .draft-cover-letter p {
   margin: 0;
@@ -1042,7 +1059,12 @@ button { font-family: inherit; }
 }
 
 /* autofill preview — one sunken panel (not nested cards) */
-.draft-autofill { }
+.draft-autofill {
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-grid-line);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-sm);
+}
 .draft-autofill-ats {
   margin: 0 0 var(--space-3);
   font-size: var(--text-sm);
@@ -1108,7 +1130,7 @@ button { font-family: inherit; }
   margin: 0;
   padding: 9px 12px;
   background: var(--color-danger-soft);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-control);
   color: var(--color-danger-ink);
   font-size: var(--text-sm);
   font-weight: 500;
@@ -1117,7 +1139,8 @@ button { font-family: inherit; }
 .draft-worker-report {
   padding: var(--space-5);
   background: var(--color-danger-soft);
-  border-radius: var(--radius-lg);
+  border: 1px solid #e8c9bf;
+  border-radius: var(--radius-panel);
 }
 .draft-worker-reason,
 .draft-worker-logs li,
@@ -1134,7 +1157,8 @@ button { font-family: inherit; }
   margin-top: var(--space-6);
   padding: var(--space-5);
   background: var(--color-surface-sunken);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-grid-line);
+  border-radius: var(--radius-panel);
 }
 .draft-submit-note {
   margin: 0 0 var(--space-4);
@@ -3235,6 +3259,117 @@ html { scroll-padding-bottom: var(--screen-bottom); }
 .tracker-wrap { max-width: 100%; }
 .job-list-link, .digest-link { min-width: 0; grid-template-columns: minmax(0, 1fr) auto; }
 
+/* Surface v2 draft review: keep the generated materials quiet, and make the automation
+   contract legible without changing its collapsed-by-default or submit behavior. */
+.draft-review .draft-back {
+  min-height: var(--control-h-touch);
+  padding: 0 4px;
+  border-radius: var(--radius-control);
+}
+.draft-review .draft-pipeline-status { text-transform: none; }
+.draft-review .draft-pipeline-status .status-chip--touch { flex: none; }
+.draft-review .draft-resume-emphasis,
+.draft-review .draft-cover-letter,
+.draft-review .draft-answers {
+  border-top-color: var(--color-grid-line);
+}
+.draft-review .draft-answer {
+  border-color: var(--color-grid-line);
+  border-radius: var(--radius-panel);
+  box-shadow: none;
+}
+.draft-review .draft-autofill {
+  margin-top: var(--space-4);
+  padding: var(--space-5);
+  border-top: 1px solid var(--color-grid-line);
+}
+.draft-review .draft-autofill-form > h2 {
+  margin: var(--space-4) calc(-1 * var(--space-5)) 0;
+  padding: var(--space-2) var(--space-5);
+  background: var(--color-grid-header);
+  border-top: 1px solid var(--color-grid-line);
+  border-bottom: 1px solid var(--color-grid-line);
+}
+.draft-review .draft-autofill-value { border-radius: var(--radius-control); }
+.draft-review .draft-autofill-answers {
+  gap: 0;
+  margin: 0 calc(-1 * var(--space-5));
+  padding: 0 var(--space-5);
+}
+.draft-review .draft-autofill-answer {
+  padding: var(--space-3) 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+.draft-review .draft-autofill-answer + .draft-autofill-answer {
+  border-top: 1px solid var(--color-grid-line);
+}
+.draft-review .draft-worker-report {
+  margin-top: var(--space-5);
+}
+.draft-review .draft-submit {
+  margin-top: var(--space-5);
+}
+.draft-review .draft-automation {
+  padding: var(--space-5) 0 0;
+  border-top-color: var(--color-grid-line);
+}
+.draft-review .draft-automation > summary {
+  display: flex;
+  min-height: var(--control-h-touch);
+  align-items: center;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--color-grid-header);
+  color: var(--color-ink);
+}
+.draft-review .draft-automation > summary:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.draft-review .job-route-link,
+.draft-review .copy-button,
+.draft-review .draft-submit-button,
+.draft-review .draft-preview-save {
+  min-height: var(--control-h-touch);
+  border-radius: var(--radius-control);
+}
+.draft-review .job-route-link {
+  padding: 0 16px;
+  font-size: var(--text-sm);
+}
+.draft-review .copy-button {
+  padding: 0 14px;
+}
+.draft-review .draft-submit-button {
+  padding: 0 18px;
+  transition: none;
+}
+.draft-review .draft-preview-save {
+  padding: 0 14px;
+  border-color: var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  transition: none;
+}
+.draft-review .draft-preview-save:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  background: var(--color-surface-sunken);
+  color: var(--color-accent-strong);
+}
+.draft-review .draft-preview-save:disabled {
+  background: var(--color-surface);
+  color: var(--color-ink-faint);
+}
+.draft-review .draft-submit-error,
+.draft-review .draft-preview-error,
+.draft-review .draft-submit-result,
+.draft-review .draft-preview-ok {
+  border-radius: var(--radius-control);
+}
+.draft-review .draft-submit-button:disabled { cursor: default; }
+
 @container (min-width: 800px) {
   .job-feed-workspace { grid-template-columns: 260px minmax(0, 1fr); align-items: start; gap: 32px; }
   .job-feed-controls { position: sticky; top: 24px; }
@@ -3318,6 +3453,15 @@ html { scroll-padding-bottom: var(--screen-bottom); }
   .tracker-spacer td { display: table-cell; }
   .tracker-footer .tracker-page-prev,
   .tracker-footer .tracker-page-next { min-height: var(--control-h-desktop); }
+  .draft-review .draft-back,
+  .draft-review .draft-automation > summary,
+  .draft-review .job-route-link,
+  .draft-review .copy-button,
+  .draft-review .draft-submit-button,
+  .draft-review .draft-preview-save {
+    min-height: var(--control-h-desktop);
+  }
+  .draft-review .draft-pipeline-status .status-chip--touch { height: 22px; }
   .draft-materials { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 40px; align-items: start; }
   .draft-resume-emphasis { grid-column: 1 / -1; }
   .profile-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }

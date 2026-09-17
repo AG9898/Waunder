@@ -3771,7 +3771,7 @@
       "id": "UI-25",
       "title": "Re-skin the Draft review screen to Surface v2",
       "description": "Apply the Surface v2 re-skin checklist to draft review only: materials, autofill answers, warnings, and the automation section. Styling only. The submit gating is safety-relevant: the submit control must stay disabled until the draft is ready and warnings are clear, approve-and-submit stays one explicit action, and no transition may delay or hide gating state. Update the draft review bullets in STYLE_GUIDE.md.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "UI",
       "depends_on": [

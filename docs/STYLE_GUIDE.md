@@ -245,11 +245,15 @@ figures where possible.
 - Manual application is the primary job-detail flow: open the resolved application link in a
   new tab (fall back to the original posting), then explicitly mark applied/waiting. On mobile,
   the primary actions precede the assessment and secondary tracking/organization follows it.
-  Draft generation and outreach live in an expandable section; draft-review materials have
-  copy controls with success/blocked feedback, and automation controls are collapsed initially.
-  The autofill preview's apply URL is rendered as its own link text, so `.draft-autofill-url`
-  carries `word-break: break-all` to wrap at phone width; a URL that is not `http(s)` renders as
-  plain text in the same class rather than as a link.
+  Draft review keeps generated materials as hairline-separated sections with discrete answer rows
+  and copy controls that retain their success/blocked feedback. The automation section remains a
+  collapsed `<details>` initially; when opened, it presents one sunken autofill panel with a grid
+  header and hairline-separated editable answers, inline warning panels, the worker report, and a
+  distinct approve panel. Its pipeline status uses the shared `StatusChip`, and the approve control
+  stays disabled until Rails says the draft is ready, every answer is complete, and warnings are
+  clear. The autofill preview's apply URL is rendered as its own link text, so
+  `.draft-autofill-url` carries `word-break: break-all` to wrap at phone width; a URL that is not
+  `http(s)` renders as plain text in the same class rather than as a link.
   Existing notes/follow-up dates survive status-only edits; clearing a stage uses a real select
   sentinel mapped back to an empty API value (Rails still defaults Applied to Waiting).
 - Primary actions use sage filled buttons; secondary actions use outline/surface buttons.

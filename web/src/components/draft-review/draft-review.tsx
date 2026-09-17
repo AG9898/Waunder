@@ -32,6 +32,7 @@
  * is written into the cache and becomes the source again.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Link, useParams } from "react-router";
 
@@ -63,6 +64,7 @@ import { pipelineStatusLabel } from "../../lib/pipeline";
 import { AppChrome } from "../app-chrome";
 import { CopyButton } from "../copy-button";
 import { LoadError, Loading } from "../load-state";
+import { StatusChip } from "../ui/status-chip";
 import { AutofillAnswers } from "./autofill-answers";
 
 export function DraftReviewScreen() {
@@ -80,7 +82,8 @@ export function DraftReviewScreen() {
     <div className="draft-review">
       <AppChrome />
       <Link className="draft-back" to="/jobs">
-        ← Jobs
+        <ArrowLeft aria-hidden="true" size={14} />
+        Jobs
       </Link>
       {/* Data first: a failed *refetch* keeps the last draft, and swapping the screen for the
           load error then would discard unsaved answer edits (AGENTS.md 2026-09-13). The key
@@ -182,6 +185,11 @@ function DraftBody({ id, draft }: { id: number; draft: ApplicationDraft }) {
   };
 
   const applyLink = externalApplicationURL(draft.autofill_payload.apply_url);
+  const applicationLabel = pipelineStatusLabel(draft.pipeline_status, draft.pipeline_stage);
+  const statusLabel = pipelineStatusLabel(draft.pipeline_status, "");
+  const pipelineStage = applicationLabel.startsWith(`${statusLabel} · `)
+    ? applicationLabel.slice(statusLabel.length + 3)
+    : "";
 
   return (
     <div className="draft-body">
@@ -189,7 +197,11 @@ function DraftBody({ id, draft }: { id: number; draft: ApplicationDraft }) {
       {draft.status === "" ? null : <p className="draft-status">{`Status: ${draft.status}`}</p>}
       {draft.pipeline_status === "" ? null : (
         <p className="draft-pipeline-status">
-          {`Application: ${pipelineStatusLabel(draft.pipeline_status, draft.pipeline_stage)}`}
+          <span className="draft-pipeline-label">Application:</span>{" "}
+          <StatusChip status={draft.pipeline_status} size="touch" />
+          {pipelineStage === "" ? null : (
+            <span className="draft-pipeline-stage">{` · ${pipelineStage}`}</span>
+          )}
         </p>
       )}
       <div className="draft-manual-intro">

@@ -1588,3 +1588,9 @@ global resize listener.
 Surface v2 controls reuse classes such as `.job-route-link` and `.copy-button` on other screens, so
 Job detail styling additions must be scoped under `.job-detail`. A global control-rule change can
 alter draft review or contacts even when the component markup and behavior were untouched.
+
+### 2026-09-17 — Draft review reskin keeps shared controls local
+Draft review also uses shared `.job-route-link` and `.copy-button` classes, so its Surface v2 control
+heights and radii must be scoped under `.draft-review`; changing the shared rules alters job detail or
+contacts. The pipeline status on this screen now uses the shared `StatusChip`, with the existing stage
+copy kept beside it.
