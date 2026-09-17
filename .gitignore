@@ -8,3 +8,7 @@
 /workers/.env
 /workers/.env.*
 !/workers/.env.example
+
+# Local apply sessions: personal answers, CV/cover letters, screenshots, browser snapshots
+/.apply-session/
+/.playwright-mcp/

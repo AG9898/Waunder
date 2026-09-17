@@ -105,7 +105,9 @@ docs/          Project docs and task queue
 initial_plan.md  Authoritative original build plan
 README.md      Repository overview
 .claude/       Claude harness config
-  skills/      Synced skills (do not edit here — edit source in ag.dev)
+  skills/      Synced skills (do not edit here — edit source in ag.dev), except the
+               repo-local apply-session skill (also mirrored in .agents/ and .codex/)
+.apply-session/  Gitignored local apply-session data: standing answers, CV, cover letters, screenshots
 ```
 
 Docs navigation: [`docs/INDEX.md`](docs/INDEX.md)
@@ -1594,3 +1596,13 @@ Draft review also uses shared `.job-route-link` and `.copy-button` classes, so i
 heights and radii must be scoped under `.draft-review`; changing the shared rules alters job detail or
 contacts. The pipeline status on this screen now uses the shared `StatusChip`, with the existing stage
 copy kept beside it.
+
+### 2026-09-17 — Local apply sessions: file roots, LinkedIn redirects, unreliable autofill
+The `apply-session` skill (RESOLVED-27) is repo-local, not synced from ag.dev: keep its three copies
+(`.claude/`, `.agents/`, `.codex/` `skills/apply-session/`) in step, with only the harness notes and
+skill path differing. The Playwright MCP only uploads files and writes screenshots under the repo
+root, so the CV, cover letters, and screenshots live in the gitignored `.apply-session/`. LinkedIn's
+Apply link goes through `linkedin.com/safety/go/?url=…` (decode it), Glassdoor apply hands off to
+Indeed Apply, and ATS "autofill from resume" can report success while leaving fields empty, so the
+agent checks every field itself. Inbound alert jobs have no stored description, so cover letters come
+from the live posting rather than the in-app generator.

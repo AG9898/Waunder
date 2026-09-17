@@ -551,3 +551,45 @@ visual systems in the app.
 [`STYLE_GUIDE.md`](STYLE_GUIDE.md), [`ARCHITECTURE.md`](ARCHITECTURE.md),
 [`CONVENTIONS.md`](CONVENTIONS.md), [`TESTING.md`](TESTING.md), [`PRD.md`](PRD.md). Supersedes the
 tracker card-layout parts of UI-04 and TRACK-01. Tasks UI-10…UI-30 and TRACK-02.
+
+### RESOLVED-27 — Supervised local apply sessions replace unattended hosted submission as the working apply path
+
+**Resolved:** 2026-09-17
+
+**Decision:** Job applications are filled by a coding agent (Claude Code or Codex) driving a
+**headed Playwright browser on the owner's machine**, through the repo-local `apply-session` skill
+(`.claude/skills/apply-session/`, mirrored in `.agents/skills/` and `.codex/skills/`).
+
+1. **Queue.** The session works the tracker's un-applied open jobs (backlog included), **oldest
+   intake first**, so older postings are handled before they go stale.
+2. **Approval.** Jobs are approved in batches (default 5): approve fills the form; decline sets the
+   job's `lifecycle_state` to `removed` (no Application is created); skip leaves Rails untouched and
+   is excluded locally.
+3. **Filling.** One browser job runs at a time, preferably in a subagent so browser snapshots do not
+   fill the orchestrator's context. The agent uploads the CV, verifies every field itself, and
+   writes any cover letter or short answers from the live posting description.
+4. **Submission.** The agent parks every form **before** its final submit; the owner reviews it,
+   completes any CAPTCHA, and clicks Submit. Only then does the agent write applied/waiting through
+   `PATCH /api/job_posts/:id/application_status`.
+5. **Standing answers.** Owner-approved answers to demographic, work-authorization, salary,
+   relocation, and similar questions live in the gitignored `.apply-session/answers.local.json` on
+   the owner's machine. The agent fills them without asking — this is the explicit owner approval
+   the "never auto-answer sensitive fields" rule requires. They are never committed or sent to Rails.
+6. **Railway.** Rails is used only to read the queue and write status. The Rails trusted-submit
+   dispatcher and the Railway `worker` service stay in place but are not part of this path.
+
+**Why:** Unattended headless submission on Railway kept failing on things a supervised local
+browser avoids: job boards that require the owner's logins (LinkedIn and Glassdoor both hide Apply
+behind sign-in), Cloudflare and CAPTCHA checks, and per-ATS handlers that break whenever a form
+changes. An agent reading the live form handles unfamiliar ATS layouts without new code, and the
+owner stays the one who submits. A two-job trial on 2026-09-17 (Ashby via LinkedIn, Indeed Apply
+via Glassdoor) completed end to end.
+
+**Alternatives rejected:** Keep improving the hosted worker — still blocked by logins and bot checks
+on a headless host. Generate cover letters with the in-app OpenRouter generator — inbound alert
+jobs have no stored description, so its letters would be generic. Parallel prep subagents — with one
+shared browser they reduce waiting time, not usage, and waste work on jobs the owner later declines.
+
+**Affects:** `.claude/skills/apply-session/`, `.agents/skills/apply-session/`,
+`.codex/skills/apply-session/`, `.gitignore` (`/.apply-session/`, `/.playwright-mcp/`),
+[`ARCHITECTURE.md`](ARCHITECTURE.md), `AGENTS.md`. No Rails, web, or worker code changes.

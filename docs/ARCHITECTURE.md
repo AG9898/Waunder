@@ -563,6 +563,16 @@ the original browser `Host` header.
    `AuditEvent` containing the audit artifacts, and syncs the user-facing tracker:
    `submitted` confirms applied/waiting while `paused` or `failed` becomes needs review.
 
+**Supervised local apply session** (the path in use; RESOLVED-27):
+1. On the owner's machine, the `apply-session` skill signs in to the `web` origin and reads the
+   un-applied open queue, oldest intake first (`GET /api/job_posts?status=all&state=open&application=not_applied&sort=oldest`).
+2. The owner approves, declines (`PATCH /api/job_posts/:id/lifecycle` → `removed`), or skips each job
+   in a batch.
+3. For each approved job, an agent fills the application in a headed local Playwright browser using
+   gitignored local standing answers, and parks it before the final submit.
+4. The owner reviews and submits; the agent then writes applied/waiting through
+   `PATCH /api/job_posts/:id/application_status`. Nothing runs on Railway except these reads and writes.
+
 ---
 
 ## Auth
