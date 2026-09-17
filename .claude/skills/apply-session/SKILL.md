@@ -53,6 +53,11 @@ open job (the helper's `queue` order).
    If they abandon it, ask whether to `remove` or `skip` it.
 7. When the batch is done, report counts (applied / removed / skipped / pending review) and offer
    the next batch.
+8. **Cleanup:** when the owner says the session is complete, first confirm no parked form is still
+   awaiting a submit decision (resolve or note any that are), then run `waunder-api.sh cleanup`.
+   It deletes everything in `.apply-session/` except `answers.local.json` and
+   `Aden_Guo_Resume.pdf`, plus all of `.playwright-mcp/`; the skipped list resets with it. Never
+   run cleanup without the owner saying the session is done.
 
 ## Delegation (context preservation)
 
@@ -72,7 +77,7 @@ Browser snapshots are the main context cost, so the orchestrator never drives th
 
 | Path | Purpose |
 |---|---|
-| `scripts/waunder-api.sh` | login / queue / job / applied / remove / skip |
+| `scripts/waunder-api.sh` | login / queue / job / applied / remove / skip / cleanup |
 | `scripts/render-cover-letter.cjs` | text → PDF via the `workers/` Playwright install |
 | `references/job-brief.md` | per-job fill instructions and return contract |
 | `.apply-session/` (repo root, gitignored) | answers, CV, cover letters, screenshots, cookies, `log.jsonl`, `skipped.txt` |

@@ -43,8 +43,10 @@ open job (the helper's `queue` order).
 2. **Batch approval:** show one compact line per job — id, title, company, source, lifecycle
    (`backlog` is included), compensation, score — and ask per job: **Approve** (fill),
    **Decline** (set removed), or **Skip** (untouched, excluded from later queues this machine).
-   Ask in one message as a numbered list and accept a compact reply such as
-   `1 approve, 2 decline, 3 skip, 4 approve, 5 approve`. Do not act on a job the reply omits.
+   Ask with the `request_user_input` tool (requestUserInput): one question per job with the options
+   Approve / Decline / Skip, split across calls if the tool limits questions per call. Only if that
+   tool is unavailable in this session, ask in one message as a numbered list and accept a compact
+   reply such as `1 approve, 2 decline, 3 skip`. Never act on a job without an explicit answer.
 3. **Apply decisions:** `waunder-api.sh remove ID` for declines, `waunder-api.sh skip ID` for skips.
 4. **Fill approved jobs one at a time** (see Delegation). Each ends `ready`, `closed`, or `blocked`.
    - `closed` → tell the owner and suggest `remove`; do not remove without their word.
@@ -56,6 +58,11 @@ open job (the helper's `queue` order).
    If they abandon it, ask whether to `remove` or `skip` it.
 7. When the batch is done, report counts (applied / removed / skipped / pending review) and offer
    the next batch.
+8. **Cleanup:** when the owner says the session is complete, first confirm no parked form is still
+   awaiting a submit decision (resolve or note any that are), then run `waunder-api.sh cleanup`.
+   It deletes everything in `.apply-session/` except `answers.local.json` and
+   `Aden_Guo_Resume.pdf`, plus all of `.playwright-mcp/`; the skipped list resets with it. Never
+   run cleanup without the owner saying the session is done.
 
 ## Delegation (context preservation)
 
@@ -77,7 +84,7 @@ when subagents are available.
 
 | Path | Purpose |
 |---|---|
-| `scripts/waunder-api.sh` | login / queue / job / applied / remove / skip |
+| `scripts/waunder-api.sh` | login / queue / job / applied / remove / skip / cleanup |
 | `scripts/render-cover-letter.cjs` | text → PDF via the `workers/` Playwright install |
 | `references/job-brief.md` | per-job fill instructions and return contract |
 | `.apply-session/` (repo root, gitignored) | answers, CV, cover letters, screenshots, cookies, `log.jsonl`, `skipped.txt` |

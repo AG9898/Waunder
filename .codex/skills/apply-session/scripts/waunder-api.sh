@@ -8,6 +8,8 @@
 #   waunder-api.sh applied ID            mark applied / waiting (only after the owner submitted)
 #   waunder-api.sh remove ID             owner declined: lifecycle_state -> removed
 #   waunder-api.sh skip ID               leave untouched in Rails; exclude from later queues locally
+#   waunder-api.sh cleanup               owner ended the session: delete .apply-session/ contents
+#                                        (except answers.local.json and the CV) and .playwright-mcp/
 #
 # Writes are sent exactly once and never retried: a replayed write is never safe to assume.
 set -euo pipefail
@@ -19,7 +21,6 @@ SKIPPED="$SESSION_DIR/skipped.txt"
 LOG="$SESSION_DIR/log.jsonl"
 BASE="${WAUNDER_BASE_URL:-https://web-production-9b240.up.railway.app}"
 mkdir -p "$SESSION_DIR"
-touch "$SKIPPED"
 
 die() { echo "error: $*" >&2; exit 1; }
 need_id() { [[ "${1:-}" =~ ^[0-9]+$ ]] || die "numeric job id required"; }
@@ -58,7 +59,7 @@ case "${1:-}" in
       resp="$(api_get "/api/job_posts?status=all&state=open&application=not_applied&sort=oldest&page=$page")"
       while read -r id; do
         [[ -z "$id" ]] && continue
-        grep -qx "$id" "$SKIPPED" && continue
+        [[ -f "$SKIPPED" ]] && grep -qx "$id" "$SKIPPED" && continue
         ids+=("$id"); (( ${#ids[@]} >= want )) && break
       done < <(jq -r '.job_posts[].id' <<<"$resp")
       [[ "$(jq -r '.page.has_next' <<<"$resp")" == true ]] || break
@@ -87,10 +88,16 @@ case "${1:-}" in
     ;;
   skip)
     need_id "${2:-}"
-    grep -qx "$2" "$SKIPPED" || echo "$2" >> "$SKIPPED"
+    grep -qxs "$2" "$SKIPPED" || echo "$2" >> "$SKIPPED"
     log skipped "$2"; echo "job $2 skipped locally"
     ;;
+  cleanup)
+    find "$SESSION_DIR" -mindepth 1 -maxdepth 1 \
+      ! -name answers.local.json ! -name Aden_Guo_Resume.pdf -exec rm -rf {} +
+    rm -rf "$ROOT/.playwright-mcp"
+    echo "session files removed (kept answers.local.json and Aden_Guo_Resume.pdf)"
+    ;;
   *)
-    sed -n '2,12p' "$0"; exit 1
+    sed -n '2,14p' "$0"; exit 1
     ;;
 esac
