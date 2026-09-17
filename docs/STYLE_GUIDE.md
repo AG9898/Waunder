@@ -290,10 +290,14 @@ figures where possible.
   than adding a nested card. Its empty state explains that generation uses the synced resume and
   never submits; the generated body preserves paragraph breaks, with Copy and explicit
   Generate/Regenerate controls plus a compact recoverable error state.
-- The profile screen's resume parse status (`.profile-resume-status`) and the push toggle's
-  subscribed indicator (`.push-toggle-status-on`) reuse the same quiet pill idiom as the
-  match-score pill, but tinted success-soft/sunken rather than sage, so "resume parsed" and
-  "notifications on" read as calm status facts rather than another action button.
+- The profile screen keeps its editable form and read-only contact, resume, push, and session
+  sections in one quiet column: section boundaries and repeated metadata rows use
+  `--color-grid-line` hairlines rather than nested cards. Profile inputs and explicit actions use
+  `--radius-control` with touch-sized controls, tightening to `--control-h-desktop` in a wide
+  profile container. The resume parse status (`.profile-resume-status`) and subscribed indicator
+  (`.push-toggle-status-on`) remain quiet success/sunken fact pills, while the conditional install
+  guide is one sunken `--radius-panel` with an explicit enable action. Contact values remain
+  presence-only and no profile, push, or sign-out write runs on render.
 
 If a new screen is added, extend the same system: a readable mobile column, purposeful desktop
 columns, a compact title, hairline sections, and one primary action where possible.

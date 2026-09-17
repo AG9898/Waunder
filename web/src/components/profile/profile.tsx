@@ -29,15 +29,15 @@
  * ## Three things Go did not render
  *
  * - **Sign out** (`useSignOut`, `FE-09`). Go had no way to end a session short of the cookie's
- *   90-day expiry. `app.css` has no rule for the control until `UI-01`, so it borrows the outline
- *   button from `.manual-entry-lookup-button` (which, unlike the push toggle's outline button, also
- *   styles `:disabled`) and the save error pill, next to `profile-sign-out` hooks of its own.
+ *   90-day expiry. It borrows the outline button from `.manual-entry-lookup-button` (which, unlike
+ *   the push toggle's outline button, also styles `:disabled`) and the save error pill, next to
+ *   `profile-sign-out` hooks of its own.
  * - **The install guide** (`FE-14`), mounted after the toggle for the two iOS gates only — see
  *   `showInstallGuide` for why it stays hidden where the toggle already answers.
  * - **Rails' 422 sentence** on a failed save (`profileSaveErrorMessage`).
  *
- * The first two are deliberate differences from the Go build for the `FE-28` parity gate. Nothing on
- * the screen writes on render: the only request a mount makes is the profile read.
+ * The first two are deliberate differences from the Go build. Nothing on the screen writes on
+ * render: the only request a mount makes is the profile read.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useCallback, useMemo, useState } from "react";

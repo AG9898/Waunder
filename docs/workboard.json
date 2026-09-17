@@ -3804,7 +3804,7 @@
       "id": "UI-26",
       "title": "Re-skin the Profile screen to Surface v2",
       "description": "Apply the Surface v2 re-skin checklist to the profile screen only: profile form, resume metadata, push toggle, and install guide. No layout, copy, or behavior changes; saves, push subscribe, and unsubscribe stay explicit actions. Update the profile bullets in STYLE_GUIDE.md.",
-      "status": "todo",
+      "status": "done",
       "priority": "low",
       "group_id": "UI",
       "depends_on": [

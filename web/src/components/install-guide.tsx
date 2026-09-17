@@ -5,7 +5,7 @@
  * It answers one question in the owner's words: *why can't I turn on notifications, and what do
  * I do about it?* `lib/platform.ts` computes the gate; this component renders the four answers.
  * Markup, classes (`.install-guide`, `.enable-notifications`, `.install-status`) and copy are
- * carried over unchanged, so the screenshot parity gate compares like with like.
+ * carried over unchanged; Surface v2 styling is scoped to the profile screen that mounts it.
  *
  * ## Two corrections to the Go original
  *

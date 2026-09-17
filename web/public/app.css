@@ -3370,6 +3370,78 @@ html { scroll-padding-bottom: var(--screen-bottom); }
 }
 .draft-review .draft-submit-button:disabled { cursor: default; }
 
+/* Surface v2 profile: keep the editor and read-only sections as one quiet column, with
+   grid-line rows instead of nested cards. All profile controls stay touch-sized until the
+   profile container is wide enough for the compact desktop height. */
+.profile .profile-input,
+.profile .profile-full-name,
+.profile .profile-headline,
+.profile .profile-summary,
+.profile .profile-location,
+.profile .profile-linkedin,
+.profile .profile-github,
+.profile .profile-portfolio {
+  min-height: var(--control-h-touch);
+  padding: 0 14px;
+  border-radius: var(--radius-control);
+}
+.profile .profile-save,
+.profile .push-toggle-enable,
+.profile .enable-notifications {
+  min-height: var(--control-h-touch);
+  padding: 0 18px;
+  border-radius: var(--radius-control);
+}
+.profile .push-toggle-disable,
+.profile .push-toggle-busy,
+.profile .profile-sign-out {
+  min-height: var(--control-h-touch);
+  padding: 0 16px;
+  border-radius: var(--radius-control);
+}
+.profile .profile-contact,
+.profile .profile-resume,
+.profile .push-toggle,
+.profile .profile-session {
+  padding-top: var(--space-5);
+  border-top-color: var(--color-grid-line);
+}
+.profile .profile-contact ul,
+.profile .profile-resume-meta {
+  gap: 0;
+  margin-top: var(--space-3);
+  border-top: 1px solid var(--color-grid-line);
+}
+.profile .profile-contact-row,
+.profile .profile-resume-meta li {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  padding: var(--space-2) 0;
+}
+.profile .profile-contact-row + .profile-contact-row,
+.profile .profile-resume-meta li + li {
+  border-top: 1px solid var(--color-grid-line);
+}
+.profile .profile-resume-status,
+.profile .push-toggle-status {
+  min-height: 22px;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+}
+.profile .profile-save-error,
+.profile .profile-sign-out-error {
+  border-radius: var(--radius-control);
+}
+.profile .install-guide {
+  margin-top: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-grid-line);
+  border-radius: var(--radius-panel);
+  box-shadow: none;
+}
+
 @container (min-width: 800px) {
   .job-feed-workspace { grid-template-columns: 260px minmax(0, 1fr); align-items: start; gap: 32px; }
   .job-feed-controls { position: sticky; top: 24px; }
@@ -3464,6 +3536,22 @@ html { scroll-padding-bottom: var(--screen-bottom); }
   .draft-review .draft-pipeline-status .status-chip--touch { height: 22px; }
   .draft-materials { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 40px; align-items: start; }
   .draft-resume-emphasis { grid-column: 1 / -1; }
+  .profile .profile-input,
+  .profile .profile-full-name,
+  .profile .profile-headline,
+  .profile .profile-summary,
+  .profile .profile-location,
+  .profile .profile-linkedin,
+  .profile .profile-github,
+  .profile .profile-portfolio,
+  .profile .profile-save,
+  .profile .push-toggle-enable,
+  .profile .enable-notifications,
+  .profile .push-toggle-disable,
+  .profile .push-toggle-busy,
+  .profile .profile-sign-out {
+    min-height: var(--control-h-desktop);
+  }
   .profile-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
   .profile-field:has(.profile-summary), .profile-form > :is(button, p) { grid-column: 1 / -1; }
   .profile-save { justify-self: start; }
