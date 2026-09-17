@@ -182,15 +182,15 @@ figures where possible.
   `--radius-control` pause/resume button at the touch or desktop control height that shows
   `Updating…` disabled while in flight. It never changes intake on render; the outcome is reported
   in a quiet `.intake-message` pill, failures in `.intake-error`.
-- The job detail is a header (title, company, origin sentence, compensation, score pill) above a
-  `.job-workspace` that holds the assessment column and a `.job-workspace-actions` aside. Below
-  800px the aside is `display: contents`, so its panels interleave with the assessment by CSS
-  `order` — route out (0), assessment (1), pipeline status (2), drafts & outreach (3), intake (4);
-  above it the aside becomes a sticky surface-coloured sidebar. The optional actions (prepare a
-  draft, contacts and outreach) sit inside a collapsed `<details class="job-optional-actions">`
-  so the primary path — open the posting on the employer's site, then record it — stays first.
-  Assessment blocks are omitted entirely when the scorer had nothing for them; only the summary
-  falls back to a sentence, because an unscored posting is the common case rather than an error.
+- The job detail header carries the title, company, origin sentence, compensation, and banded score
+  pill above a `.job-workspace`. Its assessment and cover-letter sections use 1px
+  `--color-grid-line` hairlines and spacing rather than nested cards, and scorer blocks are omitted
+  when empty; only the summary falls back to a sentence because an unscored posting is common.
+  Below 800px `.job-workspace-actions` is `display: contents`, so its panels interleave with the
+  assessment by CSS `order` — route out (0), assessment (1), pipeline status (2), drafts & outreach
+  (3), intake (4). Above it becomes the single sticky `--radius-panel` sidebar surface, with its
+  inner action sections separated by hairlines. The current pipeline status is a `StatusChip`
+  beside the existing status and stage controls.
 - On the Jobs feed each row card is followed by a `.job-list-actions` manage bar: the selection
   checkbox (`.job-select-label`, "Select") is grouped on the left with the lifecycle
   backlog/remove/restore buttons on the right, rather than floating the bare checkbox above the
@@ -282,10 +282,10 @@ figures where possible.
   does not reach `<textarea>` elements, so the pasted-posting and outreach-draft fields
   (`.manual-entry-text`, `.contact-outreach-template`, `.contact-outreach-message`) set
   `overflow-wrap: break-word` directly to stay usable at mobile widths.
-- The job-detail `.job-cover-letter` card follows the assessment-section hairline rhythm. Its
-  empty state explains that generation uses the synced resume and never submits; the generated
-  body preserves paragraph breaks, with Copy and explicit Generate/Regenerate controls plus a
-  compact recoverable error state.
+- The job-detail `.job-cover-letter` section follows the assessment-section hairline rhythm rather
+  than adding a nested card. Its empty state explains that generation uses the synced resume and
+  never submits; the generated body preserves paragraph breaks, with Copy and explicit
+  Generate/Regenerate controls plus a compact recoverable error state.
 - The profile screen's resume parse status (`.profile-resume-status`) and the push toggle's
   subscribed indicator (`.push-toggle-status-on`) reuse the same quiet pill idiom as the
   match-score pill, but tinted success-soft/sunken rather than sage, so "resume parsed" and

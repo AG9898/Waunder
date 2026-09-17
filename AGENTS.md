@@ -1583,3 +1583,8 @@ The tracker status editor resolves Mobile/Desktop from the shared `data-layout` 
 the existing 960px Auto breakpoint, not from the user agent. A layout-sensitive editor should refresh
 that signal on the opening gesture so a viewport resize or chrome selection takes effect without a
 global resize listener.
+
+### 2026-09-17 — Job detail reskin selectors need local scope
+Surface v2 controls reuse classes such as `.job-route-link` and `.copy-button` on other screens, so
+Job detail styling additions must be scoped under `.job-detail`. A global control-rule change can
+alter draft review or contacts even when the component markup and behavior were untouched.

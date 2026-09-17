@@ -3736,7 +3736,7 @@
       "id": "UI-24",
       "title": "Re-skin the Job detail screen to Surface v2",
       "description": "Apply the Surface v2 re-skin checklist to the job detail only: header, assessment sections, the manual application panel, the pipeline status panel (show the current status as a StatusChip beside its existing controls), cover letter, and optional actions. No layout, CSS order, copy, or behavior changes; mark-applied and status writes stay explicit and never draft or submit. Update the job detail bullets in STYLE_GUIDE.md.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "UI",
       "depends_on": [

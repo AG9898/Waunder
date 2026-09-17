@@ -180,12 +180,18 @@ describe("tracker rendering", () => {
     expect(screen.getByRole("heading", { name: "Application status" })).toBeInTheDocument();
     expect(statusSelect(container).value).toBe("interviewing");
     expect(stageSelect(container).value).toBe("technical");
-    expect(container.querySelector(".job-tracker-current")?.textContent).toBe(
-      "Interviewing · Technical",
-    );
-    expect(container.querySelector(".manual-tracker-current")?.textContent).toBe(
-      "Interviewing · Technical",
-    );
+    for (const selector of [".job-tracker-current", ".manual-tracker-current"]) {
+      const current = container.querySelector(selector);
+      expect(current?.querySelector('[data-slot="status-chip"]')).toHaveAttribute(
+        "data-status",
+        "interviewing",
+      );
+      expect(current?.querySelector('[data-slot="status-chip"]')).toHaveClass(
+        "status-chip--interviewing",
+        "status-chip--touch",
+      );
+      expect(current?.textContent).toBe("Interviewing · Technical");
+    }
   });
 
   it("shows the quick action but no status line for an untracked posting", async () => {

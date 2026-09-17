@@ -47,6 +47,7 @@ import {
   selectValue,
   stageFromSelectValue,
 } from "../../lib/pipeline";
+import { StatusChip } from "../ui/status-chip";
 
 export interface TrackerProps {
   /** The posting's latest Application, or `null` when it has never been tracked. */
@@ -72,11 +73,23 @@ export function TrackerStatusLine({
   if (application === null) {
     return null;
   }
+  const stage = trackerStageLabel(application.pipeline_status, application.pipeline_stage);
   return (
     <p className={className} role="status">
-      {pipelineStatusLabel(application.pipeline_status, application.pipeline_stage)}
+      <StatusChip status={application.pipeline_status} size="touch" />
+      {stage === "" ? null : <span className="job-tracker-stage">{" · "}{stage}</span>}
     </p>
   );
+}
+
+/** Keep the existing stage copy beside the chip without duplicating its status label. */
+function trackerStageLabel(status: string, stage: string): string {
+  const fullLabel = pipelineStatusLabel(status, stage);
+  const statusLabel = pipelineStatusLabel(status, "");
+  const separator = " · ";
+  return fullLabel.startsWith(`${statusLabel}${separator}`)
+    ? fullLabel.slice(statusLabel.length + separator.length)
+    : "";
 }
 
 /**
