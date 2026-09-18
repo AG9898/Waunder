@@ -3493,6 +3493,68 @@ html { scroll-padding-bottom: var(--screen-bottom); }
   box-shadow: none;
 }
 
+/* Surface v2 contacts: repeated people remain discrete panels, while each outreach draft is
+   one sunken well with hairline-separated controls rather than another card stack. */
+.contacts-view .contact {
+  border-color: var(--color-grid-line);
+  border-radius: var(--radius-panel);
+}
+.contacts-view .contact-outreach { border-top-color: var(--color-grid-line); }
+.contacts-view .contact-outreach-template {
+  border-radius: var(--radius-control);
+}
+.contacts-view .contact-outreach-generate,
+.contacts-view .contact-outreach-copy {
+  min-height: var(--control-h-touch);
+  padding: 0 18px;
+  border-radius: var(--radius-control);
+}
+.contacts-view .contact-outreach-draft {
+  padding: var(--space-4);
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-grid-line);
+  border-radius: var(--radius-panel);
+}
+.contacts-view .contact-outreach-message {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.contacts-view .contact-outreach-draft .copy-control {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-grid-line);
+}
+.contacts-view .contact-outreach-error { border-radius: var(--radius-control); }
+.contacts-view .contact-create {
+  margin-top: var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-grid-line);
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+}
+.contacts-view .contact-create > summary {
+  display: flex;
+  min-height: var(--control-h-touch);
+  align-items: center;
+  padding: 0 var(--space-4);
+  background: var(--color-grid-header);
+  border-radius: var(--radius-control);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.contacts-view .contact-create-form { padding: var(--space-4); }
+.contacts-view .contact-create .profile-input,
+.contacts-view .contact-create-save {
+  min-height: var(--control-h-touch);
+  padding: 0 14px;
+  border-radius: var(--radius-control);
+}
+.contacts-view .contact-create-error,
+.contacts-view .contact-create-ok { border-radius: var(--radius-control); }
+
 @container (min-width: 800px) {
   .job-feed-workspace { grid-template-columns: 260px minmax(0, 1fr); align-items: start; gap: 32px; }
   .job-feed-controls { position: sticky; top: 24px; }
@@ -3614,6 +3676,13 @@ html { scroll-padding-bottom: var(--screen-bottom); }
   .profile-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
   .profile-field:has(.profile-summary), .profile-form > :is(button, p) { grid-column: 1 / -1; }
   .profile-save { justify-self: start; }
+  .contacts-view .contact-outreach-generate,
+  .contacts-view .contact-outreach-copy,
+  .contacts-view .contact-create > summary,
+  .contacts-view .contact-create .profile-input,
+  .contacts-view .contact-create-save {
+    min-height: var(--control-h-desktop);
+  }
   .contacts-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
   .manual-entry-form { max-width: 800px; }
 }

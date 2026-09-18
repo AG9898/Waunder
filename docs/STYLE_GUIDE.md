@@ -302,6 +302,12 @@ figures where possible.
   (`.push-toggle-status-on`) remain quiet success/sunken fact pills, while the conditional install
   guide is one sunken `--radius-panel` with an explicit enable action. Contact values remain
   presence-only and no profile, push, or sign-out write runs on render.
+- The contacts screen keeps each person as one discrete `--radius-panel` card. Outreach is separated
+  by a grid-line hairline; its template, Generate/Regenerate, and Copy controls use
+  `--radius-control`, touch height on mobile, and `--control-h-desktop` in a wide container. A
+  generated message is one sunken `--radius-panel` well whose copy row is separated by a grid
+  hairline, not another card stack. The add-contact disclosure uses the grid-header strip over one
+  surface panel. Generation, saving, and copying remain explicit, and no send affordance exists.
 
 If a new screen is added, extend the same system: a readable mobile column, purposeful desktop
 columns, a compact title, hairline sections, and one primary action where possible.

@@ -16,12 +16,10 @@
  *
  * Rails has always served `POST /api/job_posts/:id/contact_candidates`, but the Go screen only
  * listed, so a contact could only be created against the API by hand. The form sits in a
- * `<details>` that starts collapsed, which keeps the default screen one summary line away from the
- * Go build for the `FE-28` parity gate. `app.css` is frozen until `UI-01` and has no rules for a
- * form Go never rendered, so the fields borrow the profile form's shared field vocabulary
- * (`profile-form`, `profile-field`, `profile-input`, `profile-save`, …) next to `contact-create-*`
- * hooks of their own. A save invalidates the list and awaits the refetch rather than splicing the
- * row in, so the owner sees Rails' order and Rails' copy of what it stored.
+ * `<details>` that starts collapsed. The fields borrow the profile form's shared field vocabulary
+ * (`profile-form`, `profile-field`, `profile-input`, `profile-save`, …) next to contact-scoped
+ * `contact-create-*` hooks. A save invalidates the list and awaits the refetch rather than splicing
+ * the row in, so the owner sees Rails' order and Rails' copy of what it stored.
  *
  * ## The LinkedIn link is filtered
  *

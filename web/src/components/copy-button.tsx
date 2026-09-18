@@ -36,8 +36,8 @@ export interface CopyButtonProps {
   label: string;
   /**
    * The button's class, `copy-button` unless given. The outreach draft passes
-   * `contact-outreach-copy`, the class `contacts.go` rendered and `app.css` styles as that
-   * screen's secondary action, so the port keeps Go's look there.
+   * `contact-outreach-copy` so `app.css` can style that screen's secondary action without changing
+   * the shared copy controls used on job detail and draft review.
    */
   buttonClassName?: string;
 }

@@ -3873,7 +3873,7 @@
       "id": "UI-28",
       "title": "Re-skin the Contacts and outreach screen to Surface v2",
       "description": "Apply the Surface v2 re-skin checklist to the contacts screen only: contact cards, outreach generation controls, and draft wells with copy controls. No layout, copy, or behavior changes; outreach stays generate-and-copy only with no send affordance. Update the contacts bullets in STYLE_GUIDE.md.",
-      "status": "todo",
+      "status": "done",
       "priority": "low",
       "group_id": "UI",
       "depends_on": [
