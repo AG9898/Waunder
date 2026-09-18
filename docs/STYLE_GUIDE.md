@@ -76,8 +76,8 @@ source of truth; the stylesheet is `web/public/app.css`, linked from `web/index.
 > no `.tracker-stage` pill rather than an empty one.
 >
 > **RESOLVED-26 replaces the former card/table contract.** The tracker is a horizontally scrolling
-> Surface v2 grid at every width; later Surface v2 tasks add the remaining editors without changing
-> this structural grid foundation.
+> Surface v2 grid at every width, with its status, stage, follow-up, and note editors built on this
+> structural grid foundation.
 
 ---
 
@@ -319,13 +319,13 @@ columns, a compact title, hairline sections, and one primary action where possib
 
 ---
 
-## Surface v2 (RESOLVED-26, in progress)
+## Surface v2 (RESOLVED-26, complete)
 
 The approved design is the canvas at https://claude.ai/artifact/EejxLR8rLjxT3UzbnPbvVa (artboards:
 desktop tracker grid, mobile tracker grid, mobile edit-status sheet, chips and cell states). It is a
 reference for values and anatomy only; React components stay the markup source of truth. Tasks
-UI-06…UI-30 and TRACK-02 implement it. Until a task lands, the sections above describe what ships;
-each task rewrites the bullet it replaces in the same commit.
+UI-06…UI-30 and TRACK-02 implemented it. The sections above describe the shipped system; the
+details below retain the completed design contract for future maintenance.
 
 ### Tokens added
 
@@ -352,7 +352,7 @@ One `StatusChip` renders any `pipeline_status`: a 22px (24px on touch) pill, 12p
 dot, fill and ink from this table. Its pure tone/group metadata lives in `web/src/lib/labels.ts`;
 unknown values use the Interested tone and label, while the "Not applied" tracker placeholder uses
 that tone with its own label. The Applications tracker uses the chip as its editable status-cell
-trigger; later Surface v2 screens reuse the same primitive.
+trigger, and job detail and draft review reuse the same primitive.
 
 | Group | Status | Fill | Ink | Dot | Border |
 |---|---|---|---|---|---|
@@ -417,10 +417,10 @@ Menus that list statuses group them under these four group labels, in this order
   the add control is the same accessible `/jobs/new` entry point with its label reduced to the icon;
   safe-area padding unchanged.
 
-### Re-skin checklist (screens without their own artboard)
+### Re-skin constraints (screens without their own artboard)
 
-Apply exactly these and nothing else; a task that needs a layout, copy, or behaviour change stops and
-asks.
+These constraints governed the completed re-skin and remain the maintenance contract for screens
+without their own artboard.
 
 1. Controls use `--radius-control` and `--control-h-desktop` on desktop layouts, never below
    `--control-h-touch` on mobile layouts; panels and cards use `--radius-panel`.
@@ -455,8 +455,8 @@ asks.
   `reference/` are review references only.
 - Keep the PWA manifest in `web/vite.config.ts` (`vite-plugin-pwa`) and the service worker in
   `web/src/sw.ts`; `/app-worker.js` is the permanent legacy-worker kill switch.
-- Markup changes follow an approved design (currently Surface v2, RESOLVED-26) or its re-skin
-  checklist; anything beyond that needs a new mock and plan.
+- Markup changes follow an approved design (Surface v2 is complete under RESOLVED-26) or its re-skin
+  constraints; anything beyond that needs a new mock and plan.
 - Preserve existing safety tests and behavior: submits, profile saves, manual job creation,
   push subscribe/unsubscribe, and outreach generation must remain explicit user actions.
 

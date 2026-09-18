@@ -1606,3 +1606,9 @@ Apply link goes through `linkedin.com/safety/go/?url=…` (decode it), Glassdoor
 Indeed Apply, and ATS "autofill from resume" can report success while leaving fields empty, so the
 agent checks every field itself. Inbound alert jobs have no stored description, so cover letters come
 from the live posting rather than the in-app generator.
+
+### 2026-09-18 — CSS dead-selector audits must account for generated class suffixes
+Several live Surface v2 classes are assembled from constrained values rather than emitted as full
+literals (`job-score--${band}`, `status-chip--${tone}`, lifecycle, tracker-group, and bulk-action
+suffixes). Before deleting an `app.css` selector absent as a literal under `web/src/`, trace template
+prefixes and their value domains; remove only hooks with no static or generated emitter.

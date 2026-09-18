@@ -3938,7 +3938,7 @@
       "id": "UI-30",
       "title": "Remove app.css rules left dead by the Surface v2 re-skin",
       "description": "After every Surface v2 task lands, find app.css selectors that no component under web/src/ emits any more (for example retired tracker card rules and superseded chrome rules) by diffing class names used in source against selectors in app.css, and delete only those. Check inheritance and grouped selectors before removing a rule. Mark STYLE_GUIDE.md's Surface v2 section as complete and fold anything still pending into the main sections.",
-      "status": "todo",
+      "status": "done",
       "priority": "low",
       "group_id": "UI",
       "depends_on": [
