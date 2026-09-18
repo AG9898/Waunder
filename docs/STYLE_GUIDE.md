@@ -273,6 +273,11 @@ figures where possible.
   The `FE-28` parity gate checked primary-button rings with a keyboard Tab walk and computed
   `box-shadow`, not with a screenshot taken right after `focus()`.
 - Error and success messages use soft status pills. Loading uses a gentle opacity pulse.
+- The login screen keeps its centered 28px wordmark and behavior-only form. Its passphrase field
+  and sage submit action use `--radius-control`, touch height on mobile, and
+  `--control-h-desktop` in Desktop or wide Auto layouts; the danger-soft error state uses the same
+  control radius. The sage action retains `--focus-ring-strong`, and the passphrase remains an
+  uncontrolled input that is never stored in React or TanStack state.
 - Empty feed/list states (`.digest-empty`, `.job-list-empty`, `.tracker-empty`,
   `.contacts-empty`) render as a
   quiet sunken well with centered faint-ink text — visually distinct from the danger-toned

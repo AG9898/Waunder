@@ -2770,16 +2770,25 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
 .login-form { display: flex; flex-direction: column; gap: var(--space-3); }
 .login-passphrase {
   width: 100%;
-  padding: 13px 16px;
+  min-height: var(--control-h-touch);
+  padding: 0 16px;
   background: var(--color-surface);
   border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-control);
   font-family: inherit;
   font-size: var(--text-md);
   color: var(--color-ink);
   text-align: center;
 }
-.login-status { text-align: center; }
+.login-submit {
+  min-height: var(--control-h-touch);
+  padding: 0 22px;
+  border-radius: var(--radius-control);
+}
+.login-status {
+  border-radius: var(--radius-control);
+  text-align: center;
+}
 
 /* The shared sage-soft :focus-visible ring is too low-contrast against any
    sage-filled button. Every sage-filled control gets a two-layer ring: a
@@ -2833,6 +2842,11 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
   --nav-transform: none;
 }
 
+:root[data-layout="desktop"] .login-passphrase,
+:root[data-layout="desktop"] .login-submit {
+  min-height: var(--control-h-desktop);
+}
+
 @media (min-width: 960px) {
   :root:not([data-layout="mobile"]) {
     --page-max: 1280px;
@@ -2844,6 +2858,10 @@ textarea:disabled { opacity: .6; cursor: not-allowed; }
     --nav-safe-bottom: 0px;
     --screen-bottom: 48px;
     --nav-transform: none;
+  }
+  :root:not([data-layout="mobile"]) .login-passphrase,
+  :root:not([data-layout="mobile"]) .login-submit {
+    min-height: var(--control-h-desktop);
   }
 }
 

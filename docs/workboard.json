@@ -3907,7 +3907,7 @@
       "id": "UI-29",
       "title": "Re-skin the Login screen to Surface v2",
       "description": "Apply the Surface v2 re-skin checklist to the login screen only: wordmark, passphrase field, submit button, and error state. No copy or behavior changes; the passphrase input stays uncontrolled and is never stored in query or mutation state. Update the login bullet in STYLE_GUIDE.md.",
-      "status": "todo",
+      "status": "done",
       "priority": "low",
       "group_id": "UI",
       "depends_on": [
