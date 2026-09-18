@@ -258,8 +258,12 @@ figures where possible.
   sentinel mapped back to an empty API value (Rails still defaults Applied to Waiting).
 - Primary actions use sage filled buttons; secondary actions use outline/surface buttons.
 - The Jobs-screen import action is a compact sage-soft outline control; empty-feed import is a
-  text action inside the quiet empty-state well. Manual import results name the outcome plainly
-  (new, already tracked, already submitted, or possible match) and link to the returned record.
+  text action inside the quiet empty-state well. Manual entry keeps one explicit, `noValidate`
+  form: its inputs and Import/lookup controls use `--radius-control`, touch height on mobile, and
+  `--control-h-desktop` in a wide container. Lookup notes are compact sage-soft or danger-soft
+  feedback pills. Import results are `--radius-panel` surfaces whose modifier class distinguishes
+  new/already-submitted (success), already-tracked (sage), and possible-match (warning), while
+  preserving Rails' outcome copy and the link to the returned record.
 - Inputs and textareas use warm surface fill, strong hairline border, 12px radius, and a
   visible sage focus ring.
   Every sage-filled button (and the vendored `Button`) uses `--focus-ring-strong` — a surface gap

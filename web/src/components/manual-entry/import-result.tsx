@@ -9,8 +9,8 @@
  * identity match (`JobPostUrlIdentity`), and the link goes to whichever posting Rails named — for
  * a match, the existing one, not a duplicate.
  *
- * Every outcome keeps Go's `.manual-entry-result` box, so the four read apart by their sentence
- * and link label, and by a modifier class (`importResultClass`) that `app.css` does not style yet.
+ * Every outcome keeps the `.manual-entry-result` panel, so the four read apart by their sentence,
+ * link label, and the Surface v2 tone attached to the modifier class from `importResultClass`.
  */
 import { Link } from "react-router";
 

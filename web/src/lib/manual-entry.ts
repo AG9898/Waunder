@@ -245,8 +245,8 @@ export function importResultHref(result: ManualJobResult): string {
 }
 
 /**
- * A modifier class per outcome, e.g. `manual-entry-result--already-tracked`. `app.css` has no rule
- * for it yet (it is frozen until `UI-01`), so today it only makes the outcome inspectable.
+ * A modifier class per outcome, e.g. `manual-entry-result--already-tracked`. Surface v2 uses it to
+ * give each Rails-owned outcome its corresponding result-panel tone.
  */
 export function importResultClass(outcome: ImportOutcome): string {
   return `manual-entry-result--${outcome.replace(/_/g, "-")}`;

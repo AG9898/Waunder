@@ -3370,6 +3370,57 @@ html { scroll-padding-bottom: var(--screen-bottom); }
 }
 .draft-review .draft-submit-button:disabled { cursor: default; }
 
+/* Surface v2 manual entry: keep the existing form anatomy while giving its controls,
+   lookup feedback, and Rails-owned import outcomes the compact surface treatment. */
+.manual-entry .manual-entry-url,
+.manual-entry .manual-entry-application-url,
+.manual-entry .manual-entry-title,
+.manual-entry .manual-entry-company {
+  min-height: var(--control-h-touch);
+  padding: 0 14px;
+  border-radius: var(--radius-control);
+}
+.manual-entry .manual-entry-text { border-radius: var(--radius-control); }
+.manual-entry .manual-entry-submit,
+.manual-entry .manual-entry-lookup-button {
+  min-height: var(--control-h-touch);
+  padding: 0 18px;
+  border-radius: var(--radius-control);
+}
+.manual-entry .manual-entry-lookup-note,
+.manual-entry .manual-entry-lookup-warning {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+}
+.manual-entry .manual-entry-lookup-note {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-ink);
+}
+.manual-entry .manual-entry-lookup-warning {
+  background: var(--color-danger-soft);
+  color: var(--color-danger-ink);
+}
+.manual-entry .manual-entry-error { border-radius: var(--radius-control); }
+.manual-entry .manual-entry-result {
+  border-color: var(--color-grid-line);
+  border-radius: var(--radius-panel);
+}
+.manual-entry .manual-entry-result--new,
+.manual-entry .manual-entry-result--already-submitted {
+  background: var(--color-success-soft);
+  color: var(--color-success-ink);
+}
+.manual-entry .manual-entry-result--already-tracked {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-ink);
+}
+.manual-entry .manual-entry-result--possible-match {
+  background: var(--color-warning-soft);
+  color: var(--color-warning-ink);
+}
+.manual-entry .manual-entry-result-msg,
+.manual-entry .manual-entry-result-link { color: inherit; }
+
 /* Surface v2 profile: keep the editor and read-only sections as one quiet column, with
    grid-line rows instead of nested cards. All profile controls stay touch-sized until the
    profile container is wide enough for the compact desktop height. */
@@ -3536,6 +3587,14 @@ html { scroll-padding-bottom: var(--screen-bottom); }
   .draft-review .draft-pipeline-status .status-chip--touch { height: 22px; }
   .draft-materials { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 40px; align-items: start; }
   .draft-resume-emphasis { grid-column: 1 / -1; }
+  .manual-entry .manual-entry-url,
+  .manual-entry .manual-entry-application-url,
+  .manual-entry .manual-entry-title,
+  .manual-entry .manual-entry-company,
+  .manual-entry .manual-entry-submit,
+  .manual-entry .manual-entry-lookup-button {
+    min-height: var(--control-h-desktop);
+  }
   .profile .profile-input,
   .profile .profile-full-name,
   .profile .profile-headline,

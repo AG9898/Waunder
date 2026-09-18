@@ -3839,7 +3839,7 @@
       "id": "UI-27",
       "title": "Re-skin the Manual entry screen to Surface v2",
       "description": "Apply the Surface v2 re-skin checklist to manual job entry only: the form, URL lookup control and prefill note, and import result states. No layout, copy, or behavior changes; the form stays noValidate so Rails validation messages still show, and imports stay explicit. Update the manual entry bullets in STYLE_GUIDE.md.",
-      "status": "todo",
+      "status": "done",
       "priority": "low",
       "group_id": "UI",
       "depends_on": [
