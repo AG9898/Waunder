@@ -110,7 +110,8 @@ Be honest about the current state — most of the suite is still to be written.
   association, and manual-send message validation.
 - **api/** — `spec/services/job_post_title_screen_spec.rb` and
   `spec/services/inbound_posting_title_filter_spec.rb`: table-driven accepted/rejected title-family
-  boundaries plus aggregate pre-materialization screening counts and reasons.
+  boundaries, the case-insensitive Jobright.ai company block, and aggregate pre-materialization
+  screening counts and reasons.
 - **api/** — `spec/services/inbound_email_parser_spec.rb`: service specs for the deterministic
   known-sender (LinkedIn/Indeed/Glassdoor) email parser, pre-materialization title screening,
   normalized JobPost and URL-alias persistence, company reuse, and LLM-fallback flagging for

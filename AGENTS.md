@@ -1612,3 +1612,9 @@ Several live Surface v2 classes are assembled from constrained values rather tha
 literals (`job-score--${band}`, `status-chip--${tone}`, lifecycle, tracker-group, and bulk-action
 suffixes). Before deleting an `app.css` selector absent as a literal under `web/src/`, trace template
 prefixes and their value domains; remove only hooks with no static or generated emitter.
+
+### 2026-09-21 — Jobright.ai arrives as a LinkedIn company, not an ingestion source
+Production Jobright.ai records have `source = linkedin` and `company = Jobright.ai`; their stored
+source, posting, and application URLs are all the same short-lived LinkedIn listing, with no
+recoverable employer/ATS destination. Block the normalized company name before materialization in
+the shared inbound filter so both deterministic parsing and LLM fallback reject it.

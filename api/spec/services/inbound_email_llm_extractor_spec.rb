@@ -73,6 +73,24 @@ RSpec.describe InboundEmailLlmExtractor do
     )
   end
 
+  it "does not materialize a Jobright.ai posting extracted by the LLM" do
+    client = FakeLlmClient.new(
+      "postings" => [
+        { "title" => "AI Engineer", "company" => "JOBRIGHT.AI",
+          "posting_url" => "https://www.linkedin.com/jobs/view/4468092813/" }
+      ]
+    )
+    email = inbound_email(text: "Jobright.ai is hiring an AI Engineer")
+
+    result = nil
+    expect { result = described_class.new(email, client: client).call }.not_to change(JobPost, :count)
+
+    expect(result.status).to eq("llm_parsed")
+    expect(email.reload.raw_payload.dig("parse_result", "title_screen", "reasons")).to eq(
+      "company_blocked" => 1
+    )
+  end
+
   it "keeps the fallback flag and creates nothing when the model finds no postings" do
     client = FakeLlmClient.new("postings" => [])
     email = inbound_email(text: "Newsletter, no jobs here")

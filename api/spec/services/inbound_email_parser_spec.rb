@@ -288,6 +288,28 @@ RSpec.describe InboundEmailParser do
       expect(JobPost.last.company).to eq(existing)
     end
 
+    it "rejects Jobright.ai postings before materialization" do
+      text = <<~TEXT
+        AI Engineer, Entry Level
+        Jobright.ai · Canada
+        https://www.linkedin.com/jobs/view/4468092813/
+      TEXT
+      email = inbound_email(from: "jobs@linkedin.com", text:)
+
+      expect do
+        result = described_class.new(email).call
+        expect(result.fallback?).to be(false)
+        expect(result.job_posts).to be_empty
+      end.not_to change(JobPost, :count)
+
+      expect(email.reload.raw_payload.dig("parse_result", "title_screen")).to include(
+        "accepted" => 0,
+        "rejected" => 1,
+        "reasons" => { "company_blocked" => 1 }
+      )
+      expect(Company.where("LOWER(name) = ?", "jobright.ai")).to be_empty
+    end
+
     it "matches a forwarded alert via the original sender in the body" do
       text = <<~TEXT
         ---------- Forwarded message ---------

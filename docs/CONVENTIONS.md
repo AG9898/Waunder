@@ -273,12 +273,15 @@ dispatch.
   AI/ML/LLM/agentic engineering, platform/DevOps/SRE/cloud, and data engineering; explicit
   management (including DevOps/cloud/SRE/infrastructure managers), data science/analytics,
   developer-relations, non-software developer (real estate, business), sales/solutions/support,
-  AI-training, and non-software-engineering exclusions win. Business-area wording (marketing,
-  sales, pharmacy, CAD, technician) rejects a title only when no target family phrase matches. Rejected candidates create no Company, JobPost,
-  route, URL identity, or scoring job; aggregate candidate/accepted/rejected counts and reasons are
-  stored under `InboundEmail.raw_payload.parse_result.title_screen`. An LLM extraction containing
-  only screened-out candidates is still `llm_parsed` so it is never paid for repeatedly. Manual
-  imports bypass this automatic gate.
+  AI-training, and non-software-engineering exclusions win. The same pre-materialization filter
+  rejects `Jobright.ai` as a company (case-insensitive): its LinkedIn alerts expose only
+  short-lived LinkedIn listings and do not provide a recoverable employer/ATS destination.
+  Business-area wording (marketing, sales, pharmacy, CAD, technician) rejects a title only when no
+  target family phrase matches. Rejected candidates create no Company, JobPost, route, URL identity,
+  or scoring job; aggregate candidate/accepted/rejected counts and reasons are stored under
+  `InboundEmail.raw_payload.parse_result.title_screen`. An LLM extraction containing only
+  screened-out candidates is still `llm_parsed` so it is never paid for repeatedly. Manual imports
+  bypass this automatic gate.
 - **Already submitted** is defined by `Application.status == "submitted"`, which is written after
   a successful worker report. `pipeline_status == "applied"` and non-terminal automation states
   must not be used as a submission duplicate signal.

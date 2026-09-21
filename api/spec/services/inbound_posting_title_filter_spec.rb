@@ -5,6 +5,7 @@ RSpec.describe InboundPostingTitleFilter do
     software = { title: "Software Engineer", company: "Acme" }
     result = described_class.call([
       software,
+      { title: "AI Engineer", company: " JobRight.AI " },
       { title: "Data Scientist", company: "Data Co" },
       { title: "Product Manager", company: "Product Co" }
     ])
@@ -12,10 +13,11 @@ RSpec.describe InboundPostingTitleFilter do
     expect(result.accepted_postings).to eq([ software ])
     expect(result.summary).to eq(
       "policy" => JobPostTitleScreen::POLICY_VERSION,
-      "candidates" => 3,
+      "candidates" => 4,
       "accepted" => 1,
-      "rejected" => 2,
+      "rejected" => 3,
       "reasons" => {
+        "company_blocked" => 1,
         "title_matches_exclusion" => 1,
         "title_missing_target_role" => 1
       }
