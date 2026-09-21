@@ -1,7 +1,7 @@
 /**
  * The tracker's rows on TanStack Table (`UI-04`/`UI-14`): column sorting, visibility, pinning,
  * sizing, and window virtualization. The same table is a Surface v2 grid at every width: the
- * row-number rail and Job column stay pinned while the remaining columns scroll in the panel.
+ * row-number rail stays pinned, while the Job column joins it only at desktop container widths.
  *
  * - Sorting is a view over the page Rails served. The Sort select still orders the feed on the
  *   server; a header click reorders only the loaded rows.
@@ -30,7 +30,7 @@ import type { JobSummary } from "../../api/schemas";
 import { TRACKER_COLUMNS, type TrackerColumnId, VIRTUALIZE_AFTER } from "../../lib/tracker-columns";
 import { TrackerRow } from "./tracker-row";
 
-/** The row-number rail is outside TanStack's data columns but remains pinned with the Job column. */
+/** The row-number rail is outside TanStack's data columns and remains pinned at every width. */
 const FIXED_COLUMN_COUNT = 1;
 
 /** Estimated px per row before measurement; the mobile row is the conservative height. */

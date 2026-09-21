@@ -1709,9 +1709,9 @@ button { font-family: inherit; }
 }
 
 /* Application tracker grid (UI-14).
-   One Surface v2 grid is used at every width. The number rail and Job column stay pinned while
-   the remaining columns scroll inside the panel; mobile uses the same cells rather than the
-   retired data-label card layout. */
+   One Surface v2 grid is used at every width. The number rail stays pinned while the table scrolls;
+   at desktop widths the Job column is pinned too. Mobile uses the same cells rather than the
+   retired data-label card layout, but lets Job scroll so it cannot consume the narrow viewport. */
 .tracker-wrap {
   --tracker-row-number-width: 34px;
   position: relative;
@@ -1767,7 +1767,7 @@ button { font-family: inherit; }
   color: var(--color-accent-strong);
 }
 .tracker-table [data-pinned="left"] {
-  position: sticky;
+  position: static;
   z-index: 2;
   background: var(--color-surface);
 }
@@ -3617,8 +3617,9 @@ html { scroll-padding-bottom: var(--screen-bottom); }
   .job-detail .job-optional-actions .job-contacts-link { padding: 0; }
   .job-detail .status-chip--touch { height: 22px; }
   .digest-items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  /* Desktop tightens the grid while keeping the same pinned/scrolling anatomy. */
+  /* Desktop tightens the grid and adds the Job column to the pinned row-number rail. */
   .tracker-wrap { --tracker-row-number-width: 48px; }
+  .tracker-table [data-pinned="left"] { position: sticky; }
   .tracker-grid-scroll::after { display: none; }
   .tracker-table th,
   .tracker-sort { height: 36px; min-height: 36px; }

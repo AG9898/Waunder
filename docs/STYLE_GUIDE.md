@@ -62,9 +62,9 @@ source of truth; the stylesheet is `web/public/app.css`, linked from `web/index.
 >
 > The tracker's grid carries its markup contract into `web/src/components/tracker/`: one
 > `<table class="tracker-table">` inside `.tracker-grid-scroll`, a row-number rail, and
-> `.tracker-cell-job` as the TanStack-pinned leading data cell. `tracker-row tracker-row--<group>`
-> from `trackerRowClass` remains the group-tint hook; the company is also rendered as a quiet second
-> line inside the pinned Job cell on mobile. The full structural slice contains Job, Company, Score,
+> `.tracker-cell-job` as the TanStack-pinned leading data cell on desktop. `tracker-row
+> tracker-row--<group>` from `trackerRowClass` remains the group-tint hook; the company is also
+> rendered as a quiet second line inside the Job cell on mobile. The full structural slice contains Job, Company, Score,
 > Status, Stage, Applied, Intaked, Updated, Follow-up, and Note; Status is an editable `StatusChip`
 > command popover on desktop and a bottom drawer on mobile, Stage is an editable pipeline-stage
 > popover, and Follow-up is an editable
@@ -212,8 +212,10 @@ figures where possible.
   selects under `.tracker-toolbar-controls`, next to the compact `.tracker-columns` dropdown.
 - The tracker grid runs on TanStack Table (UI-04/UI-14/UI-16): a header click sorts only the loaded page
   (direction in `aria-sort` and the `.tracker-sort[data-sort]` arrow), while the sunken header uses
-  Lucide column icons and a sorted-column state. The row-number rail and Job column are pinned,
-  column widths come from TanStack sizing, and the remaining columns scroll inside the panel. A
+  Lucide column icons and a sorted-column state. The row-number rail is always pinned; the Job
+  column is pinned only at the 800px desktop-container breakpoint so mobile retains a usable
+  horizontal viewport. Column widths come from TanStack sizing, and the remaining columns scroll
+  inside the panel. A
   `.tracker-columns` dropdown hides every non-Job column (never Job), pages over 60 rows are
   window-virtualized with measured rows, and `.tracker-spacer` rows stay explicit table rows.
   `.tracker-footer` remains inside the grid panel and carries the inclusive row range plus
@@ -221,7 +223,7 @@ figures where possible.
   The server Sort select still orders the feed.
 - The tracker uses one real table at every width, with gridlines, a 34px mobile / 36px desktop
   header strip, 56px mobile / 40px desktop rows, and a 28px mobile right-edge scroll fade. The
-  pinned Job cell ellipsizes its title and places Company beneath it on mobile; the Status cell
+  Job cell ellipsizes its title and places Company beneath it on mobile; the Status cell
   uses a grouped `StatusChip` popover and the Stage cell uses the pipeline-stage popover, both
   keeping the group tint. Empty states name the active tab ("No applications submitted yet.") rather
   than a generic "no rows".
@@ -343,7 +345,7 @@ Add these alongside the existing `:root` tokens (and restate them in `tailwind.c
 | `--control-h-desktop` | 32px | Compact desktop controls |
 | `--control-h-touch` | 44px | Minimum touch target on mobile layouts |
 
-The pinned Job column's right edge uses `--color-border-strong`; other column edges use
+The Job column's right edge uses `--color-border-strong`; other column edges use
 `--color-grid-line`.
 
 ### Status chips
@@ -380,7 +382,8 @@ Menus that list statuses group them under these four group labels, in this order
   Follow-up is an editable calendar
   popover with Clear; Applied remains read-only and Note is an editable popover textarea with
   explicit Save and Cancel.
-- Column order: row number (48px desktop / 34px mobile, centered, faint tabular digits), Job (pinned;
+- Column order: row number (48px desktop / 34px mobile, centered, faint tabular digits), Job
+  (pinned on desktop;
   source logo 14px + title 600, ellipsis; on mobile the company sits under the title as a 12px faint
   second line), Company, Score (match-score band pill), Status (`StatusChip`), Stage (pipeline stage
   popover, faint `—` when empty), Applied, Updated, Follow-up, Note (ink-soft, single-line ellipsis). Dates
@@ -390,8 +393,9 @@ Menus that list statuses group them under these four group labels, in this order
   values without browser timezone conversion.
 - Header cells are 12px/600 uppercase faint text with a 13px lucide icon; the sorted column uses
   `--color-header-sorted`, sage-strong text, and an arrow icon for direction.
-- The grid scrolls horizontally inside its panel with the Job column pinned; on mobile a 28px fade on
-  the panel's right edge signals more columns.
+- The grid scrolls horizontally inside its panel with the Job column pinned at desktop container
+  widths only; on mobile Job scrolls with the other data columns and a 28px fade on the panel's right
+  edge signals more columns.
 - Toolbar above the grid: title plus a one-line stats sentence ("N applied to · N jobs tracked");
   segmented group tabs with counts (active tab: surface fill, sage-strong text, sage-soft count pill);
   Show and Sort as compact labelled controls; Columns as a dropdown menu. Footer inside the panel:

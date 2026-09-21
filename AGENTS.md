@@ -1618,3 +1618,8 @@ Production Jobright.ai records have `source = linkedin` and `company = Jobright.
 source, posting, and application URLs are all the same short-lived LinkedIn listing, with no
 recoverable employer/ATS destination. Block the normalized company name before materialization in
 the shared inbound filter so both deterministic parsing and LLM fallback reject it.
+
+### 2026-09-21 — Tracker Job pinning is desktop-only
+The Applications tracker keeps its 34px row-number rail sticky at every width, but the 240px Job
+column becomes sticky only in the `min-width: 800px` container query. Pinning both on a phone leaves
+almost no visible scrolling viewport, especially after page padding and the mobile scroll fade.

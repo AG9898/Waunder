@@ -518,7 +518,8 @@ fights `app.css`, and TanStack Table already provides pinning, sizing, sorting, 
 
 1. **Tracker.** The Applications tracker becomes a spreadsheet-style grid at every layout width:
    row numbers, gridlines, a sunken header strip with column icons and a sorted-column state, the Job
-   column pinned while the rest scrolls horizontally, and pagination in a footer inside the grid.
+   column pinned on desktop while it scrolls with the remaining columns on mobile, and pagination
+   in a footer inside the grid.
    Columns are Job (with source logo), Company, Score, Status, Stage, Applied, Updated, Follow-up,
    and Note. The mobile self-labelling card layout and its `data-label` contract are **retired**,
    not preserved. Status, stage, follow-up date, and note are editable in the cell; every edit is an

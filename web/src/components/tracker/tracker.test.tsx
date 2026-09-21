@@ -1175,7 +1175,7 @@ describe("Surface v2 tracker grid", () => {
     );
   });
 
-  it("renders one grid with row numbers, icons, pinned Job, and mobile company text", async () => {
+  it("renders one grid with row numbers, icons, desktop-pinned Job, and mobile company text", async () => {
     rows = [
       { ...fixtures.unscoredJob, id: 1, title: "Untracked", application: null },
       {
@@ -1287,7 +1287,7 @@ describe("Surface v2 tracker grid", () => {
     expect(declared(mobile, ".tracker-row", "height")).toBe("56px");
     expect(declared(mobile, ".tracker-cell", "height")).toBe("56px");
     expect(declared(mobile, ".tracker-cell-number", "position")).toBe("sticky");
-    expect(declared(mobile, '.tracker-table [data-pinned="left"]', "position")).toBe("sticky");
+    expect(declared(mobile, '.tracker-table [data-pinned="left"]', "position")).toBe("static");
     expect(declared(mobile, ".tracker-job-company-mobile", "display")).toBe("block");
     expect(declared(mobile, ".tracker-row--editing .tracker-cell", "background")).toBe(
       "var(--color-row-active)",
@@ -1353,6 +1353,7 @@ describe("Surface v2 tracker grid", () => {
     const desktop = rulesOf(atRuleBody(css, "@container (min-width: 800px)"));
 
     expect(declared(desktop, ".tracker-wrap", "--tracker-row-number-width")).toBe("48px");
+    expect(declared(desktop, '.tracker-table [data-pinned="left"]', "position")).toBe("sticky");
     expect(declared(desktop, ".tracker-table th", "height")).toBe("36px");
     expect(declared(desktop, ".tracker-sort", "min-height")).toBe("36px");
     expect(declared(desktop, ".tracker-row", "height")).toBe("40px");
@@ -1372,7 +1373,7 @@ describe("Surface v2 tracker grid", () => {
     }
   });
 
-  it("pins the rail and Job column while preserving group tint and gridlines", () => {
+  it("pins the rail and preserves the Job divider, group tint, and gridlines", () => {
     const mobile = rulesOf(unconditional(stylesheet()));
 
     expect(declared(mobile, ".tracker-row-number-header", "left")).toBe("0");

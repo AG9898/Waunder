@@ -5,8 +5,8 @@
  * ## One markup, one grid
  *
  * This row is a real `<tr>` of `<td>`s, and `public/app.css` lays it out as one horizontally
- * scrolling Surface v2 grid at every width. The row-number rail and Job cell are sticky; the
- * company is repeated as a quiet second line inside the pinned Job cell on mobile while its
+ * scrolling Surface v2 grid at every width. The row-number rail stays sticky; the Job cell is
+ * sticky only on desktop. Company repeats as a quiet second line inside Job on mobile while its
  * existing column remains available to TanStack visibility controls.
  *
  * ## Tracker cell editors write the tracker and nothing else
