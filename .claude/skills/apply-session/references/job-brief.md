@@ -54,6 +54,14 @@ submit button. The orchestrator gives you: the job JSON from `waunder-api.sh job
    - "How did you hear about us": the value for this job's `source`.
    - A question neither the answers file nor the resume can answer truthfully: pick the most honest
      option and list it under `flags`. Do not stop the fill for it.
+   - **Exception: sensitive questions** (legal, criminal/background, government employment,
+     employment restrictions, demographic/self-ID, religion, gender identity, disability,
+     sponsorship, salary) are answered only from `answers.local.json`. If it has no answer, leave
+     the question blank and flag it. Do not guess, and do not pick "Prefer not to say" for the
+     owner. Leave required terms/consent checkboxes for the owner too.
+   - Indeed Apply appears to hold one in-progress application per account. If another Indeed
+     review page is already parked in this session, do not start a new Indeed flow: return
+     `blocked` with `Indeed Apply pending`.
 7. **Written answers and cover letters** follow `writing_style`: casual, short sentences, one
    specific posting requirement tied to real resume work, then growth (owner's and the company's),
    a team that shares the passion, and agentic development. No buzzwords, no polished-LLM cadence.
