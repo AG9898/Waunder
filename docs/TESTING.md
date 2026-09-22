@@ -116,6 +116,11 @@ Be honest about the current state — most of the suite is still to be written.
   known-sender (LinkedIn/Indeed/Glassdoor) email parser, pre-materialization title screening,
   normalized JobPost and URL-alias persistence, company reuse, and LLM-fallback flagging for
   unknown senders and empty parses.
+- **api/** — `spec/services/inbound_email_parsers/glassdoor_spec.rb` (fixture
+  `spec/fixtures/files/inbound_emails/glassdoor_company_insights.txt`, a sanitized real body):
+  Glassdoor company-insights ("What You Need to Know") detection by subject or body marker,
+  job-list-only extraction that skips the research sections, bare-rating/logo-line handling,
+  hyphenated-company cross-check, and `jl=` listing-id canonicalization.
 - **api/** — `spec/services/job_post_materializer_spec.rb`: inbound materialization coverage for
   stable source/posting/application URL-alias registration and retry-safe identity reuse without
   LLM calls.

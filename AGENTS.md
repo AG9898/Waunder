@@ -1623,3 +1623,11 @@ the shared inbound filter so both deterministic parsing and LLM fallback reject 
 The Applications tracker keeps its 34px row-number rail sticky at every width, but the 240px Job
 column becomes sticky only in the `min-width: 800px` container query. Pinning both on a phone leaves
 almost no visible scrolling viewport, especially after page padding and the mobile scroll fade.
+
+### 2026-09-22 — Glassdoor company-insights emails take a separate parser path
+Glassdoor's "<Company>: What You Need to Know" email (detected by that subject or its "Check out
+these jobs" line) opens with research sections whose `job-listing/<slug>.htm?jl=<id>` links the
+digest path turned into junk postings, and its job list uses a logo+link line plus a bare `3.7 ★`
+line that the digest path mis-read as company. `InboundEmailParsers::Glassdoor#parse_company_insights`
+reads only after the marker, ends each block at the whole-line bracketed link, and takes company and
+location from "Company - Location" cross-checked against the company line; the digest path is unchanged.

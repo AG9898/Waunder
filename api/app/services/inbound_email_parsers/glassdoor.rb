@@ -30,6 +30,19 @@ module InboundEmailParsers
   # (after dropping logo/avatar/pixel images, apply-flag/age META, and the
   # salary) — this bounds the first unrated block against the email preamble.
   # The legacy "title / Company — Location" forward layout is still handled.
+  #
+  # 3. COMPANY-INSIGHTS email ("<Company>: What You Need to Know") — a
+  #    separate template, detected by its subject or its "Check out these jobs"
+  #    marker line and parsed on its own path (`parse_company_insights`). Its
+  #    research sections (salaries, interviews, benefits for jobs already applied
+  #    to) are skipped entirely; only the list after the marker is read:
+  #      Gatekeeper Systems (Canada)                <- company
+  #      [logo.png]https://…/partner/jobListing.htm?…jobListingId=123[pixel]
+  #      3.7 ★                                      <- bare rating (optional)
+  #      Software Engineer                          <- title
+  #      Gatekeeper Systems (Canada) - Abbotsford   <- "Company - Location"
+  #      Easy Apply                                 <- apply flag (optional)
+  #      [https://…/partner/jobListing.htm?…jobListingId=123]  <- end anchor
   class Glassdoor < Base
     # A Glassdoor application/listing link on any Glassdoor TLD. The trailing
     # `\]` exclusion keeps a native `[https://…]`-bracketed link from absorbing
@@ -39,7 +52,9 @@ module InboundEmailParsers
     # the `/job-listing/` path but are NOT postings — skip them.
     REDIRECT = %r{/job-listing/api/}i
     # The stable numeric listing id carried in the partner-redirect link.
-    LISTING_ID = /jobListingId=(\d+)/i
+    # The stable numeric listing id carried in the partner-redirect link, or
+    # the `jl=` param of a `/job-listing/<slug>.htm?jl=<id>` link.
+    LISTING_ID = /(?:jobListingId|[?&]jl)=(\d+)/i
     # A "Company <rating> ★" line — the rated-block anchor (★ is U+2605).
     COMPANY_RATING = /\A(?<company>.+?)\s+\d(?:\.\d+)?\s*★\s*\z/u
     # A salary/compensation line (e.g. "$55 - $60 (Employer Est.)").
@@ -65,6 +80,13 @@ module InboundEmailParsers
     # The legacy "Company — Location" pair on a single line (em/en dash/hyphen).
     COMPANY_LOCATION = /\A(?<company>.+?)\s+[—–-]\s+(?<location>.+)\z/
 
+    # Company-insights variant detection: the subject suffix, or the line that
+    # opens its job list (the research sections above it are never parsed).
+    INSIGHTS_SUBJECT = /:\s*What You Need to Know\s*\z/i
+    INSIGHTS_MARKER = /\ACheck out these jobs\z/i
+    # A bare rating line ("3.7 ★") — the company is on its own line above.
+    BARE_RATING = /\A\d(?:\.\d+)?\s*★\z/u
+
     def self.source_name
       "glassdoor"
     end
@@ -75,6 +97,8 @@ module InboundEmailParsers
 
     def parse
       lines = cleaned_lines
+      return parse_company_insights(lines) if company_insights?(lines)
+
       previous_url_index = -1
 
       lines.each_index.filter_map do |index|
@@ -91,6 +115,64 @@ module InboundEmailParsers
     end
 
     private
+
+    def company_insights?(lines)
+      subject.strip.match?(INSIGHTS_SUBJECT) || lines.any? { |l| l.match?(INSIGHTS_MARKER) }
+    end
+
+    # Company-insights path: read only the job list after the marker. Each
+    # block ends at a whole-line bracketed job link; the logo line (which also
+    # carries the job link) belongs to the block rather than closing it.
+    def parse_company_insights(lines)
+      marker = lines.index { |l| l.match?(INSIGHTS_MARKER) }
+      return [] if marker.nil?
+
+      block = []
+      lines[(marker + 1)..].filter_map do |line|
+        url = line[JOB_URL]
+        unless url && line.match?(IMAGE_OR_PIXEL) && !url.match?(REDIRECT)
+          block << line
+          next
+        end
+
+        fields = insights_block(block)
+        block = []
+        build(fields, url) if fields
+      end
+    end
+
+    # Company line / logo+link line / optional bare rating / title /
+    # "Company - Location" / META. Company and location come from the
+    # "Company - Location" line, cross-checked against the company line above
+    # the logo so a hyphenated company name is never split.
+    def insights_block(block)
+      logo_index = block.rindex { |l| l[JOB_URL] }
+      return nil if logo_index.nil?
+
+      header = logo_index.positive? ? block[logo_index - 1] : nil
+      rest = block[(logo_index + 1)..].reject { |l| l.match?(BARE_RATING) || l.match?(META) }
+      salary_index = rest.index { |l| l.match?(SALARY) }
+      salary = salary_index && rest.delete_at(salary_index)
+      title, company_location = rest
+      return nil if title.blank?
+
+      company, location = split_company_location(company_location, header)
+      return nil if company.blank?
+
+      { company: company, title: title, location: location, salary: salary }
+    end
+
+    def split_company_location(line, header)
+      if line && header.present?
+        prefix = /\A#{Regexp.escape(header)}\s+[—–-]\s+/
+        return [ header, line.sub(prefix, "") ] if line.match?(prefix)
+      end
+
+      match = line&.match(COMPANY_LOCATION)
+      return [ match[:company], match[:location] ] if match
+
+      [ header, nil ]
+    end
 
     # Lines with whitespace stripped, filler removed, and empty / image / avatar
     # lines dropped — but block order preserved. Bracketed-URL image and
