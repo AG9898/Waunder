@@ -39,7 +39,12 @@ use the Rails trusted-submit dispatcher or the `workers/` service (see RESOLVED-
 Batch size is **5** unless the owner says otherwise. Start point is always the oldest un-applied
 open job (the helper's `queue` order).
 
-1. **Queue:** `waunder-api.sh queue <N>`.
+1. **Queue and liveness check:** `waunder-api.sh queue <N>`, then launch **one** read-only
+   subagent (or, without subagents, check inline) that opens each posting URL (reusing one tab, filling nothing) and returns per job:
+   `live` / `closed` / `unclear`, the apply route (Easy Apply or external ATS host), location, and
+   any visible disqualifier (years, on-site city, clearance). If a board shows closed, it checks the
+   company's own ATS board for the same role. The queue is oldest-first, so many jobs have expired;
+   present only live jobs for approval and ask whether to `remove` the closed ones.
 2. **Batch approval:** show one compact line per job — id, title, company, source, lifecycle
    (`backlog` is included), compensation, score — and ask per job: **Approve** (fill),
    **Decline** (set removed), or **Skip** (untouched, excluded from later queues this machine).
