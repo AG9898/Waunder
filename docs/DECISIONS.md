@@ -562,7 +562,8 @@ tracker card-layout parts of UI-04 and TRACK-01. Tasks UI-10…UI-30 and TRACK-0
 (`.claude/skills/apply-session/`, mirrored in `.agents/skills/` and `.codex/skills/`).
 
 1. **Queue.** The session works the tracker's un-applied open jobs (backlog included), **oldest
-   intake first**, so older postings are handled before they go stale.
+   intake first** by default, so older postings are handled before they go stale; the owner can
+   choose newest-first for a session (`waunder-api.sh queue N --newest`, `sort=newest`).
 2. **Approval.** Jobs are approved in batches (default 5): approve fills the form; decline sets the
    job's `lifecycle_state` to `removed` (no Application is created); skip leaves Rails untouched and
    is excluded locally.

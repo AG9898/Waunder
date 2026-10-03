@@ -2,8 +2,9 @@
 # Deterministic Rails API helper for supervised local apply sessions.
 #
 #   waunder-api.sh login                 sign in with $APP_SHARED_SECRET, else api/.env (never printed)
-#   waunder-api.sh queue [N]             next N (default 5) un-applied open jobs, oldest intake first,
-#                                        excluding ids in .apply-session/skipped.txt
+#   waunder-api.sh queue [N] [--newest]  next N (default 5) un-applied open jobs, oldest intake first
+#                                        (--newest: most recent intake first), excluding ids in
+#                                        .apply-session/skipped.txt
 #   waunder-api.sh job ID                one job's detail (URLs, compensation, description excerpt)
 #   waunder-api.sh applied ID            mark applied / waiting (only after the owner submitted)
 #   waunder-api.sh remove ID             owner declined: lifecycle_state -> removed
@@ -58,9 +59,17 @@ case "${1:-}" in
     echo "logged in"
     ;;
   queue)
-    want="${2:-5}"; page=1; ids=()
+    want=5; sort=oldest
+    for arg in "${@:2}"; do
+      case "$arg" in
+        --newest) sort=newest ;;
+        --oldest) sort=oldest ;;
+        *) [[ "$arg" =~ ^[0-9]+$ ]] || die "queue: unknown argument '$arg'"; want="$arg" ;;
+      esac
+    done
+    page=1; ids=()
     while (( ${#ids[@]} < want )); do
-      resp="$(api_get "/api/job_posts?status=all&state=open&application=not_applied&sort=oldest&page=$page")"
+      resp="$(api_get "/api/job_posts?status=all&state=open&application=not_applied&sort=$sort&page=$page")"
       while read -r id; do
         [[ -z "$id" ]] && continue
         [[ -f "$SKIPPED" ]] && grep -qx "$id" "$SKIPPED" && continue
@@ -102,6 +111,6 @@ case "${1:-}" in
     echo "session files removed (kept answers.local.json and Aden_Guo_Resume.pdf)"
     ;;
   *)
-    sed -n '2,14p' "$0"; exit 1
+    sed -n '2,15p' "$0"; exit 1
     ;;
 esac

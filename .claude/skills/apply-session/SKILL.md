@@ -1,6 +1,6 @@
 ---
 name: apply-session
-description: Run a supervised, local, headed-browser job application session over Waunder's un-applied queue (oldest intake first) — batch approval, one browser job at a time, forms parked before submit for the owner, then status written back to Rails. Use when the owner asks to apply to jobs, start/continue an apply session, or work through the application queue.
+description: Run a supervised, local, headed-browser job application session over Waunder's un-applied queue (oldest intake first by default, or newest first on request) — batch approval, one browser job at a time, forms parked before submit for the owner, then status written back to Rails. Use when the owner asks to apply to jobs, start/continue an apply session, or work through the application queue.
 version: 1.0.0
 ---
 
@@ -34,15 +34,16 @@ use the Rails trusted-submit dispatcher or the `workers/` service (see RESOLVED-
 
 ## Loop
 
-Batch size is **5** unless the owner says otherwise. Start point is always the oldest un-applied
-open job (the helper's `queue` order).
+Batch size is **5** unless the owner says otherwise. The default order is oldest un-applied open
+job first (`queue N`). If the owner asks for newest first, use `queue N --newest` (most recent
+intake first) for every batch in that session.
 
-1. **Queue and liveness check:** `waunder-api.sh queue <N>`, then launch **one** read-only
+1. **Queue and liveness check:** `waunder-api.sh queue <N>` (add `--newest` if chosen), then launch **one** read-only
    subagent that opens each posting URL (reusing one tab, filling nothing) and returns per job:
    `live` / `closed` / `unclear`, the apply route (Easy Apply or external ATS host), location, and
    any visible disqualifier (years, on-site city, clearance). If a board shows closed, it checks the
-   company's own ATS board for the same role. The queue is oldest-first, so many jobs have expired;
-   present only live jobs for approval and ask whether to `remove` the closed ones.
+   company's own ATS board for the same role. Older jobs often have expired (expect more of this
+   oldest-first); present only live jobs for approval and ask whether to `remove` the closed ones.
 2. **Batch approval:** show one compact line per job — id, title, company, source, lifecycle
    (`backlog` is included), compensation, score — and ask per job: **Approve** (fill),
    **Decline** (set removed), or **Skip** (untouched, excluded from later queues this machine).
@@ -82,7 +83,7 @@ Browser snapshots are the main context cost, so the orchestrator never drives th
 
 | Path | Purpose |
 |---|---|
-| `scripts/waunder-api.sh` | login / queue / job / applied / remove / skip / cleanup |
+| `scripts/waunder-api.sh` | login / queue (`--newest`) / job / applied / remove / skip / cleanup |
 | `scripts/render-cover-letter.cjs` | text → PDF via the `workers/` Playwright install |
 | `references/job-brief.md` | per-job fill instructions and return contract |
 | `.apply-session/` (repo root, gitignored) | answers, CV, cover letters, screenshots, cookies, `log.jsonl`, `skipped.txt` |

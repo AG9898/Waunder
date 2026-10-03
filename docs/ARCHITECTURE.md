@@ -565,7 +565,8 @@ the original browser `Host` header.
 
 **Supervised local apply session** (the path in use; RESOLVED-27):
 1. On the owner's machine, the `apply-session` skill signs in to the `web` origin and reads the
-   un-applied open queue, oldest intake first (`GET /api/job_posts?status=all&state=open&application=not_applied&sort=oldest`).
+   un-applied open queue, oldest intake first by default (`GET /api/job_posts?status=all&state=open&application=not_applied&sort=oldest`),
+   or newest first when the owner chooses it (`sort=newest`).
 2. The owner approves, declines (`PATCH /api/job_posts/:id/lifecycle` → `removed`), or skips each job
    in a batch.
 3. For each approved job, an agent fills the application in a headed local Playwright browser using
